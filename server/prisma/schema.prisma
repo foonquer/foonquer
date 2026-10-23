@@ -1,0 +1,1016 @@
+// 먹장깨기 Prisma 스키마
+// 원본: docs ERD v0.7 (먹장깨기-ERD-v0.2.dbml). ERD를 바꾸면 이 파일도 같이 고친다.
+// - 테이블·컬럼 이름은 DB에서 snake_case(@@map/@map), 코드에서는 camelCase로 쓴다.
+// - CHECK 제약은 Prisma가 표현하지 못해서 마이그레이션 SQL(prisma/migrations)에 직접 넣는다.
+// - 코드값 컬럼(char(1) 등)의 값 목록은 각 필드 위 주석에 있다.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model Member {
+  id                      BigInt                   @id @default(autoincrement())
+  /// 이메일 로그인 id · 소셜로만 가입하면 null 가능
+  email                   String?                  @unique @db.VarChar(255)
+  /// bcrypt 해시 · 소셜 전용 계정은 null
+  password                String?                  @db.VarChar(255)
+  /// 2~10자 (한글·영문·숫자) · 프로필 설정(S-04) 전에는 null
+  nickname                String?                  @unique @db.VarChar(10)
+  /// 닉네임은 30일에 한 번만 변경 가능 — 이 값으로 확인
+  nicknameChangedAt       DateTime?                @map("nickname_changed_at")
+  /// M 남성 / F 여성 / N 선택 안 함
+  gender                  String?                  @db.Char(1)
+  /// 10 / 20 / 30 / 40 / 50(50대 이상)
+  ageGroup                Int?                     @map("age_group") @db.TinyInt
+  /// 내 동네(member_local_region)를 마지막으로 바꾼 시각 — 내 동네는 한 시즌에 한 번만 바꿀 수 있다. 회원가입 때 처음 고른 것은 세지 않는다
+  localChangedAt          DateTime?                @map("local_changed_at")
+  /// 프로필 사진 S3 key · null이면 먹깨비를 프로필로 사용
+  profileImageKey         String?                  @map("profile_image_key") @db.VarChar(255)
+  /// 신뢰 온도 — 리뷰 도움돼요/도움 안 돼요, 신고, AI 리뷰 분석으로 오르내린다. 리뷰 카드에 칭호와 함께 보여 주고, 리뷰의 별점 반영 비중(review.score_weight)을 정하는 데 쓴다
+  trustTemp               Decimal                  @default(36.5) @map("trust_temp") @db.Decimal(4, 1)
+  /// 먹포인트 잔액 — 항상 point_history 합계와 같아야 한다
+  pointBalance            Int                      @default(0) @map("point_balance")
+  /// 정복·리뷰 알림
+  conquestAlarm           Boolean                  @default(true) @map("conquest_alarm")
+  /// 먹짱·순위 변동 알림
+  rankAlarm               Boolean                  @default(true) @map("rank_alarm")
+  /// 이벤트·혜택 알림 — 켜고 끌 때 member_consent(MARKETING)도 함께 기록
+  marketingAlarm          Boolean                  @default(false) @map("marketing_alarm")
+  /// 이메일 로그인 연속 실패 횟수 — 5번이면 잠금, 성공하면 0
+  loginFailCount          Int                      @default(0) @map("login_fail_count") @db.TinyInt
+  /// 로그인 잠금 해제 시각 (5번 실패 → 10분)
+  lockedUntil             DateTime?                @map("locked_until")
+  /// P 프로필 설정 전 / A 활성 / S 이용 정지 / D 탈퇴
+  status                  String                   @default("P") @db.Char(1)
+  lastLoginAt             DateTime?                @map("last_login_at")
+  regDate                 DateTime                 @default(now()) @map("reg_date")
+  updateDate              DateTime?                @updatedAt @map("update_date")
+  /// 탈퇴 시각 — 탈퇴하면 email·nickname을 비워 다른 사람이 쓸 수 있게 한다
+  deleteDate              DateTime?                @map("delete_date")
+  memberLocalRegions      MemberLocalRegion[]
+  memberWithdrawals       MemberWithdrawal[]
+  socialAccounts          SocialAccount[]
+  refreshTokens           RefreshToken[]
+  memberConsents          MemberConsent[]
+  pushSubscriptions       PushSubscription[]
+  savedRestaurants        SavedRestaurant[]
+  searchHistories         SearchHistory[]
+  visits                  Visit[]
+  conquests               Conquest[]
+  reviews                 Review[]
+  reviewReactions         ReviewReaction[]
+  seasonRegionStats       SeasonRegionStat[]
+  seasonResults           SeasonResult[]
+  memberAchievements      MemberAchievement[]
+  mukkaebi                Mukkaebi?
+  memberRegionBackgrounds MemberRegionBackground[]
+  pointHistories          PointHistory[]
+  expHistories            ExpHistory[]
+  memberItems             MemberItem[]
+  notifications           Notification[]
+  inquiries               Inquiry[]
+  reports                 Report[]
+  blockerMemberBlocks     MemberBlock[]            @relation("member_block_blocker_id")
+  blockedMemberBlocks     MemberBlock[]            @relation("member_block_blocked_id")
+
+  @@map("member")
+}
+
+/// 내 동네(로컬). 회원가입 S-06에서 처음 고르고, 내 정보 → 내 동네 추가로 늘린다. 한 사람 최대 3곳 (앱에서 확인).
+/// 집뿐 아니라 직장 근처처럼 자주 가는 동네도 고를 수 있다.
+/// 방문 인증 때 이 표의 구 중에 가게의 구가 있으면 visit.is_local = true → 리뷰 카드에 "로컬", 아니면 "외부 방문"
+model MemberLocalRegion {
+  id        BigInt   @id @default(autoincrement())
+  userId    BigInt   @map("user_id")
+  /// 고른 동 (region.level = 3)
+  regionId  Int      @map("region_id")
+  /// 그 동이 속한 구 (level = 2) — 로컬 판정이 구 단위라서 따로 둔다
+  sigunguId Int      @map("sigungu_id")
+  /// 고른 순서 0~2 — 0번 동네의 구를 현황·랭킹 화면의 기본 구로 쓴다(초안)
+  sortOrder Int      @default(0) @map("sort_order") @db.TinyInt
+  regDate   DateTime @default(now()) @map("reg_date")
+  user      Member   @relation(fields: [userId], references: [id])
+  region    Region   @relation("member_local_region_region_id", fields: [regionId], references: [id])
+  sigungu   Region   @relation("member_local_region_sigungu_id", fields: [sigunguId], references: [id])
+
+  @@unique([userId, regionId], map: "member_local_region_uk")
+  @@unique([userId, sortOrder], map: "member_local_region_order_uk")
+  @@index([sigunguId], map: "member_local_region_sigungu_idx")
+  @@map("member_local_region")
+}
+
+/// 회원 탈퇴 화면의 떠나는 이유 — 개인정보 없이 이유만 남겨 서비스 개선에 쓴다
+model MemberWithdrawal {
+  id           BigInt   @id @default(autoincrement())
+  userId       BigInt   @map("user_id")
+  /// RARELY_USE 자주 쓰지 않음 / NO_RESTAURANT 가고 싶은 맛집이 없음 / VERIFY_HARD 영수증 인증이 번거로움 / ETC 기타 · 선택 안 하면 null
+  reasonCode   String?  @map("reason_code") @db.VarChar(20)
+  reasonDetail String?  @map("reason_detail") @db.VarChar(255)
+  regDate      DateTime @default(now()) @map("reg_date")
+  user         Member   @relation(fields: [userId], references: [id])
+
+  @@map("member_withdrawal")
+}
+
+model SocialAccount {
+  id         BigInt   @id @default(autoincrement())
+  userId     BigInt   @map("user_id")
+  /// K 카카오 / G 구글
+  provider   String   @db.Char(1)
+  /// 소셜 서비스가 주는 사용자 고유 id
+  providerId String   @map("provider_id") @db.VarChar(255)
+  email      String?  @db.VarChar(255)
+  regDate    DateTime @default(now()) @map("reg_date")
+  user       Member   @relation(fields: [userId], references: [id])
+
+  @@unique([provider, providerId], map: "social_account_provider_uk")
+  @@unique([userId, provider], map: "social_account_user_provider_uk")
+  @@map("social_account")
+}
+
+model RefreshToken {
+  id        BigInt    @id @default(autoincrement())
+  userId    BigInt    @map("user_id")
+  /// refresh token의 SHA-256
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  expiresAt DateTime  @map("expires_at")
+  /// 로그아웃·재발급 시각
+  revokedAt DateTime? @map("revoked_at")
+  regDate   DateTime  @default(now()) @map("reg_date")
+  user      Member    @relation(fields: [userId], references: [id])
+
+  @@index([userId], map: "refresh_token_user_idx")
+  @@index([expiresAt], map: "refresh_token_expires_idx")
+  @@map("refresh_token")
+}
+
+model AuthTemporaryToken {
+  id        BigInt    @id @default(autoincrement())
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  /// EMAIL_VERIFY 이메일 인증 코드(6자리, 5분) / EMAIL_VERIFIED 인증 완료 토큰(회원가입에 사용, 30분) / PASSWORD_RESET 비밀번호 재설정 링크(30분) / OAUTH_RESULT 소셜 콜백 결과 교환 코드(1분) / ACCOUNT_LINK 같은 이메일 계정 연동 토큰(5분)
+  tokenType String    @map("token_type") @db.VarChar(20)
+  /// EMAIL_VERIFY { email, codeHash, attempts } / EMAIL_VERIFIED { email } / PASSWORD_RESET { userId } / OAUTH_RESULT { provider, providerId, email, emailVerified } / ACCOUNT_LINK { targetUserId, provider, providerId, email }
+  payload   Json
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  regDate   DateTime  @default(now()) @map("reg_date")
+
+  @@index([tokenType, expiresAt], map: "auth_temporary_token_type_expires_idx")
+  @@map("auth_temporary_token")
+}
+
+/// 동의를 바꿀 때마다 새 행을 추가한다 (이력 보관). 최신 상태 = consent_type별 가장 큰 id
+model MemberConsent {
+  id            BigInt    @id @default(autoincrement())
+  userId        BigInt    @map("user_id")
+  /// TERMS 서비스 이용약관(필수) / PRIVACY 개인정보 수집·이용(필수) / LOCATION 위치기반 서비스(필수) / MARKETING 이벤트·혜택 알림(선택)
+  consentType   String    @map("consent_type") @db.VarChar(20)
+  agreed        Boolean   @default(false)
+  policyVersion String    @map("policy_version") @db.VarChar(20)
+  agreedAt      DateTime? @map("agreed_at")
+  withdrawnAt   DateTime? @map("withdrawn_at")
+  regDate       DateTime  @default(now()) @map("reg_date")
+  user          Member    @relation(fields: [userId], references: [id])
+
+  @@index([userId, consentType, id], map: "member_consent_user_type_id_idx")
+  @@map("member_consent")
+}
+
+/// [2차] 푸시 알림을 붙일 때 사용
+model PushSubscription {
+  id           BigInt    @id @default(autoincrement())
+  userId       BigInt    @map("user_id")
+  /// PWA Web Push 구독 주소
+  endpoint     String    @db.VarChar(1024)
+  /// endpoint의 SHA-256 — 긴 문자열에 unique를 걸지 않기 위해
+  endpointHash String    @unique @map("endpoint_hash") @db.Char(64)
+  p256dh       String    @db.VarChar(255)
+  auth         String    @db.VarChar(255)
+  userAgent    String?   @map("user_agent") @db.VarChar(255)
+  regDate      DateTime  @default(now()) @map("reg_date")
+  updateDate   DateTime? @updatedAt @map("update_date")
+  user         Member    @relation(fields: [userId], references: [id])
+
+  @@index([userId], map: "push_subscription_user_idx")
+  @@map("push_subscription")
+}
+
+/// 구 경계 폴리곤(GeoJSON)은 DB가 아니라 프론트 정적 파일로 둔다
+model Region {
+  id                        Int                      @id @default(autoincrement())
+  /// 법정동 코드 10자리 (카카오 coord2regioncode의 B 코드). 시·도/구는 뒤를 0으로 채운 코드
+  code                      String                   @unique @db.VarChar(10)
+  /// 서울특별시 / 강서구 / 가양동
+  name                      String                   @db.VarChar(20)
+  /// 서울특별시 강서구 가양동
+  fullName                  String                   @map("full_name") @db.VarChar(60)
+  /// 1 시·도 / 2 시·군·구 / 3 동
+  level                     Int                      @db.TinyInt
+  parentId                  Int?                     @map("parent_id")
+  /// 먹짱 지도에서 아바타를 놓을 중심 좌표
+  centerLat                 Decimal?                 @map("center_lat") @db.Decimal(10, 7)
+  centerLng                 Decimal?                 @map("center_lng") @db.Decimal(10, 7)
+  /// 구(level = 2)의 특색 배경 에셋 이름 (예: BG_MAPO_WORLDCUP) — 먹깨비 뒤 배경. 사는 것이 아니라 그 구에서 가게 10곳을 정복하면 저절로 얻는다(member_region_background)
+  bgKey                     String?                  @map("bg_key") @db.VarChar(40)
+  parent                    Region?                  @relation("region_parent_id", fields: [parentId], references: [id])
+  regionMemberLocalRegions  MemberLocalRegion[]      @relation("member_local_region_region_id")
+  sigunguMemberLocalRegions MemberLocalRegion[]      @relation("member_local_region_sigungu_id")
+  children                  Region[]                 @relation("region_parent_id")
+  regionRestaurants         Restaurant[]             @relation("restaurant_region_id")
+  sigunguRestaurants        Restaurant[]             @relation("restaurant_sigungu_id")
+  conquests                 Conquest[]
+  seasonRegionStats         SeasonRegionStat[]
+  seasonResults             SeasonResult[]
+  mukkaebis                 Mukkaebi[]
+  memberRegionBackgrounds   MemberRegionBackground[]
+
+  @@index([parentId, name], map: "region_parent_name_idx")
+  @@index([level], map: "region_level_idx")
+  @@map("region")
+}
+
+model Season {
+  id                 Int                 @id @default(autoincrement())
+  /// 시즌 1, 2, 3 …
+  seasonNo           Int                 @unique @map("season_no")
+  /// 예) 시즌 3 = 2026-09-01
+  startDate          DateTime            @map("start_date") @db.Date
+  /// 예) 시즌 3 = 2027-02-28 (포함)
+  endDate            DateTime            @map("end_date") @db.Date
+  /// U 예정 / A 진행 중 / E 종료(집계 중) / F 순위·칭호 확정
+  status             String              @default("U") @db.Char(1)
+  finalizedAt        DateTime?           @map("finalized_at")
+  regDate            DateTime            @default(now()) @map("reg_date")
+  visits             Visit[]
+  conquests          Conquest[]
+  seasonRegionStats  SeasonRegionStat[]
+  seasonResults      SeasonResult[]
+  memberAchievements MemberAchievement[]
+  memberItems        MemberItem[]
+
+  @@map("season")
+}
+
+/// 카카오 category_name → 우리 카테고리 매핑 (모든 가게는 카테고리가 있음, 안 맞으면 기타)
+/// 음식점 > 한식(육류,고기·해물,생선 제외) → 한식 / 음식점 > 한식 > 육류,고기 → 고깃집 / 음식점 > 한식 > 해물,생선 → 해산물
+/// 음식점 > 중식·일식·양식·분식·치킨·패스트푸드 → 같은 이름 / 음식점 > 아시아음식 → 아시안
+/// 카테고리 그룹 CE7, 음식점 > 카페, 음식점 > 간식(제과·베이커리·디저트) → 카페·디저트 / 그 외(음식점 > 술집·뷔페·퓨전요리·도시락 등) → 기타
+model Category {
+  id          Int          @id @default(autoincrement())
+  /// id 순서(= sort_order, 검색 홈 칩 순서): 1 한식 / 2 중식 / 3 일식 / 4 양식 / 5 분식 / 6 고깃집 / 7 해산물 / 8 치킨 / 9 패스트푸드 / 10 아시안 / 11 카페·디저트 / 12 기타(술집·뷔페·퓨전·도시락 등) — 배달 앱 카테고리, 술집은 기타에 포함 (2026-10-08 12개로 확정)
+  name        String       @unique @db.VarChar(20)
+  sortOrder   Int          @default(0) @map("sort_order") @db.TinyInt
+  restaurants Restaurant[]
+
+  @@map("category")
+}
+
+model Restaurant {
+  id                BigInt            @id @default(autoincrement())
+  /// 카카오 로컬 API place id — 검색·저장·인증 때 처음 등장하면 DB에 저장
+  kakaoPlaceId      String            @unique @map("kakao_place_id") @db.VarChar(20)
+  name              String            @db.VarChar(100)
+  /// 카카오 category_name을 우리 카테고리로 매핑
+  categoryId        Int?              @map("category_id")
+  /// 원본 값 예) 음식점 > 한식 > 칼국수
+  kakaoCategoryName String?           @map("kakao_category_name") @db.VarChar(100)
+  phone             String?           @db.VarChar(20)
+  roadAddress       String?           @map("road_address") @db.VarChar(255)
+  jibunAddress      String?           @map("jibun_address") @db.VarChar(255)
+  /// 동 (level = 3)
+  regionId          Int               @map("region_id")
+  /// 구 (level = 2) — 랭킹·검색·로컬 판정에 자주 쓰여서 따로 둔다
+  sigunguId         Int               @map("sigungu_id")
+  /// 현장 인증 거리 계산의 기준 좌표
+  lat               Decimal           @db.Decimal(10, 7)
+  lng               Decimal           @db.Decimal(10, 7)
+  /// 사업자등록번호 — 처음 인증된 영수증에서 얻는다. 같은 이름 다른 지점 구분에 사용
+  businessNo        String?           @map("business_no") @db.VarChar(12)
+  /// 영업시간 — 카카오 API가 주지 않으므로 직접 입력한 경우만 (없으면 화면에서 숨김). 형식: 요일(mon~sun)별 open/close 배열, 한국 시간 24시간제. 예) {"mon":[{"open":"11:00","close":"21:00"}],"sun":[]} · 쉬는 요일은 빈 배열, 점심·저녁 따로 영업하면 배열에 2개
+  businessHours     Json?             @map("business_hours")
+  /// A 영업 / C 폐업 / H 숨김
+  status            String            @default("A") @db.Char(1)
+  regDate           DateTime          @default(now()) @map("reg_date")
+  updateDate        DateTime?         @updatedAt @map("update_date")
+  category          Category?         @relation(fields: [categoryId], references: [id])
+  region            Region            @relation("restaurant_region_id", fields: [regionId], references: [id])
+  sigungu           Region            @relation("restaurant_sigungu_id", fields: [sigunguId], references: [id])
+  restaurantStat    RestaurantStat?
+  savedRestaurants  SavedRestaurant[]
+  visits            Visit[]
+  conquests         Conquest[]
+  reviews           Review[]
+  mukkaebis         Mukkaebi[]
+
+  @@index([sigunguId, categoryId], map: "restaurant_sigungu_category_idx")
+  @@index([regionId, categoryId], map: "restaurant_region_category_idx")
+  @@index([lat, lng], map: "restaurant_latlng_idx")
+  @@index([businessNo], map: "restaurant_business_no_idx")
+  @@map("restaurant")
+}
+
+/// 음식점 상세·추천맛집용 집계. 비율 대신 개수를 저장해서 리뷰가 추가·삭제될 때 +1/-1로 정확히 갱신한다. review.score_weight가 바뀌면 그 차이만큼 weight_sum·weighted_score_sum을 고친다
+model RestaurantStat {
+  restaurantId       BigInt     @id @map("restaurant_id")
+  /// 인증 평가 수 (공개 리뷰)
+  reviewCount        Int        @default(0) @map("review_count")
+  textReviewCount    Int        @default(0) @map("text_review_count")
+  photoReviewCount   Int        @default(0) @map("photo_review_count")
+  /// 리뷰 score_avg의 합 — 단순 평균 = score_sum / review_count
+  scoreSum           Decimal    @default(0) @map("score_sum") @db.Decimal(12, 1)
+  /// 공개 리뷰 score_weight 합계
+  weightSum          Decimal    @default(0) @map("weight_sum") @db.Decimal(10, 2)
+  /// 리뷰마다 score_avg × score_weight를 더한 값 — 화면의 대표 별점 = weighted_score_sum / weight_sum (신뢰 온도가 낮은 리뷰는 덜 반영)
+  weightedScoreSum   Decimal    @default(0) @map("weighted_score_sum") @db.Decimal(12, 2)
+  tasteSum           Int        @default(0) @map("taste_sum")
+  cleanlinessSum     Int        @default(0) @map("cleanliness_sum")
+  portionSum         Int        @default(0) @map("portion_sum")
+  serviceSum         Int        @default(0) @map("service_sum")
+  priceSum           Int        @default(0) @map("price_sum")
+  /// 세부평가(청결·양·서비스·가격·재방문 의사)를 남긴 리뷰 수 — 맛 외 항목 평균과 재방문 의사 %의 분모. 맛 평균의 분모는 review_count
+  detailReviewCount  Int        @default(0) @map("detail_review_count")
+  /// 재방문 의사 있음 수 → 재방문 의사 % = revisit_intent_count ÷ detail_review_count
+  revisitIntentCount Int        @default(0) @map("revisit_intent_count")
+  /// 성공한 방문 인증 수 (영수증 + 현장)
+  visitCount         Int        @default(0) @map("visit_count")
+  /// 로컬 방문 수 (visit.is_local = true) → 현지인 방문 %
+  localVisitCount    Int        @default(0) @map("local_visit_count")
+  /// 방문한 사람 수
+  visitorCount       Int        @default(0) @map("visitor_count")
+  /// 2번 이상 방문한 사람 수 → 재방문 %
+  revisitorCount     Int        @default(0) @map("revisitor_count")
+  /// 이 가게를 정복한 사람 수 ("12명이 이미 정복했어요")
+  conquerorCount     Int        @default(0) @map("conqueror_count")
+  saveCount          Int        @default(0) @map("save_count")
+  updateDate         DateTime?  @updatedAt @map("update_date")
+  restaurant         Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@map("restaurant_stat")
+}
+
+/// 가고 싶은 곳. 정복하면 목록에서는 빠지지만(조회 시 conquest와 비교) 행은 지우지 않는다
+model SavedRestaurant {
+  userId       BigInt     @map("user_id")
+  restaurantId BigInt     @map("restaurant_id")
+  /// "저장한 지 12일이 지났어요" 알림을 보낸 시각 (중복 알림 방지)
+  remindedAt   DateTime?  @map("reminded_at")
+  regDate      DateTime   @default(now()) @map("reg_date")
+  user         Member     @relation(fields: [userId], references: [id])
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@id([userId, restaurantId])
+  @@index([userId, regDate], map: "saved_restaurant_user_date_idx")
+  @@map("saved_restaurant")
+}
+
+/// [2차] 최근 검색 — 브라우저 저장소로 대신해도 된다
+model SearchHistory {
+  id      BigInt   @id @default(autoincrement())
+  userId  BigInt   @map("user_id")
+  keyword String   @db.VarChar(50)
+  regDate DateTime @default(now()) @map("reg_date")
+  user    Member   @relation(fields: [userId], references: [id])
+
+  @@index([userId, regDate], map: "search_history_user_date_idx")
+  @@map("search_history")
+}
+
+/// 현장 인증은 체류 시간 확인 없이 위치 확인 1번 + 갤러리 음식 사진 1장으로 끝난다 (2026-10-02)
+model Visit {
+  id                BigInt             @id @default(autoincrement())
+  userId            BigInt             @map("user_id")
+  /// 인증한 가게 — 가게 상세에서 시작하면 처음부터, 홈에서 영수증을 바로 찍으면 "이 가게가 맞나요?" 확인 후 채운다
+  restaurantId      BigInt?            @map("restaurant_id")
+  /// 영수증 인증은 결제일(paid_at), 현장 인증은 인증 시각(verified_at)이 속한 시즌 — 인증 성공 시 채움
+  seasonId          Int?               @map("season_id")
+  /// R 영수증 인증 / S 현장 인증(위치 확인 + 갤러리 음식 사진)
+  method            String             @db.Char(1)
+  /// P 영수증 읽는 중 / R 가게 확인 대기 / L 위치 확인 완료(현장 인증, 음식 사진 대기) / V 인증 완료(별점 대기, 먹깨비 이동 중) / C 정복 완료(별점 등록) / F 실패
+  status            String             @default("P") @db.Char(1)
+  /// 영수증: UNREADABLE 영수증을 읽기 어려움 / DUPLICATE 이미 인증한 영수증 / STORE_MISMATCH 가게 정보가 다름 / EXPIRED 7일 지난 영수증 · 현장: TOO_FAR 매장 밖(100m 초과) / PHOTO_UNCLEAR 음식이 잘 보이지 않음 / PHOTO_MISMATCH 사진의 위치·촬영 시간이 맞지 않음
+  failReason        String?            @map("fail_reason") @db.VarChar(20)
+  /// 영수증 사진 S3 key — 영수증 인증(method = R)만
+  receiptImageKey   String?            @map("receipt_image_key") @db.VarChar(255)
+  /// CLOVA OCR(영수증 특화 모델) 응답 중 필요한 부분 — 매장 정보, 결제 내역, 금액, 메뉴 줄
+  ocrRaw            Json?              @map("ocr_raw")
+  ocrStoreName      String?            @map("ocr_store_name") @db.VarChar(100)
+  ocrBusinessNo     String?            @map("ocr_business_no") @db.VarChar(12)
+  /// 카드 승인번호 (있을 때)
+  ocrApprovalNo     String?            @map("ocr_approval_no") @db.VarChar(20)
+  /// 영수증 가게명이 고른 가게와 같은지 ("가게명 일치")
+  storeNameMatched  Boolean?           @map("store_name_matched")
+  /// 사업자번호가 같은지 ("사업자번호 일치")
+  businessNoMatched Boolean?           @map("business_no_matched")
+  /// 결제 일시 — 7일 이내만 인증 (영수증 인증)
+  paidAt            DateTime?          @map("paid_at")
+  /// 결제 금액 (원)
+  totalAmount       Int?               @map("total_amount")
+  /// SHA-256(사업자번호|결제일시|금액|승인번호) — 성공한 인증에만 채워서 같은 영수증 재사용을 막는다
+  receiptHash       String?            @unique @map("receipt_hash") @db.Char(64)
+  /// 현장 인증: 위치 확인 때 기기 좌표
+  checkinLat        Decimal?           @map("checkin_lat") @db.Decimal(10, 7)
+  checkinLng        Decimal?           @map("checkin_lng") @db.Decimal(10, 7)
+  /// GPS 정확도 (m)
+  checkinAccuracy   Int?               @map("checkin_accuracy") @db.SmallInt
+  /// 가게까지 거리 (m) — 100m 이내면 통과 ("매장에서 42m · 인증 범위 100m 이내")
+  checkinDistanceM  Int?               @map("checkin_distance_m") @db.SmallInt
+  /// 위치 확인 시각
+  checkinAt         DateTime?          @map("checkin_at")
+  /// 현장 인증: 갤러리에서 고른 음식 사진 S3 key (앱 안에서 직접 찍지 않는다)
+  sitePhotoKey      String?            @map("site_photo_key") @db.VarChar(255)
+  /// 사진 EXIF 촬영 시각 — 없으면 null
+  photoTakenAt      DateTime?          @map("photo_taken_at")
+  /// 사진 EXIF 위치 — 브라우저가 지우면 null, 있으면 가게 좌표와 비교해 보강 검증
+  photoLat          Decimal?           @map("photo_lat") @db.Decimal(10, 7)
+  photoLng          Decimal?           @map("photo_lng") @db.Decimal(10, 7)
+  /// 인증 시점에 작성자의 내 동네 구(member_local_region) 중 가게의 구가 있는지 — 리뷰 카드의 로컬/외부 방문 표시와 현지인 방문 %에 사용. 나중에 내 동네를 바꿔도 이 값은 그대로 둔다
+  isLocal           Boolean            @default(false) @map("is_local")
+  verifiedAt        DateTime?          @map("verified_at")
+  regDate           DateTime           @default(now()) @map("reg_date")
+  updateDate        DateTime?          @updatedAt @map("update_date")
+  user              Member             @relation(fields: [userId], references: [id])
+  restaurant        Restaurant?        @relation(fields: [restaurantId], references: [id])
+  season            Season?            @relation(fields: [seasonId], references: [id])
+  visitReceiptItems VisitReceiptItem[]
+  conquest          Conquest?
+  review            Review?
+  inquiries         Inquiry[]
+
+  @@index([userId, regDate], map: "visit_user_date_idx")
+  @@index([userId, restaurantId, status], map: "visit_user_restaurant_idx")
+  @@index([restaurantId, status], map: "visit_restaurant_status_idx")
+  @@index([status, regDate], map: "visit_status_idx")
+  @@map("visit")
+}
+
+/// OCR로 읽은 메뉴 줄 (영수증 인증만) — 메뉴 검색, 가게별 인기 메뉴, 데이터 분석에 사용
+model VisitReceiptItem {
+  id       BigInt @id @default(autoincrement())
+  visitId  BigInt @map("visit_id")
+  menuName String @map("menu_name") @db.VarChar(50)
+  quantity Int    @default(1) @db.SmallInt
+  /// 줄 금액 (원)
+  price    Int?
+  visit    Visit  @relation(fields: [visitId], references: [id])
+
+  @@index([visitId], map: "visit_receipt_item_visit_idx")
+  @@index([menuName], map: "visit_receipt_item_menu_idx")
+  @@map("visit_receipt_item")
+}
+
+/// 한 시즌에 같은 가게는 한 번만 정복으로 센다. 누적 정복 = restaurant_id를 중복 없이 센 수
+model Conquest {
+  id           BigInt     @id @default(autoincrement())
+  userId       BigInt     @map("user_id")
+  restaurantId BigInt     @map("restaurant_id")
+  seasonId     Int        @map("season_id")
+  /// 가게의 구 (랭킹 집계 단위) — 가게 정보가 바뀌어도 기록은 그대로 두려고 복사
+  sigunguId    Int        @map("sigungu_id")
+  /// 정복을 만든 방문 인증
+  visitId      BigInt     @unique @map("visit_id")
+  /// 별점 등록 = 정복 완료 시각
+  conqueredAt  DateTime   @map("conquered_at")
+  user         Member     @relation(fields: [userId], references: [id])
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  season       Season     @relation(fields: [seasonId], references: [id])
+  sigungu      Region     @relation(fields: [sigunguId], references: [id])
+  visit        Visit      @relation(fields: [visitId], references: [id])
+
+  @@unique([userId, restaurantId, seasonId], map: "conquest_user_restaurant_season_uk")
+  @@index([seasonId, sigunguId, userId], map: "conquest_season_sigungu_idx")
+  @@index([userId, conqueredAt], map: "conquest_user_date_idx")
+  @@index([restaurantId, seasonId], map: "conquest_restaurant_idx")
+  @@map("conquest")
+}
+
+model Review {
+  id              BigInt           @id @default(autoincrement())
+  /// 방문 인증(영수증·현장) 1건에 리뷰 1개 — 인증 없이 리뷰를 쓸 수 없다. 인증 방식과 로컬 여부는 visit에서 읽는다
+  visitId         BigInt           @unique @map("visit_id")
+  userId          BigInt           @map("user_id")
+  restaurantId    BigInt           @map("restaurant_id")
+  /// 맛 1~5 · 별점 v4: 맛만 필수(이것만 남겨도 정복), 나머지 항목과 재방문 의사는 리뷰를 쓸 때 입력
+  taste           Int              @db.TinyInt
+  /// 청결 1~5 · 리뷰(세부평가)를 쓸 때만, 아니면 null
+  cleanliness     Int?             @db.TinyInt
+  /// 양 1~5 · 리뷰를 쓸 때만
+  portion         Int?             @db.TinyInt
+  /// 서비스 1~5 · 리뷰를 쓸 때만
+  service         Int?             @db.TinyInt
+  /// 가격 만족도 1~5 · 리뷰를 쓸 때만
+  price           Int?             @db.TinyInt
+  /// 입력한 항목들의 평균 (맛만 남기면 맛 점수) — 정렬·대표 별점 계산용 (초안)
+  scoreAvg        Decimal          @map("score_avg") @db.Decimal(2, 1)
+  /// 재방문 의사 있음 / 없음 · 리뷰를 쓸 때만, 아니면 null
+  revisitIntent   Boolean?         @map("revisit_intent")
+  /// 글 리뷰 (최대 500자) · null이면 별점만 남긴 리뷰
+  content         String?          @db.VarChar(500)
+  /// 글 리뷰를 쓴 시각 — 별점과 따로 나중에 쓸 수 있다
+  contentRegDate  DateTime?        @map("content_reg_date")
+  imageCount      Int              @default(0) @map("image_count") @db.TinyInt
+  /// 도움돼요 수
+  helpfulCount    Int              @default(0) @map("helpful_count")
+  /// 도움 안 돼요 수
+  unhelpfulCount  Int              @default(0) @map("unhelpful_count")
+  /// AI 리뷰 분석 결과(Gemini API) — 글 길이, 사진 첨부 여부, AI가 쓴 글 같은 말투인지 등. 무료 티어 호출 한도 때문에 리뷰 작성 후 비동기로 분석하고, 한도를 넘거나 실패하면 ai_checked_at을 null로 두고 score_weight는 1.00으로 시작한다
+  aiResult        Json?            @map("ai_result")
+  /// AI 분석 시각 · null이면 아직 분석 전
+  aiCheckedAt     DateTime?        @map("ai_checked_at")
+  /// 이 리뷰가 가게 대표 별점에 반영되는 비중 0~1 — 작성자 신뢰 온도와 AI 분석으로 정한다. 신뢰도가 낮으면 1보다 작다
+  scoreWeight     Decimal          @default(1) @map("score_weight") @db.Decimal(3, 2)
+  /// A 공개 / H 숨김(신고 처리) / D 삭제
+  status          String           @default("A") @db.Char(1)
+  /// 별점 등록 시각
+  regDate         DateTime         @default(now()) @map("reg_date")
+  updateDate      DateTime?        @updatedAt @map("update_date")
+  visit           Visit            @relation(fields: [visitId], references: [id])
+  user            Member           @relation(fields: [userId], references: [id])
+  restaurant      Restaurant       @relation(fields: [restaurantId], references: [id])
+  reviewImages    ReviewImage[]
+  reviewReactions ReviewReaction[]
+
+  @@index([restaurantId, status, regDate], map: "review_restaurant_latest_idx")
+  @@index([restaurantId, status, helpfulCount], map: "review_restaurant_helpful_idx")
+  @@index([userId, regDate], map: "review_user_date_idx")
+  @@map("review")
+}
+
+model ReviewImage {
+  id        BigInt   @id @default(autoincrement())
+  reviewId  BigInt   @map("review_id")
+  /// S3 key
+  imageKey  String   @map("image_key") @db.VarChar(255)
+  /// 0~4 (최대 5장)
+  sortOrder Int      @default(0) @map("sort_order") @db.TinyInt
+  regDate   DateTime @default(now()) @map("reg_date")
+  review    Review   @relation(fields: [reviewId], references: [id])
+
+  @@unique([reviewId, sortOrder], map: "review_image_order_uk")
+  @@map("review_image")
+}
+
+/// 평가에 참여하면 먹포인트를 준다(reward_policy REVIEW_VOTE). point_history는 ref_type = REVIEW_REACTION, ref_id = 이 행 id로 남겨서, 눌렀다 취소하고 다시 눌러도 한 리뷰에 한 번만 받는다. 리뷰 열람 횟수 제한은 없다(2026-10-06 삭제)
+model ReviewReaction {
+  id         BigInt    @id @default(autoincrement())
+  reviewId   BigInt    @map("review_id")
+  userId     BigInt    @map("user_id")
+  /// H 도움돼요 / U 도움 안 돼요 / N 취소 — 자기 리뷰에는 누를 수 없다(앱에서 확인). 취소해도 행을 지우지 않는다
+  type       String    @db.Char(1)
+  regDate    DateTime  @default(now()) @map("reg_date")
+  updateDate DateTime? @updatedAt @map("update_date")
+  review     Review    @relation(fields: [reviewId], references: [id])
+  user       Member    @relation(fields: [userId], references: [id])
+
+  @@unique([reviewId, userId], map: "review_reaction_review_user_uk")
+  @@index([userId], map: "review_reaction_user_idx")
+  @@map("review_reaction")
+}
+
+/// 현황·랭킹·먹짱 지도·TOP 50·칭호를 모두 이 표에서 읽는다.
+/// 정복이 생기면 conquest_count +1, 순위·상위 %·티어는 배치(예: 5분마다)로
+/// RANK() OVER (PARTITION BY season_id, sigungu_id ORDER BY conquest_count DESC, last_conquered_at) 로 다시 계산한다.
+/// 활동 탐험가 수 = 같은 (season_id, sigungu_id)에서 conquest_count > 0인 행 수
+model SeasonRegionStat {
+  id              BigInt    @id @default(autoincrement())
+  seasonId        Int       @map("season_id")
+  sigunguId       Int       @map("sigungu_id")
+  userId          BigInt    @map("user_id")
+  conquestCount   Int       @default(0) @map("conquest_count")
+  /// 동점이면 먼저 도달한 사람이 위
+  lastConqueredAt DateTime? @map("last_conquered_at")
+  /// 구 안 순위 (RANK는 MySQL 예약어라 rank_no)
+  rankNo          Int?      @map("rank_no")
+  /// 상위 % — 시즌 보상 방망이·밤하늘을 정하는 기준
+  topPercent      Decimal?  @map("top_percent") @db.Decimal(5, 2)
+  /// B 초보 탐방러(0~4곳) / R 단골(5곳~) / G 미식가(20곳~) / C 정복자(20곳~ + 상위 10%) / M 먹짱(1위)
+  tier            String    @default("B") @db.Char(1)
+  /// 티어 상승 축하 화면을 마지막으로 보여 준 티어 — tier와 다르면 축하 화면을 띄운다
+  celebratedTier  String    @default("B") @map("celebrated_tier") @db.Char(1)
+  /// 시즌이 끝나고 확정되면 true — 시즌 기록·칭호 화면이 이 값을 본다
+  isFinalized     Boolean   @default(false) @map("is_finalized")
+  updateDate      DateTime? @updatedAt @map("update_date")
+  season          Season    @relation(fields: [seasonId], references: [id])
+  sigungu         Region    @relation(fields: [sigunguId], references: [id])
+  user            Member    @relation(fields: [userId], references: [id])
+
+  @@unique([seasonId, sigunguId, userId], map: "season_region_stat_uk")
+  @@index([seasonId, sigunguId, rankNo], map: "season_region_stat_rank_idx")
+  @@index([userId, seasonId], map: "season_region_stat_user_idx")
+  @@map("season_region_stat")
+}
+
+/// 시즌 확정 배치가 사람마다 1행씩 만든다
+model SeasonResult {
+  id               BigInt    @id @default(autoincrement())
+  seasonId         Int       @map("season_id")
+  userId           BigInt    @map("user_id")
+  /// 가장 높은 순위(상위 %)를 받은 구 — 시즌 결과 발표 화면의 대표 결과
+  bestSigunguId    Int       @map("best_sigungu_id")
+  /// season_region_stat.tier와 같은 코드
+  bestTier         String    @map("best_tier") @db.Char(1)
+  bestRankNo       Int       @map("best_rank_no")
+  /// 시즌 보상을 정하는 기준 — season_reward_rule과 비교
+  bestTopPercent   Decimal?  @map("best_top_percent") @db.Decimal(5, 2)
+  /// 그 시즌 전체 정복 수 (모든 구 합계)
+  conquestTotal    Int       @default(0) @map("conquest_total")
+  /// 시즌 보상 먹포인트 — point_history(SEASON_REWARD)와 같은 값
+  rewardPoint      Int       @default(0) @map("reward_point")
+  /// 이 시즌에 받은 도깨비 방망이 (나무·청동·은·황금 중 1개) — best_top_percent에 맞는 CLUB 아이템. 먹짱(1위)도 황금. 왕관·밤하늘은 member_item(season_id)에 남긴다
+  rewardClubItemId Int?      @map("reward_club_item_id")
+  /// 시즌 결과 발표 화면을 본 시각 · null이면 앱을 열 때 보여 준다
+  seenAt           DateTime? @map("seen_at")
+  regDate          DateTime  @default(now()) @map("reg_date")
+  season           Season    @relation(fields: [seasonId], references: [id])
+  user             Member    @relation(fields: [userId], references: [id])
+  bestSigungu      Region    @relation(fields: [bestSigunguId], references: [id])
+  rewardClubItem   Item?     @relation(fields: [rewardClubItemId], references: [id])
+
+  @@unique([seasonId, userId], map: "season_result_uk")
+  @@map("season_result")
+}
+
+/// 시즌 확정 배치가 season_result를 만들 때 쓰는 보상표. 초안:
+/// P 10 → 황금 방망이 + 밤하늘 / P 30 → 은 방망이 / P 50 → 청동 방망이 / P 100 → 나무 방망이 / R 1 → 왕관
+/// 방망이(CLUB)는 걸린 규칙 중 threshold가 가장 낮은 1개만 주고, 왕관·밤하늘 같은 명예 아이템은 걸린 규칙을 모두 준다.
+/// 1위는 상위 10%에도 들어서 황금 방망이·밤하늘·왕관을 모두 받는다(2026-10-06 확정).
+/// 받은 아이템은 member_item(acquired_type = S, season_id)에 넣는다.
+model SeasonRewardRule {
+  id        Int      @id @default(autoincrement())
+  /// R 순위 / P 상위 %
+  ruleType  String   @map("rule_type") @db.Char(1)
+  /// R이면 몇 위까지(먹짱 = 1), P이면 상위 몇 % 이내(10 / 30 / 50 / 100)
+  threshold Decimal  @db.Decimal(5, 2)
+  /// 주는 아이템 — 방망이(CLUB) 또는 명예 아이템(왕관·밤하늘)
+  itemId    Int      @map("item_id")
+  regDate   DateTime @default(now()) @map("reg_date")
+  item      Item     @relation(fields: [itemId], references: [id])
+
+  @@unique([ruleType, threshold, itemId], map: "season_reward_rule_uk")
+  @@map("season_reward_rule")
+}
+
+/// 활동 업적. 시즌별 티어 칭호(강서구 단골 등)는 season_region_stat에서 보여준다
+model Achievement {
+  id                 Int                 @id @default(autoincrement())
+  /// FIRST_CONQUEST / REVIEW_10 / REVIEW_50 / HELPFUL_300 / SEASON_CONQUEST_30 / SEASON_TOP10 / MUKJJANG …
+  code               String              @unique @db.VarChar(40)
+  /// 첫 정복 / 리뷰 10개 / 도움왕 / 구의 먹짱 …
+  name               String              @db.VarChar(30)
+  description        String?             @db.VarChar(255)
+  /// CONQUEST_TOTAL / SEASON_CONQUEST / DISTRICT_COUNT(탐험한 구 수) / REVIEW_TEXT_COUNT / REVIEW_PHOTO_COUNT / HELPFUL_RECEIVED / WEEKLY_STREAK / SEASON_RANK / SEASON_TIER
+  conditionType      String              @map("condition_type") @db.VarChar(30)
+  /// 목표값 (10개, 300회, TOP 10 …)
+  conditionValue     Int                 @map("condition_value")
+  rewardPoint        Int                 @default(0) @map("reward_point")
+  /// 프론트 아이콘 이름
+  iconKey            String?             @map("icon_key") @db.VarChar(100)
+  sortOrder          Int                 @default(0) @map("sort_order")
+  status             String              @default("A") @db.Char(1)
+  memberAchievements MemberAchievement[]
+  items              Item[]
+
+  @@map("achievement")
+}
+
+model MemberAchievement {
+  id            BigInt      @id @default(autoincrement())
+  userId        BigInt      @map("user_id")
+  achievementId Int         @map("achievement_id")
+  /// 시즌과 관련된 업적이면 처음 달성한 시즌
+  seasonId      Int?        @map("season_id")
+  achievedAt    DateTime    @default(now()) @map("achieved_at")
+  user          Member      @relation(fields: [userId], references: [id])
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  season        Season?     @relation(fields: [seasonId], references: [id])
+
+  @@unique([userId, achievementId], map: "member_achievement_uk")
+  @@map("member_achievement")
+}
+
+/// 크기 단계는 level로 계산한다(level_policy, 뿔 단계는 2026-10-06 삭제). 배경은 얻은 구 배경 중 내가 고른 것(bg_sigungu_id → region.bg_key)을 쓴다(2026-10-06). 처음 얻은 배경은 자동으로 골라 두고, 여러 개면 꾸미기에서 바꾼다(초안). 가진 아이템인지는 member_item으로 확인하고, 안 가진 아이템은 착용할 수 없다(앱에서 확인). 음식 분야 깨비와 색깔은 만들지 않는다(2026-10-06)
+model Mukkaebi {
+  /// 회원 1명에 먹깨비 1마리
+  userId              BigInt      @id @map("user_id")
+  level               Int         @default(1)
+  /// 누적 경험치
+  exp                 Int         @default(0)
+  /// 쓰고 있는 모자 (item.category = HAT, 왕관 포함) · 없으면 null
+  hatItemId           Int?        @map("hat_item_id")
+  /// 쓰고 있는 얼굴 아이템 (item.category = FACE) · 없으면 null
+  faceItemId          Int?        @map("face_item_id")
+  /// 들고 있는 소품 (item.category = PROP) · 없으면 null
+  propItemId          Int?        @map("prop_item_id")
+  /// 밤하늘을 쓰고 있으면 그 아이템 (item.category = SKIN) · null이면 기본 코랄
+  skinItemId          Int?        @map("skin_item_id")
+  /// 들고 다니는 도깨비 방망이 (item.category = CLUB) · 아직 없으면 null — 소품과 별개로 한 자리를 쓴다
+  clubItemId          Int?        @map("club_item_id")
+  /// 지도 위 먹깨비 위치 = 마지막으로 정복한 가게
+  currentRestaurantId BigInt?     @map("current_restaurant_id")
+  /// 골라 둔 구 배경 (region.level = 2, member_region_background에 있는 구만) · null이면 기본 배경
+  bgSigunguId         Int?        @map("bg_sigungu_id")
+  /// 성장 축하 화면을 마지막으로 보여 준 레벨
+  celebratedLevel     Int         @default(1) @map("celebrated_level")
+  updateDate          DateTime?   @updatedAt @map("update_date")
+  user                Member      @relation(fields: [userId], references: [id])
+  hatItem             Item?       @relation("mukkaebi_hat_item_id", fields: [hatItemId], references: [id])
+  faceItem            Item?       @relation("mukkaebi_face_item_id", fields: [faceItemId], references: [id])
+  propItem            Item?       @relation("mukkaebi_prop_item_id", fields: [propItemId], references: [id])
+  skinItem            Item?       @relation("mukkaebi_skin_item_id", fields: [skinItemId], references: [id])
+  clubItem            Item?       @relation("mukkaebi_club_item_id", fields: [clubItemId], references: [id])
+  currentRestaurant   Restaurant? @relation(fields: [currentRestaurantId], references: [id])
+  bgSigungu           Region?     @relation(fields: [bgSigunguId], references: [id])
+
+  @@map("mukkaebi")
+}
+
+/// 구 배경 획득 (2026-10-06 결정: 그 구에서 10곳 정복하면 저절로 얻고, 여러 개면 골라 씀)
+/// - 정복 저장(conquest INSERT) 때 그 구에서 정복한 서로 다른 가게 수를 세어 10 이상이고 행이 없으면 INSERT
+/// - 세는 기준은 모든 시즌 누적, 서로 다른 restaurant_id (초안 — 시즌마다 다시 세는지는 팀 확인 필요)
+/// - 한 번 얻으면 시즌이 바뀌어도 사라지지 않는다 (초안)
+/// - 10은 숫자를 바꿀 수 있게 reward_policy 같은 설정 값으로 두면 좋다
+model MemberRegionBackground {
+  id         BigInt   @id @default(autoincrement())
+  userId     BigInt   @map("user_id")
+  /// 얻은 구 배경 (region.level = 2)
+  sigunguId  Int      @map("sigungu_id")
+  /// 얻은 시각
+  unlockedAt DateTime @map("unlocked_at")
+  user       Member   @relation(fields: [userId], references: [id])
+  sigungu    Region   @relation(fields: [sigunguId], references: [id])
+
+  @@unique([userId, sigunguId], map: "member_region_background_uk")
+  @@map("member_region_background")
+}
+
+model LevelPolicy {
+  level       Int    @id
+  /// 이 레벨이 되는 누적 경험치
+  requiredExp Int    @map("required_exp")
+  /// E 알(LV.1~2) / B 아기(LV.3~9) / K 어린이(LV.10~19) / A 다 큼(LV.20~, 여기서 크기가 멈춤)
+  stage       String @db.Char(1)
+  /// 깨비를 그릴 크기 — 아기 60 / 어린이 80 / 다 큼 100 (알은 100)
+  sizePercent Int    @default(100) @map("size_percent") @db.TinyInt
+  /// 레벨업 보상 먹포인트
+  rewardPoint Int    @default(0) @map("reward_point")
+
+  @@map("level_policy")
+}
+
+/// 보상 수치를 코드가 아니라 표에 두어서 배포 없이 조정한다
+model RewardPolicy {
+  /// VISIT_VERIFIED / REVIEW_TEXT / REVIEW_PHOTO / HELPFUL_RECEIVED / REVIEW_VOTE / FIRST_CONQUEST / LEVEL_UP / TIER_UP / SEASON_REWARD
+  reason      String  @id @db.VarChar(30)
+  /// 초안: 방문 인증 +50 / 글 리뷰 +30 / 사진 리뷰 +20 / 도움돼요 받기 +5 / 리뷰 평가 참여(도움돼요·안 돼요 누르기) +5 / 새 가게 첫 정복 +100 / 레벨업 +200 / 티어 상승 +100 / 시즌 보상 +300(티어별로 다르게 가능)
+  point       Int     @default(0)
+  /// 초안: 글 리뷰 +20
+  exp         Int     @default(0)
+  /// 하루 최대 지급 횟수 (어뷰징 방지) · null이면 제한 없음 — REVIEW_VOTE는 아무 리뷰나 눌러 포인트를 모으지 못하게 제한을 두는 게 좋다
+  dailyLimit  Int?    @map("daily_limit")
+  description String? @db.VarChar(100)
+
+  @@map("reward_policy")
+}
+
+/// 잔액 변경과 이 표 insert는 한 트랜잭션에서. 사용은 UPDATE member SET point_balance = point_balance - ? WHERE id = ? AND point_balance >= ?
+model PointHistory {
+  id           BigInt   @id @default(autoincrement())
+  userId       BigInt   @map("user_id")
+  /// 적립은 +, 사용은 -
+  amount       Int
+  balanceAfter Int      @map("balance_after")
+  /// reward_policy.reason + PURCHASE / ACHIEVEMENT / ADMIN
+  reason       String   @db.VarChar(30)
+  /// 먹포인트 내역 화면에 보일 문구 (예: 새맛집 방문 인증, 리뷰 평가 참여, 딸기 모자 구매) — 가게·아이템 이름이 바뀌어도 그대로 남게 저장
+  title        String   @db.VarChar(60)
+  /// VISIT / REVIEW / REVIEW_REACTION / CONQUEST / ITEM / ACHIEVEMENT / LEVEL / SEASON_RESULT / SEASON_REGION_STAT
+  refType      String?  @map("ref_type") @db.VarChar(20)
+  refId        BigInt?  @map("ref_id")
+  regDate      DateTime @default(now()) @map("reg_date")
+  user         Member   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, reason, refType, refId], map: "point_history_once_uk")
+  @@index([userId, id], map: "point_history_user_idx")
+  @@map("point_history")
+}
+
+model ExpHistory {
+  id         BigInt   @id @default(autoincrement())
+  userId     BigInt   @map("user_id")
+  amount     Int
+  reason     String   @db.VarChar(30)
+  refType    String?  @map("ref_type") @db.VarChar(20)
+  refId      BigInt?  @map("ref_id")
+  levelAfter Int      @map("level_after")
+  regDate    DateTime @default(now()) @map("reg_date")
+  user       Member   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, reason, refType, refId], map: "exp_history_once_uk")
+  @@index([userId, id], map: "exp_history_user_idx")
+  @@map("exp_history")
+}
+
+/// 개발 대상: 모자 6개 + 왕관, 얼굴 6개, 소품 6개, 밤하늘, 방망이 5종. 등·오라·배경 아이템과 음식 분야 깨비·색깔은 만들지 않는다 (2026-10-06)
+model Item {
+  id                      Int                @id @default(autoincrement())
+  /// HAT_STRAWBERRY, FACE_HEART_SUNGLASSES, PROP_TTEOKKKOCHI, HAT_CROWN, SKIN_NIGHTSKY, CLUB_GOLD 같은 코드 — 프론트 에셋 이름과 맞춘다
+  code                    String             @unique @db.VarChar(40)
+  /// HAT 모자(6개 + 먹짱 왕관) / FACE 얼굴(6개) / PROP 소품(6개) / SKIN 밤하늘(상위 10% 명예) / CLUB 도깨비 방망이(나무·청동·은·황금 + 합성으로 만드는 전설)
+  category                String             @db.VarChar(10)
+  name                    String             @db.VarChar(30)
+  description             String?            @db.VarChar(255)
+  /// 먹포인트 가격 · 모자·얼굴·소품만 판매 · null이면 판매하지 않음
+  price                   Int?
+  /// D 기본 지급 / P 포인트 구매(모자·얼굴·소품) / S 시즌 보상(방망이 1~4단계, 왕관, 밤하늘) / M 합성(전설의 방망이) / A 업적 / E 이벤트
+  unlockType              String             @default("P") @map("unlock_type") @db.Char(1)
+  /// 방망이 단계 — 1 나무 / 2 청동 / 3 은 / 4 황금(먹짱도 황금) / 5 전설(황금 3개를 합쳐서 만든다)
+  clubTier                Int?               @map("club_tier") @db.TinyInt
+  /// unlock_type = A일 때 필요한 업적
+  requiredAchievementId   Int?               @map("required_achievement_id")
+  /// NEW / HOT — 상점 배지
+  badge                   String?            @db.VarChar(10)
+  sortOrder               Int                @default(0) @map("sort_order")
+  saleStart               DateTime?          @map("sale_start")
+  saleEnd                 DateTime?          @map("sale_end")
+  /// A 판매·노출 / H 숨김
+  status                  String             @default("A") @db.Char(1)
+  regDate                 DateTime           @default(now()) @map("reg_date")
+  requiredAchievement     Achievement?       @relation(fields: [requiredAchievementId], references: [id])
+  seasonResults           SeasonResult[]
+  seasonRewardRules       SeasonRewardRule[]
+  hatItemMukkaebis        Mukkaebi[]         @relation("mukkaebi_hat_item_id")
+  faceItemMukkaebis       Mukkaebi[]         @relation("mukkaebi_face_item_id")
+  propItemMukkaebis       Mukkaebi[]         @relation("mukkaebi_prop_item_id")
+  skinItemMukkaebis       Mukkaebi[]         @relation("mukkaebi_skin_item_id")
+  clubItemMukkaebis       Mukkaebi[]         @relation("mukkaebi_club_item_id")
+  itemRecipe              ItemRecipe?        @relation("item_recipe_result_item_id")
+  materialItemItemRecipes ItemRecipe[]       @relation("item_recipe_material_item_id")
+  memberItems             MemberItem[]
+
+  @@index([category, status, sortOrder], map: "item_category_idx")
+  @@map("item")
+}
+
+/// 황금 방망이 3개를 모으면 전설의 방망이로 합칠 수 있다. 합칠 때 member_item에서 황금 방망이 quantity -3, 전설의 방망이 +1 (한 트랜잭션)
+model ItemRecipe {
+  /// 합성으로 만드는 아이템 — 전설의 방망이 (unlock_type = M)
+  resultItemId   Int  @id @map("result_item_id")
+  /// 재료 — 황금 방망이
+  materialItemId Int  @map("material_item_id")
+  /// 필요한 재료 개수 (초안 3개)
+  materialCount  Int  @default(3) @map("material_count") @db.TinyInt
+  resultItem     Item @relation("item_recipe_result_item_id", fields: [resultItemId], references: [id])
+  materialItem   Item @relation("item_recipe_material_item_id", fields: [materialItemId], references: [id])
+
+  @@map("item_recipe")
+}
+
+/// 같은 방망이를 또 받으면 행을 늘리지 않고 quantity를 올린다. 시즌마다 받은 방망이는 season_result.reward_club_item_id에도 남는다. 모아 둔 황금 방망이가 없어지면(합성) quantity 0인 행으로 남기고 지우지 않는다
+model MemberItem {
+  id           BigInt    @id @default(autoincrement())
+  userId       BigInt    @map("user_id")
+  itemId       Int       @map("item_id")
+  /// 가진 개수 — 방망이만 2개 이상이 될 수 있다 (시즌마다 받으면 +1, 합성하면 황금 -3). 모자·얼굴·소품·밤하늘은 항상 1
+  quantity     Int       @default(1)
+  /// D 기본 지급 / P 구매 / A 업적 보상 / S 시즌 보상 / M 합성 / E 이벤트
+  acquiredType String    @map("acquired_type") @db.Char(1)
+  /// acquired_type = S일 때 처음 받은 시즌
+  seasonId     Int?      @map("season_id")
+  acquiredAt   DateTime  @default(now()) @map("acquired_at")
+  /// null이면 "새로 얻음" 배지 표시
+  seenAt       DateTime? @map("seen_at")
+  user         Member    @relation(fields: [userId], references: [id])
+  item         Item      @relation(fields: [itemId], references: [id])
+  season       Season?   @relation(fields: [seasonId], references: [id])
+
+  @@unique([userId, itemId], map: "member_item_uk")
+  @@index([userId, seenAt], map: "member_item_new_idx")
+  @@map("member_item")
+}
+
+/// 알림함은 30일 동안 보관 — 지난 알림은 배치로 지운다. 홈·내 정보의 종 아이콘 빨간 점 = 안 읽은 알림 있음
+model Notification {
+  id       BigInt   @id @default(autoincrement())
+  userId   BigInt   @map("user_id")
+  /// RANK 정복·순위 / REVIEW 리뷰 / MUKKAEBI 먹깨비 / NOTICE 공지·이벤트 — 알림함 필터
+  category String   @db.VarChar(10)
+  /// CONQUEST / RANK_CHANGE / TIER_UP / MUKJJANG / SEASON_END / HELPFUL / SAVED_REMINDER / LEVEL_UP / NEW_ITEM / NOTICE / EVENT / INQUIRY_ANSWER
+  type     String   @db.VarChar(20)
+  title    String   @db.VarChar(60)
+  content  String   @db.VarChar(255)
+  refType  String?  @map("ref_type") @db.VarChar(20)
+  refId    BigInt?  @map("ref_id")
+  isRead   Boolean  @default(false) @map("is_read")
+  regDate  DateTime @default(now()) @map("reg_date")
+  user     Member   @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead, id], map: "notification_user_read_idx")
+  @@index([userId, category, id], map: "notification_user_category_idx")
+  @@index([regDate], map: "notification_reg_date_idx")
+  @@map("notification")
+}
+
+model Notice {
+  id         Int       @id @default(autoincrement())
+  title      String    @db.VarChar(100)
+  content    String    @db.Text
+  /// 필독 / NEW 같은 목록 배지
+  tag        String?   @db.VarChar(10)
+  isPinned   Boolean   @default(false) @map("is_pinned")
+  status     String    @default("A") @db.Char(1)
+  regDate    DateTime  @default(now()) @map("reg_date")
+  updateDate DateTime? @updatedAt @map("update_date")
+
+  @@map("notice")
+}
+
+model Faq {
+  id        Int    @id @default(autoincrement())
+  /// VISIT 방문 인증 / RANK 정복·순위 / POINT 먹포인트 / ACCOUNT 계정
+  category  String @db.VarChar(20)
+  question  String @db.VarChar(100)
+  answer    String @db.Text
+  sortOrder Int    @default(0) @map("sort_order")
+  status    String @default("A") @db.Char(1)
+
+  @@map("faq")
+}
+
+/// 약관 보기 화면(시행일 선택). 동의 기록은 member_consent가 (type, version)으로 가리킨다
+model PolicyDocument {
+  id            Int      @id @default(autoincrement())
+  /// TERMS 이용약관 / PRIVACY 개인정보 처리방침 / LOCATION 위치기반 서비스
+  type          String   @db.VarChar(20)
+  /// member_consent.policy_version과 같은 값
+  version       String   @db.VarChar(20)
+  content       String   @db.Text
+  /// 시행일
+  effectiveDate DateTime @map("effective_date") @db.Date
+  regDate       DateTime @default(now()) @map("reg_date")
+
+  @@unique([type, version], map: "policy_document_type_version_uk")
+  @@index([type, effectiveDate], map: "policy_document_type_date_idx")
+  @@map("policy_document")
+}
+
+/// 고객센터 1:1 문의. 답변이 달리면 notification(INQUIRY_ANSWER)과 이메일로 알린다
+model Inquiry {
+  id         BigInt    @id @default(autoincrement())
+  userId     BigInt    @map("user_id")
+  /// VISIT 방문 인증 / ACCOUNT 계정 / REPORT 신고 / ETC 기타
+  category   String    @db.VarChar(20)
+  content    String    @db.VarChar(1000)
+  /// 방문 인증(영수증·현장) 문제일 때 해당 인증
+  refVisitId BigInt?   @map("ref_visit_id")
+  /// 첨부 사진 S3 key (선택)
+  imageKey   String?   @map("image_key") @db.VarChar(255)
+  /// W 대기 / D 답변 완료
+  status     String    @default("W") @db.Char(1)
+  answer     String?   @db.VarChar(1000)
+  answeredAt DateTime? @map("answered_at")
+  regDate    DateTime  @default(now()) @map("reg_date")
+  user       Member    @relation(fields: [userId], references: [id])
+  refVisit   Visit?    @relation(fields: [refVisitId], references: [id])
+
+  @@index([userId, regDate], map: "inquiry_user_idx")
+  @@map("inquiry")
+}
+
+/// 탐방러 프로필 ••• → 신고하기. 신고한 사실은 상대에게 알리지 않는다
+model Report {
+  id          BigInt    @id @default(autoincrement())
+  reporterId  BigInt    @map("reporter_id")
+  /// R 리뷰 / M 회원
+  targetType  String    @map("target_type") @db.Char(1)
+  targetId    BigInt    @map("target_id")
+  /// SPAM / ABUSE / FAKE / PRIVACY / ETC
+  reason      String    @db.VarChar(20)
+  /// 자세한 내용 (선택, 200자)
+  detail      String?   @db.VarChar(200)
+  /// P 접수 / A 조치 완료 / R 반려
+  status      String    @default("P") @db.Char(1)
+  processedAt DateTime? @map("processed_at")
+  regDate     DateTime  @default(now()) @map("reg_date")
+  reporter    Member    @relation(fields: [reporterId], references: [id])
+
+  @@unique([reporterId, targetType, targetId], map: "report_once_uk")
+  @@index([targetType, targetId], map: "report_target_idx")
+  @@map("report")
+}
+
+/// 탐방러 프로필 ••• → 차단하기. 차단한 사람의 리뷰와 프로필은 목록에서 숨긴다
+model MemberBlock {
+  blockerId BigInt   @map("blocker_id")
+  blockedId BigInt   @map("blocked_id")
+  regDate   DateTime @default(now()) @map("reg_date")
+  blocker   Member   @relation("member_block_blocker_id", fields: [blockerId], references: [id])
+  blocked   Member   @relation("member_block_blocked_id", fields: [blockedId], references: [id])
+
+  @@id([blockerId, blockedId])
+  @@map("member_block")
+}

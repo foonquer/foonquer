@@ -13,11 +13,12 @@ RUN corepack enable
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY server/package.json ./server/package.json
-COPY web/package.json ./web/package.json
+# web/에 package.json이 생기면 아래 줄을 살린다. (lockfile에 web이 들어가면 frozen 설치에 필요)
+# COPY web/package.json ./web/package.json
 
 # postinstall(prisma generate)이 쓰는 파일만 먼저 복사해서 의존성 설치 캐시를 살린다.
 COPY server/prisma ./server/prisma
-COPY server/scripts ./server/scripts
+COPY server/prisma.config.ts ./server/prisma.config.ts
 
 RUN pnpm install --frozen-lockfile --filter ./server...
 

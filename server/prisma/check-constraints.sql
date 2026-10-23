@@ -1,0 +1,27 @@
+-- CHECK 제약 (ERD checks) — Prisma 스키마로 표현할 수 없어 직접 추가한다
+ALTER TABLE `member` ADD CONSTRAINT `member_point_balance_chk` CHECK (point_balance >= 0);
+ALTER TABLE `member` ADD CONSTRAINT `member_trust_temp_chk` CHECK (trust_temp between 0 and 99.9);
+ALTER TABLE `member` ADD CONSTRAINT `member_login_fail_chk` CHECK (login_fail_count between 0 and 5);
+ALTER TABLE `member_local_region` ADD CONSTRAINT `member_local_region_order_chk` CHECK (sort_order between 0 and 2);
+ALTER TABLE `season` ADD CONSTRAINT `season_period_chk` CHECK (start_date < end_date);
+ALTER TABLE `visit` ADD CONSTRAINT `visit_restaurant_required_chk` CHECK (status in ('P','R','F') or restaurant_id is not null);
+ALTER TABLE `visit` ADD CONSTRAINT `visit_amount_chk` CHECK (total_amount is null or total_amount >= 0);
+ALTER TABLE `visit` ADD CONSTRAINT `visit_method_chk` CHECK (method in ('R','S'));
+ALTER TABLE `visit` ADD CONSTRAINT `visit_receipt_image_chk` CHECK (method <> 'R' or receipt_image_key is not null);
+ALTER TABLE `visit` ADD CONSTRAINT `visit_checkin_chk` CHECK (method <> 'S' or (checkin_lat is not null and checkin_lng is not null));
+ALTER TABLE `visit` ADD CONSTRAINT `visit_site_photo_chk` CHECK (method <> 'S' or status not in ('V','C') or site_photo_key is not null);
+ALTER TABLE `review` ADD CONSTRAINT `review_taste_chk` CHECK (taste between 1 and 5);
+ALTER TABLE `review` ADD CONSTRAINT `review_detail_score_chk` CHECK ((cleanliness is null or cleanliness between 1 and 5) and (portion is null or portion between 1 and 5) and (service is null or service between 1 and 5) and (price is null or price between 1 and 5));
+ALTER TABLE `review` ADD CONSTRAINT `review_image_count_chk` CHECK (image_count between 0 and 5);
+ALTER TABLE `review` ADD CONSTRAINT `review_weight_chk` CHECK (score_weight between 0 and 1);
+ALTER TABLE `season_reward_rule` ADD CONSTRAINT `season_reward_rule_type_chk` CHECK (rule_type in ('R','P'));
+ALTER TABLE `level_policy` ADD CONSTRAINT `level_policy_stage_chk` CHECK (stage in ('E','B','K','A'));
+ALTER TABLE `level_policy` ADD CONSTRAINT `level_policy_size_chk` CHECK (size_percent between 1 and 100);
+ALTER TABLE `item` ADD CONSTRAINT `item_category_chk` CHECK (category in ('HAT','FACE','PROP','SKIN','CLUB'));
+ALTER TABLE `item` ADD CONSTRAINT `item_price_chk` CHECK (price is null or price >= 0);
+ALTER TABLE `item` ADD CONSTRAINT `item_purchase_price_chk` CHECK (unlock_type <> 'P' or price is not null);
+ALTER TABLE `item` ADD CONSTRAINT `item_club_chk` CHECK (category <> 'CLUB' or (club_tier between 1 and 5 and price is null and ((club_tier < 5 and unlock_type = 'S') or (club_tier = 5 and unlock_type = 'M'))));
+ALTER TABLE `item` ADD CONSTRAINT `item_club_tier_chk` CHECK (category = 'CLUB' or club_tier is null);
+ALTER TABLE `item` ADD CONSTRAINT `item_craft_chk` CHECK (unlock_type <> 'M' or (category = 'CLUB' and club_tier = 5));
+ALTER TABLE `item_recipe` ADD CONSTRAINT `item_recipe_count_chk` CHECK (material_count >= 2);
+ALTER TABLE `member_item` ADD CONSTRAINT `member_item_quantity_chk` CHECK (quantity >= 0);
