@@ -1,0 +1,41 @@
+:root {
+  font-family:
+    'Pretendard Variable',
+    Pretendard,
+    -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    sans-serif;
+  color: #1f1f1f;
+  background: #ffffff;
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+/* 모바일 화면 기준. 넓은 화면에서는 가운데에 앱 폭만큼 보여 준다. */
+#root {
+  max-width: 480px;
+  min-height: 100dvh;
+  margin: 0 auto;
+}
+
+.page {
+  padding: 24px 16px;
+}
+
+.status[data-status='ok'] {
+  color: #1a7f37;
+}
+
+.status[data-status='down'] {
+  color: #cf222e;
+}

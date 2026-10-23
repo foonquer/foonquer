@@ -36,7 +36,7 @@
 | --- | --- | --- |
 | **Server** | ![Node.js](https://img.shields.io/badge/Node.js_24-5FA04E?style=for-the-badge&logo=nodedotjs&logoColor=white) ![Express](https://img.shields.io/badge/Express_5-000000?style=for-the-badge&logo=express&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) | 팀원 모두 Node.js 경험이 있고, Express 5는 async 에러를 기본으로 처리해 구조가 단순하다 |
 | **DB · ORM** | ![MySQL](https://img.shields.io/badge/MySQL_8-4479A1?style=for-the-badge&logo=mysql&logoColor=white) ![Prisma](https://img.shields.io/badge/Prisma_7-2D3748?style=for-the-badge&logo=prisma&logoColor=white) | 랭킹·집계 쿼리가 많아 관계형 DB, 타입 안전한 쿼리와 마이그레이션 관리를 위해 Prisma |
-| **Web** | ![React](https://img.shields.io/badge/React_PWA-61DAFB?style=for-the-badge&logo=react&logoColor=black) ![Kakao](https://img.shields.io/badge/Kakao_Map_SDK-FFCD00?style=for-the-badge&logo=kakao&logoColor=black) | 앱 설치 없이 모바일 웹으로 카메라·위치를 쓰기 위해 PWA, 지도는 카카오맵 |
+| **Web** | ![React](https://img.shields.io/badge/React_19-61DAFB?style=for-the-badge&logo=react&logoColor=black) ![Vite](https://img.shields.io/badge/Vite_PWA-646CFF?style=for-the-badge&logo=vite&logoColor=white) ![Kakao](https://img.shields.io/badge/Kakao_Map_SDK-FFCD00?style=for-the-badge&logo=kakao&logoColor=black) | 앱 설치 없이 모바일 웹으로 카메라·위치를 쓰기 위해 PWA, 지도는 카카오맵 |
 | **외부 API** | ![Kakao](https://img.shields.io/badge/Kakao_Local_API-FFCD00?style=for-the-badge&logo=kakao&logoColor=black) ![Naver](https://img.shields.io/badge/CLOVA_OCR-03C75A?style=for-the-badge&logo=naver&logoColor=white) ![Gemini](https://img.shields.io/badge/Gemini_API-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white) | 가게 검색, 영수증 인식(영수증 특화 모델), AI 리뷰 분석(무료 티어) |
 | **Infra** | ![AWS](https://img.shields.io/badge/AWS_EC2·S3·CloudFront-232F3E?style=for-the-badge&logo=amazonwebservices&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white) | 서버는 EC2에 Docker로, 웹은 Vercel로 배포. 이미지는 S3 + CloudFront |
 | **Tooling** | ![pnpm](https://img.shields.io/badge/pnpm_10.12.1-F69220?style=for-the-badge&logo=pnpm&logoColor=white) ![ESLint](https://img.shields.io/badge/ESLint-4B32C3?style=for-the-badge&logo=eslint&logoColor=white) ![Prettier](https://img.shields.io/badge/Prettier-F7B93E?style=for-the-badge&logo=prettier&logoColor=black) ![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white) | 모노레포(pnpm workspace), 커밋 전 husky + lint-staged로 자동 검사 |
@@ -68,7 +68,17 @@ foonquer/
 │   │   └── seed.ts          # 기본 데이터 (카테고리 12개)
 │   ├── test/                # Vitest + supertest
 │   └── Dockerfile
-├── web/                     # React PWA (준비 중)
+├── web/                     # 웹 (Vite + React + PWA)
+│   ├── src/
+│   │   ├── main.tsx         # 앱 시작
+│   │   ├── router.tsx       # 화면 경로 목록
+│   │   ├── pages/           # 화면 (HomePage, NotFoundPage …)
+│   │   ├── lib/api.ts       # 서버 호출 함수 (공통 응답 형식 처리)
+│   │   ├── styles/          # 전역 CSS
+│   │   └── test/            # Vitest + Testing Library
+│   ├── public/              # 아이콘, favicon (PWA 아이콘은 임시)
+│   ├── vite.config.ts       # PWA 설정, /api 개발 프록시
+│   └── vercel.json          # Vercel 배포 설정
 ├── docs/                    # ERD, API 명세 등 기획 문서
 ├── scripts/deploy-remote.sh # EC2에서 실행되는 배포 스크립트
 ├── docker-compose.yml       # EC2에서 서버 컨테이너 실행
@@ -141,6 +151,16 @@ pnpm -C server dev
 
 http://localhost:3000/api/v1/health 에서 `{"success":true,"data":{"status":"ok"},...}`가 보이면 성공.
 
+### 6. 웹 실행
+
+서버를 켜 둔 상태에서 터미널을 하나 더 열고 실행한다.
+
+```bash
+pnpm -C web dev
+```
+
+http://localhost:5173 에서 "서버 연결됨"이 보이면 웹과 서버가 연결된 것이다. 개발 중에는 웹의 `/api` 요청을 Vite가 `localhost:3000`으로 넘겨 준다 (CORS 설정 불필요).
+
 <br>
 
 ## 📦 패키지 매니저
@@ -155,7 +175,7 @@ pnpm -C server add -D @types/xxx    # server 개발 의존성
 pnpm add -D -w some-tool            # 루트(모노레포 공통) 개발 의존성
 ```
 
-### 자주 쓰는 명령어 (`pnpm -C server ...`)
+### 서버 명령어 (`pnpm -C server ...`)
 
 | 명령어 | 하는 일 |
 | --- | --- |
@@ -168,6 +188,14 @@ pnpm add -D -w some-tool            # 루트(모노레포 공통) 개발 의존�
 | `db:deploy` | 마이그레이션 적용만 (운영 배포용) |
 | `db:seed` | 기본 데이터 넣기 |
 | `db:studio` | DB를 브라우저에서 보기 |
+
+### 웹 명령어 (`pnpm -C web ...`)
+
+| 명령어 | 하는 일 |
+| --- | --- |
+| `dev` | 개발 서버 (http://localhost:5173) |
+| `build` / `preview` | 빌드(타입 검사 포함) / 빌드 결과 미리 보기 |
+| `typecheck` · `lint` · `format` · `test` | 타입 검사 · ESLint · Prettier · Vitest |
 
 <br>
 
@@ -217,6 +245,16 @@ pnpm -C server db:migrate                                       # 적용
 | `CORS_ORIGINS` | 허용할 웹 주소 (쉼표로 여러 개, 비우면 전체 허용) | `http://localhost:5173` |
 
 운영 서버의 환경변수는 AWS SSM Parameter Store(`/foonquer/prod/*`)에 두고, 배포할 때 EC2에서 `.env`로 만든다.
+
+### 웹 (`web/.env.local`)
+
+Vite는 `VITE_`로 시작하는 변수만 화면 코드에 넣는다. **비밀값(API 키 비밀번호 등)은 넣지 않는다** — 빌드 결과에 그대로 보인다.
+
+| 변수 | 설명 | 로컬 |
+| --- | --- | --- |
+| `VITE_API_BASE_URL` | API 서버 주소 | 비워 둔다 (개발 프록시 사용) |
+
+배포(Vercel)에서는 프로젝트 환경변수에 서버 도메인을 넣는다.
 
 <br>
 
@@ -286,7 +324,7 @@ router.post('/', validate({ body: createReviewSchema }), async (req, res) => { .
 
 - 변수·함수는 **camelCase** (`handleDelete`), 클래스·타입은 **PascalCase** (`AppError`), 상수 객체는 PascalCase (`ReviewError`).
 - 파일 이름은 **kebab-case + 역할** (`review.router.ts`, `app-error.ts`).
-- 포맷은 Prettier(작은따옴표, 끝 쉼표, 한 줄 100자)가 정한다. 커밋할 때 husky + lint-staged가 바뀐 `.ts` 파일에 ESLint와 Prettier를 자동으로 돌린다.
+- 포맷은 Prettier(작은따옴표, 끝 쉼표, 한 줄 100자)가 정한다. 커밋할 때 husky + lint-staged가 바뀐 `.ts`·`.tsx` 파일에 ESLint와 Prettier를 자동으로 돌린다.
 - 줄바꿈은 LF로 고정(`.gitattributes`). Windows에서도 따로 설정할 것이 없다.
 
 <br>
@@ -382,6 +420,10 @@ GitHub 저장소 설정(Settings → Secrets and variables → Actions)에 필�
 ### 웹 (Vercel)
 
 `web/`을 Vercel 프로젝트로 연결한다 (준비 중).
+
+- Vercel에서 이 저장소를 가져오고 **Root Directory를 `web`** 으로 지정한다. pnpm 모노레포는 Vercel이 알아서 인식한다.
+- 환경변수 `VITE_API_BASE_URL`에 서버 도메인을 넣는다.
+- `web/vercel.json`이 모든 경로를 `index.html`로 보내서, `/restaurants/1` 같은 주소로 바로 들어와도 화면이 뜬다.
 
 ### 배포가 실패했거나 잘못 배포됐을 때
 
