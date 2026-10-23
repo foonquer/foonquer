@@ -370,6 +370,7 @@ npm i -g gitmoji-cli
 | :---: | --- | --- |
 | 🎉 | Init | 프로젝트 초기 세팅 |
 | ✨ | Feat | 새 기능 |
+| 🔨 | Modify | 기존 기능·코드 수정 |
 | 🐛 | Fix | 버그 수정 |
 | 💄 | Design | UI·CSS 변경 |
 | ✏️ | Typing Error | 오타 수정 |
@@ -384,13 +385,13 @@ npm i -g gitmoji-cli
 ### 브랜치 이름
 
 - 형식: `타입/#이슈번호/작업명` (작업명은 camelCase 또는 kebab-case)
-- 타입: `init`, `feat`, `fix`, `refactor`
+- 타입: `init`, `feat`, `modify`, `fix`, `refactor`
 - 예시: `feat/#12/review-create`, `fix/#20/login-token`
 
 ### 이슈 제목
 
 - 형식: `[태그] 작업 요약`
-- 태그: `Init`, `Feat`, `Fix`, `Refactor`
+- 태그: `Init`, `Feat`, `Modify`, `Fix`, `Refactor`
 - 예시: `[Feat] 리뷰 작성 API`, `[Fix] 로그인 토큰 만료 처리`
 
 <br>
