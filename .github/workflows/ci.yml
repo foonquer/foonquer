@@ -1,0 +1,48 @@
+name: CI
+
+# develop·main으로 가는 PR마다 서버와 웹을 검사한다. 실패하면 merge하지 않는다.
+on:
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HUSKY: 0
+
+jobs:
+  check:
+    name: Lint · Typecheck · Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4 # 루트 package.json의 packageManager(pnpm@10.12.1)를 쓴다
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json # engines.node (24.14.0)
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Server lint
+        run: pnpm -C server lint
+      - name: Server typecheck
+        run: pnpm -C server typecheck
+      - name: Server test
+        run: pnpm -C server test
+
+      - name: Web lint
+        run: pnpm -C web lint
+      - name: Web build (typecheck 포함)
+        run: pnpm -C web build
+      - name: Web test
+        run: pnpm -C web test
