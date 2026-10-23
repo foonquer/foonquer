@@ -435,7 +435,7 @@ model Visit {
   regDate           DateTime           @default(now()) @map("reg_date")
   updateDate        DateTime?          @updatedAt @map("update_date")
   user              Member             @relation(fields: [userId], references: [id])
-  restaurant        Restaurant?        @relation(fields: [restaurantId], references: [id])
+  restaurant        Restaurant?        @relation(fields: [restaurantId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   season            Season?            @relation(fields: [seasonId], references: [id])
   visitReceiptItems VisitReceiptItem[]
   conquest          Conquest?
