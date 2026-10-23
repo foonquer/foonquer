@@ -1,0 +1,8 @@
+packages:
+  - server
+  - web
+
+# pnpm 10.12.1에서는 allowBuilds 대신 이 목록으로 필요한 빌드 스크립트만 허용합니다.
+onlyBuiltDependencies:
+  - '@prisma/engines'
+  - prisma

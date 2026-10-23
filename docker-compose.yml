@@ -1,0 +1,14 @@
+services:
+  app:
+    # deploy.yml이 올리는 이미지 이름(ghcr.io/<조직>/<저장소>-server)과 같아야 한다. 저장소 이름을 바꾸면 여기도 바꾼다.
+    image: ghcr.io/foonquer/foonquer-server:latest
+    ports:
+      - '3000:${PORT:-3000}'
+    env_file:
+      - .env
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'

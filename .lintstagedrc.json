@@ -1,0 +1,4 @@
+{
+  "server/**/*.ts": ["pnpm -C server exec eslint --fix", "pnpm -C server exec prettier --write"],
+  "web/**/*.{ts,tsx}": ["pnpm -C web exec prettier --write"]
+}
