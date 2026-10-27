@@ -1,0 +1,60 @@
+# CodeRabbit AI 코드 리뷰 설정 (부글 저장소 설정을 먹장깨기 구조에 맞게 옮김)
+# CodeRabbit GitHub 앱이 foonquer 조직에 설치되어 있어야 PR에 리뷰가 달린다.
+language: 'ko-KR'
+
+reviews:
+  profile: 'assertive'
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - 'develop'
+      - 'main'
+      # 앞 PR 위에 쌓은 PR(base가 feat/·init/ 브랜치)도 리뷰한다.
+      - 'feat/.*'
+      - 'init/.*'
+      - 'fix/.*'
+      - 'refactor/.*'
+  path_filters:
+    - '!server/src/generated/**'
+    - '!pnpm-lock.yaml'
+    - '!server/prisma/migrations/**'
+    - '!server/src/modules/region/data/**'
+  path_instructions:
+    - path: 'server/src/modules/**/*.router.ts'
+      instructions: >
+        Express 라우터입니다. 경로·메서드가 API 명세서(노션)와 같은지, 요청을 validate()와 zod 스키마로
+        검사하는지, 로그인이 필요한 라우트에 requireAuth(level)가 명세서의 "회원 상태별 접근" 표대로
+        붙어 있는지 확인해 주세요. 응답은 ok()/created()로만 만들어야 합니다.
+    - path: 'server/src/modules/**/*.service.ts'
+      instructions: >
+        비즈니스 로직입니다. 에러는 AppError와 모듈의 *.errors.ts(defineErrors) 코드를 쓰는지,
+        명세서의 에러 코드·HTTP 상태와 같은지, 여러 테이블을 바꾸는 처리가 한 트랜잭션인지,
+        동시에 두 번 요청돼도 안전한지(unique 제약, FOR UPDATE), Prisma 쿼리에 N+1이나
+        불필요한 전체 조회가 없는지 확인해 주세요. 응답 시각은 KST ISO 8601(toKstIso)이어야 합니다.
+    - path: 'server/src/modules/**/*.schema.ts'
+      instructions: >
+        요청 검증 zod 스키마입니다. 명세서의 필수 여부·형식·길이 제한과 같은지, 필드별 에러 코드
+        (예: EMAIL_REQUIRED)를 메시지 자리에 넣었는지 확인해 주세요.
+    - path: 'server/src/common/**'
+      instructions: >
+        세 명이 같이 쓰는 공통 코드입니다. 다른 모듈에 영향을 주는 변경인지, README의 설명과 맞는지
+        확인해 주세요.
+    - path: 'server/test/**/*.test.ts'
+      instructions: >
+        Vitest + supertest API 테스트입니다. 정상 케이스뿐 아니라 명세서 Error 항목의 예외 케이스와
+        DB에 남는 결과까지 검사하는지 확인해 주세요.
+    - path: 'server/prisma/schema.prisma'
+      instructions: >
+        ERD(docs)와 같아야 합니다. 스키마를 바꾸면 마이그레이션 파일이 같이 있는지 확인해 주세요.
+    - path: 'web/src/**'
+      instructions: >
+        React PWA 화면 코드입니다. 서버 호출은 lib/api.ts를 쓰는지 확인해 주세요.
+
+chat:
+  auto_reply: true
