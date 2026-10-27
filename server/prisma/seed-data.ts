@@ -1,4 +1,5 @@
 import type { PrismaClient } from '../src/generated/prisma/client';
+import { SEOUL, SEOUL_DONG, SEOUL_SIGUNGU } from '../src/modules/region/seoul-regions';
 
 // 바뀌지 않는 기본 데이터. 여러 번 실행해도 같은 결과가 되도록 upsert만 쓴다.
 // prisma/seed.ts(배포·로컬)와 테스트 준비(test/global-setup.ts)가 같이 쓴다.
@@ -62,9 +63,63 @@ async function seedPolicyDocuments(prisma: PrismaClient) {
   return created;
 }
 
+// 서울 구 25개·법정동 467개 (src/modules/region/data/seoul-regions.json). 법정동 코드(region.code)로 upsert한다.
+// 처음 넣을 때 서울특별시 → 구(코드 순) → 동(코드 순)으로 넣어서 새 DB에서는 id가 항상 같다.
+async function seedRegions(prisma: PrismaClient) {
+  const decimal = (n: number) => n.toFixed(7);
+  const upsert = async (
+    code: string,
+    data: { name: string; fullName: string; level: number; parentId: number | null },
+    center: { lat: number; lng: number },
+  ) => {
+    const values = {
+      ...data,
+      centerLat: decimal(center.lat),
+      centerLng: decimal(center.lng),
+    };
+    return prisma.region.upsert({
+      where: { code },
+      update: values,
+      create: { code, ...values },
+      select: { id: true },
+    });
+  };
+
+  const sido = await upsert(
+    SEOUL.code,
+    { name: SEOUL.name, fullName: SEOUL.name, level: 1, parentId: null },
+    SEOUL,
+  );
+  const sigunguIds = new Map<string, { id: number; name: string }>();
+  for (const gu of SEOUL_SIGUNGU) {
+    const row = await upsert(
+      gu.code,
+      { name: gu.name, fullName: `${SEOUL.name} ${gu.name}`, level: 2, parentId: sido.id },
+      gu,
+    );
+    sigunguIds.set(gu.code, { id: row.id, name: gu.name });
+  }
+  for (const dong of SEOUL_DONG) {
+    const gu = sigunguIds.get(dong.sigunguCode);
+    if (!gu) throw new Error(`구를 찾을 수 없습니다: ${dong.code} ${dong.name}`);
+    await upsert(
+      dong.code,
+      {
+        name: dong.name,
+        fullName: `${SEOUL.name} ${gu.name} ${dong.name}`,
+        level: 3,
+        parentId: gu.id,
+      },
+      dong,
+    );
+  }
+  return { sigunguCount: SEOUL_SIGUNGU.length, dongCount: SEOUL_DONG.length };
+}
+
 /** 기본 데이터를 모두 넣고 넣은 개수를 돌려준다 */
 export async function seedBaseData(prisma: PrismaClient) {
   const categoryCount = await seedCategories(prisma);
   const policyDocumentCreated = await seedPolicyDocuments(prisma);
-  return { categoryCount, policyDocumentCreated };
+  const regions = await seedRegions(prisma);
+  return { categoryCount, policyDocumentCreated, ...regions };
 }
