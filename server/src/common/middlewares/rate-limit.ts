@@ -14,6 +14,12 @@ interface RateLimitOptions {
 
 // 테스트에서 매번 횟수를 비우려고 만든 store를 모아 둔다.
 const stores: MemoryStore[] = [];
+const resettables: (() => void)[] = [];
+
+/** 메모리에 횟수를 세는 다른 곳(RecentEvents 등)도 resetRateLimits()로 함께 비우게 등록한다 */
+export function registerResettable(reset: () => void) {
+  resettables.push(reset);
+}
 
 /**
  * 같은 IP의 요청 횟수 제한. 서버 1대(메모리 저장) 기준이다.
@@ -36,4 +42,5 @@ export function rateLimit({ windowMs, limit, error }: RateLimitOptions): Request
 /** 테스트 전용: 모든 요청 횟수 기록을 지운다 */
 export async function resetRateLimits() {
   await Promise.all(stores.map((store) => store.resetAll()));
+  for (const reset of resettables) reset();
 }
