@@ -169,6 +169,69 @@ export const AccountError = defineErrors({
     message: '이전에 쓰던 비밀번호와 다르게 정해 주세요.',
   },
 
+  // 소셜 로그인 (AUTH-06 ~ 09). AUTH-06·07은 JSON이 아니라 {FRONT}/oauth/callback?error=코드 로 보낸다.
+  UNSUPPORTED_PROVIDER: {
+    status: 400,
+    code: 'UNSUPPORTED_PROVIDER',
+    message: '지원하지 않는 로그인 방식이에요.',
+  },
+  OAUTH_STATE_MISMATCH: {
+    status: 400,
+    code: 'OAUTH_STATE_MISMATCH',
+    message: '로그인 요청이 올바르지 않아요. 다시 시도해 주세요.',
+  },
+  OAUTH_CANCELLED: { status: 400, code: 'OAUTH_CANCELLED', message: '로그인을 취소했어요.' },
+  SOCIAL_LOGIN_FAILED: {
+    status: 500,
+    code: 'SOCIAL_LOGIN_FAILED',
+    message: '소셜 로그인 처리에 실패했어요.',
+  },
+  OAUTH_RESULT_CODE_REQUIRED: {
+    status: 400,
+    code: 'OAUTH_RESULT_CODE_REQUIRED',
+    message: 'oauthResultCode가 필요해요.',
+  },
+  OAUTH_RESULT_CODE_INVALID: {
+    status: 400,
+    code: 'OAUTH_RESULT_CODE_INVALID',
+    message: '잘못되었거나 이미 쓴 로그인 코드예요. 다시 로그인해 주세요.',
+  },
+  OAUTH_RESULT_CODE_EXPIRED: {
+    status: 401,
+    code: 'OAUTH_RESULT_CODE_EXPIRED',
+    message: '로그인 시간이 지났어요. 다시 로그인해 주세요.',
+  },
+  ACCOUNT_LINK_TOKEN_REQUIRED: {
+    status: 400,
+    code: 'ACCOUNT_LINK_TOKEN_REQUIRED',
+    message: 'accountLinkToken이 필요해요.',
+  },
+  ACCOUNT_LINK_TOKEN_INVALID: {
+    status: 401,
+    code: 'ACCOUNT_LINK_TOKEN_INVALID',
+    message: '잘못되었거나 이미 쓴 연동 요청이에요.',
+  },
+  ACCOUNT_LINK_TOKEN_EXPIRED: {
+    status: 401,
+    code: 'ACCOUNT_LINK_TOKEN_EXPIRED',
+    message: '연동 시간이 지났어요. 소셜 로그인을 다시 해 주세요.',
+  },
+  MEMBER_NOT_FOUND: {
+    status: 404,
+    code: 'MEMBER_NOT_FOUND',
+    message: '연결할 계정을 찾을 수 없어요.',
+  },
+  PROVIDER_ALREADY_LINKED: {
+    status: 409,
+    code: 'PROVIDER_ALREADY_LINKED',
+    message: '이 계정에는 이미 다른 소셜 계정이 연결되어 있어요.',
+  },
+  SOCIAL_ACCOUNT_ALREADY_USED: {
+    status: 409,
+    code: 'SOCIAL_ACCOUNT_ALREADY_USED',
+    message: '이 소셜 계정은 이미 다른 회원에 연결되어 있어요.',
+  },
+
   // 비밀번호 변경 (SET-05)
   CURRENT_PASSWORD_INCORRECT: {
     status: 400,

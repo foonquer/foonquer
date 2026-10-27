@@ -1,4 +1,5 @@
 import { CONSENT_TYPES, type ConsentType, findLatestConsents } from '../../common/auth/consent';
+import { MemberStatus } from '../../common/auth/member-status';
 import { AppError } from '../../common/errors/app-error';
 import { kstTodayAsDbDate, toKstIsoOrNull } from '../../common/time';
 import type { Prisma } from '../../generated/prisma/client';
@@ -80,4 +81,13 @@ export async function saveConsents(db: Db, userId: bigint, input: ConsentInput, 
       agreedAt: row?.agreed ? toKstIsoOrNull(row.agreedAt) : null,
     };
   });
+}
+
+/** AUTH-15 약관 동의 저장. 이미 동의한 항목은 그대로 두고(멱등) 바뀐 항목만 새로 기록한다 */
+export async function saveMemberConsents(userId: bigint, status: string, input: ConsentInput) {
+  const consents = await prisma.$transaction((tx) => saveConsents(tx, userId, input));
+  return {
+    nextAction: status === MemberStatus.PENDING ? ('PROFILE_REQUIRED' as const) : ('HOME' as const),
+    consents,
+  };
 }
