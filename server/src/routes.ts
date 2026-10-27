@@ -1,5 +1,7 @@
 import { Router } from 'express';
+import { authRouter } from './modules/auth/auth.router';
 import { healthRouter } from './modules/health/health.router';
+import { userRouter } from './modules/user/user.router';
 
 /**
  * /api/v1 아래 라우터 모음. 도메인을 추가할 때 여기에 한 줄씩 붙인다.
@@ -8,3 +10,5 @@ import { healthRouter } from './modules/health/health.router';
 export const router = Router();
 
 router.use('/health', healthRouter);
+router.use('/auth', authRouter);
+router.use('/users', userRouter);
