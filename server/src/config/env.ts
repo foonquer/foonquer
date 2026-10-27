@@ -44,6 +44,8 @@ const envSchema = z.object({
   KAKAO_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  /** 사진·영수증을 두는 S3 버킷 이름. 비우면 올린 사진을 확인할 수 없어 사진 key를 받지 않는다 */
+  AWS_S3_BUCKET: z.string().optional(),
   /** 프로필·리뷰 사진 공개 주소(CloudFront). 예) https://img.example.com — 비우면 사진 URL을 null로 준다 */
   IMAGE_BASE_URL: z
     .url()
