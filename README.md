@@ -254,6 +254,14 @@ pnpm -C server db:migrate                                       # 적용
 | `TRUST_PROXY` | 서버 앞 프록시(nginx·로드밸런서·Cloudflare) 단계 수. 요청 횟수 제한이 실제 사용자 IP를 보게 한다 | `0` |
 | `COOKIE_SECURE` | 쿠키 Secure 속성 (`true`/`false`) | `true` |
 | `TEST_DATABASE_URL` | 테스트 DB 주소. 이름이 `_test`로 끝나야 한다 | 비워 두면 `mysql://root:password@localhost:3307/foonquer_test` |
+| `FRONTEND_URL` | 웹 주소. 비밀번호 재설정 메일 링크(`{FRONTEND_URL}/password/reset?token=`)·소셜 로그인 콜백에 쓴다 | `http://localhost:5173` |
+| `MAIL_DRIVER` | `console`(메일 대신 서버 로그에 출력) / `ses`(AWS SES로 발송) | `console` |
+| `MAIL_FROM` | 보내는 사람 주소. SES에서 인증한 도메인·주소여야 한다 (`ses`일 때 필수) | 비워 둔다 |
+| `AWS_REGION` | SES·S3 리전 | `ap-northeast-2` |
+| `IMAGE_BASE_URL` | 프로필·리뷰 사진 공개 주소(CloudFront). 비우면 사진 URL을 `null`로 준다 | 비워 둔다 |
+
+> 로컬에서 회원가입을 해 보면 인증 코드 메일이 `pnpm -C server dev`를 띄운 터미널에 `[mail:console]`로 찍힌다.
+> 운영(SES)은 EC2 인스턴스 IAM 역할에 `ses:SendEmail` 권한을 주고, SES에서 보내는 도메인을 인증해야 한다. SES 샌드박스 상태에서는 인증한 주소로만 보낼 수 있다.
 
 운영 서버의 환경변수는 AWS SSM Parameter Store(`/foonquer/prod/*`)에 두고, 배포할 때 EC2에서 `.env`로 만든다.
 
