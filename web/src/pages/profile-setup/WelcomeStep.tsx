@@ -2,6 +2,7 @@ import { AGE_LABEL, GENDER_LABEL, type Welcome } from '../../api/users';
 import egg from '../../assets/illust/mukkaebi-egg.svg';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
+import { iGa } from '../../lib/korean';
 import { setNextAction } from '../../lib/session';
 import type { ProfileDraft } from './ProfileSetupPage';
 import styles from './WelcomeStep.module.css';
@@ -18,13 +19,6 @@ const CONFETTI = [
   { left: 107, top: 58, w: 7, h: 4, rotate: 40, color: '#ea7b66' },
   { left: 250, top: 49, w: 8, h: 4, rotate: -40, color: '#f2c14e' },
 ];
-
-/** 받침이 있으면 '이', 없으면 '가' (단골이 / 먹짱이 / 고수가) */
-function subjectParticle(word: string) {
-  const code = word.charCodeAt(word.length - 1) - 0xac00;
-  if (code < 0 || code > 11171) return '이';
-  return code % 28 === 0 ? '가' : '이';
-}
 
 type Props = { welcome: Welcome; draft: ProfileDraft };
 
@@ -87,7 +81,7 @@ export function WelcomeStep({ welcome, draft }: Props) {
             </span>
           </div>
           <p className={styles.goalText}>
-            {`${firstGoal.sigunguName} 맛집 ${firstGoal.target}곳을 정복하면\n${firstGoal.nextTierName}${subjectParticle(firstGoal.nextTierName)} 돼요`}
+            {`${firstGoal.sigunguName} 맛집 ${firstGoal.target}곳을 정복하면\n${iGa(firstGoal.nextTierName)} 돼요`}
           </p>
           <div
             className={styles.bar}
