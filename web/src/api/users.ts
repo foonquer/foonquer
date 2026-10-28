@@ -83,3 +83,52 @@ export const completeProfile = (body: {
 /** 닉네임 규칙 (서버와 같다): 한글·영문·숫자 2~10자 */
 export const NICKNAME_PATTERN = /^[가-힣a-zA-Z0-9]{2,10}$/;
 export const NICKNAME_MAX = 10;
+
+/** USER-05 프로필 수정 (바꿀 값만 보낸다) */
+export const updateProfile = (body: { nickname?: string; gender?: Gender; ageGroup?: AgeGroup }) =>
+  api.call<{
+    id: number;
+    nickname: string;
+    nicknameChangeableAt: string | null;
+    gender: Gender;
+    ageGroup: AgeGroup;
+  }>('PATCH', '/users/me', { body });
+
+/** LOCAL-01 내 동네 목록 */
+export type LocalRegionList = {
+  items: LocalRegion[];
+  minCount: number;
+  maxCount: number;
+  /** 이번 시즌에 아직 바꿀 수 있는지 */
+  canChange: boolean;
+  /** 다시 바꿀 수 있는 날 (YYYY-MM-DD, 지금 바꿀 수 있으면 null) */
+  nextChangeAvailableAt: string | null;
+};
+export const getLocalRegions = () => api.get<LocalRegionList>('/users/me/local-regions');
+
+/** LOCAL-02 내 동네 추가 (서버 문구 "{구} {동}을 내 동네에 추가했어요."를 토스트로 쓴다) */
+export const addLocalRegion = (regionId: number) =>
+  api.call<Omit<LocalRegionList, 'minCount' | 'maxCount'> & { added: LocalRegion }>(
+    'POST',
+    '/users/me/local-regions',
+    { body: { regionId } },
+  );
+
+/** LOCAL-03 내 동네 빼기 */
+export const removeLocalRegion = (localRegionId: number) =>
+  api.call<Omit<LocalRegionList, 'minCount' | 'maxCount' | 'added'>>(
+    'DELETE',
+    `/users/me/local-regions/${localRegionId}`,
+  );
+
+/** SET-05 비밀번호 변경. 다른 기기는 로그아웃되고 이 기기는 새 토큰을 받는다 */
+export const changePassword = (body: {
+  currentPassword: string;
+  newPassword: string;
+  newPasswordConfirm: string;
+}) =>
+  api.call<{ accessToken: string; accessTokenExpiresIn: number; passwordChangedAt: string }>(
+    'PATCH',
+    '/users/me/password',
+    { body },
+  );

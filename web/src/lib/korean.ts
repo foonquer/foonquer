@@ -17,3 +17,8 @@ export function euro(word: string) {
   const fc = finalConsonant(word);
   return `${word}${fc === 0 || fc === 8 ? '로' : '으로'}`;
 }
+
+/** 을/를 (가양동을, 서울로를) */
+export function eulReul(word: string) {
+  return `${word}${finalConsonant(word) === 0 ? '를' : '을'}`;
+}

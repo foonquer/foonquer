@@ -1,0 +1,57 @@
+/* Figma 메뉴 카드: 흰색 둥글기 20, 안쪽 4·18 / 줄 위아래 12~13 / 줄 사이 선 #edf0ea */
+.list {
+  padding: 4px 18px;
+  border-radius: 20px;
+  background: var(--mk-white);
+}
+
+.item + .item {
+  border-top: 1px solid var(--mk-divider);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 0;
+  text-align: left;
+}
+
+.label {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--mk-ink);
+}
+
+.label[data-muted='true'] {
+  color: var(--mk-subtle);
+}
+
+.right {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mk-subtle);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sectionTitle {
+  padding-left: 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-muted);
+}
