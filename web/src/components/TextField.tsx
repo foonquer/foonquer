@@ -78,8 +78,14 @@ export function TextField({
           id={messageId}
           className={styles.message}
           data-status={status}
-          // 오류는 입력창에 포커스가 없어도 바로 읽어 준다
-          role={status === 'error' || status === 'alert' ? 'alert' : undefined}
+          // 오류는 바로, 확인 결과(✓)는 하던 일을 끊지 않고 읽어 준다
+          role={
+            status === 'error' || status === 'alert'
+              ? 'alert'
+              : status === 'ok'
+                ? 'status'
+                : undefined
+          }
         >
           {status === 'ok' && '✓ '}
           {message}
