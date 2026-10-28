@@ -18,10 +18,14 @@ export async function resetDb() {
   tableNames ??= await loadTableNames();
   await prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0');
-    for (const name of tableNames ?? []) {
-      await tx.$executeRawUnsafe(`DELETE FROM \`${name}\``);
+    try {
+      for (const name of tableNames ?? []) {
+        await tx.$executeRawUnsafe(`DELETE FROM \`${name}\``);
+      }
+    } finally {
+      // 지우다 실패해도 이 연결을 다시 쓰는 다음 테스트가 외래 키 검사 없이 돌지 않게 되돌린다.
+      await tx.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1');
     }
-    await tx.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1');
   });
   await resetRateLimits();
 }
