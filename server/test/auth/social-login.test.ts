@@ -159,6 +159,13 @@ describe('AUTH-07 GET /auth/oauth/{provider}/callback', () => {
     expect(res.headers.location).toBe('http://localhost:5173/oauth/callback?error=OAUTH_CANCELLED');
   });
 
+  it('취소(access_denied)가 아닌 다른 에러로 돌아오면 SOCIAL_LOGIN_FAILED', async () => {
+    const res = await callback({ error: 'server_error', state: 'state-1' });
+    expect(res.headers.location).toBe(
+      'http://localhost:5173/oauth/callback?error=SOCIAL_LOGIN_FAILED',
+    );
+  });
+
   it('제공자 요청이 실패하면 SOCIAL_LOGIN_FAILED', async () => {
     vi.stubGlobal(
       'fetch',
@@ -292,6 +299,37 @@ describe('AUTH-08 POST /auth/oauth/exchange', () => {
 
     expect(res.body.data.nextAction).toBe('TERMS_REQUIRED');
     expect(res.body.data.isNewUser).toBe(true);
+  });
+
+  it('탈퇴한 회원에 남은 소셜 연결이면 지우고 새 회원으로 가입시킨다', async () => {
+    const withdrawn = await createMember({ status: 'D', nickname: null });
+    await prisma.socialAccount.create({
+      data: { userId: withdrawn.id, provider: 'K', providerId: 'k-1' },
+    });
+
+    const res = await exchange(await resultCode({ providerId: 'k-1' }));
+
+    expect(res.body.data).toMatchObject({ nextAction: 'TERMS_REQUIRED', isNewUser: true });
+    const social = await prisma.socialAccount.findFirstOrThrow({ where: { providerId: 'k-1' } });
+    expect(social.userId).not.toBe(withdrawn.id);
+    expect(await prisma.socialAccount.count()).toBe(1);
+  });
+
+  it('미검증 이메일은 소셜 계정에 저장하지 않아서, 나중에 같은 이메일로 온 검증된 로그인의 연동 대상이 되지 않는다', async () => {
+    await exchange(
+      await resultCode({ providerId: 'k-1', email: 'same@email.com', emailVerified: false }),
+    );
+    const first = await prisma.socialAccount.findFirstOrThrow({ where: { providerId: 'k-1' } });
+    expect(first.email).toBeNull();
+
+    const res = await exchange(
+      await resultCode(
+        { providerId: 'g-1', email: 'same@email.com', emailVerified: true },
+        'google',
+      ),
+    );
+
+    expect(res.body.data).toMatchObject({ nextAction: 'TERMS_REQUIRED', isNewUser: true });
   });
 
   it('코드는 한 번만 쓸 수 있고, 만료되면 401, 없으면 400', async () => {
@@ -485,6 +523,46 @@ describe('AUTH-15 POST /users/me/consents', () => {
     });
     expect(await prisma.memberConsent.count({ where: { userId: member.id } })).toBe(5);
     expect(res.body.data.consents[3]).toMatchObject({ type: 'MARKETING', agreed: true });
+  });
+
+  it('동의한 뒤 약관 버전이 바뀌었으면 다시 동의할 때 새 버전으로 기록한다', async () => {
+    const member = await createMember({ status: 'P', nickname: null });
+    await agree(member.id, { terms: true, privacy: true, location: true, marketing: false });
+    await prisma.policyDocument.create({
+      data: {
+        type: 'TERMS',
+        version: '2026-10-01',
+        content: '새 버전',
+        effectiveDate: new Date('2026-10-01'),
+      },
+    });
+
+    const res = await agree(member.id, {
+      terms: true,
+      privacy: true,
+      location: true,
+      marketing: false,
+    });
+
+    expect(res.body.data.consents[0]).toMatchObject({ type: 'TERMS', policyVersion: '2026-10-01' });
+    // TERMS 한 줄만 새로 쌓인다 (MARKETING은 동의하지 않아 그대로)
+    expect(await prisma.memberConsent.count({ where: { userId: member.id } })).toBe(5);
+  });
+
+  it('동의 저장이 동시에 와도 최신 이력과 마케팅 알림 설정이 어긋나지 않는다', async () => {
+    const member = await createMember({ status: 'P', nickname: null });
+
+    await Promise.all([
+      agree(member.id, { terms: true, privacy: true, location: true, marketing: true }),
+      agree(member.id, { terms: true, privacy: true, location: true, marketing: false }),
+    ]);
+
+    const latest = await prisma.memberConsent.findFirstOrThrow({
+      where: { userId: member.id, consentType: 'MARKETING' },
+      orderBy: { id: 'desc' },
+    });
+    const after = await prisma.member.findUniqueOrThrow({ where: { id: member.id } });
+    expect(after.marketingAlarm).toBe(latest.agreed);
   });
 
   it('활성 회원이 부르면 HOME', async () => {

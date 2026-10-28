@@ -44,11 +44,11 @@ const envSchema = z.object({
     .default('http://localhost:3000')
     .transform((v) => v.replace(/\/+$/, '')),
   /** 카카오 REST API 키 (카카오 로그인 client_id, 로컬 API 호출에 같이 쓴다) */
-  KAKAO_REST_API_KEY: z.string().optional(),
+  KAKAO_REST_API_KEY: blankAsUndefined(z.string().optional()),
   /** 카카오 로그인 보안의 Client Secret을 켰을 때만 */
-  KAKAO_CLIENT_SECRET: z.string().optional(),
-  GOOGLE_CLIENT_ID: z.string().optional(),
-  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  KAKAO_CLIENT_SECRET: blankAsUndefined(z.string().optional()),
+  GOOGLE_CLIENT_ID: blankAsUndefined(z.string().optional()),
+  GOOGLE_CLIENT_SECRET: blankAsUndefined(z.string().optional()),
   /** 프로필·리뷰 사진 공개 주소(CloudFront). 예) https://img.example.com — 비우면 사진 URL을 null로 준다 */
   IMAGE_BASE_URL: blankAsUndefined(
     z
