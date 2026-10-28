@@ -53,6 +53,8 @@ export function EmailSignupPage() {
   const expiry = useCountdown();
   const resend = useCountdown();
   const verifying = useRef(false);
+  /** 이메일을 바꿀 때마다 올린다. 바꾸기 전 이메일로 보낸 요청의 응답은 버린다 */
+  const emailVersion = useRef(0);
 
   const normalized = email.trim().toLowerCase();
 
@@ -89,6 +91,7 @@ export function EmailSignupPage() {
 
   const changeEmail = (value: string) => {
     setEmail(value);
+    emailVersion.current += 1;
     // 이메일을 바꾸면 인증을 처음부터
     setCodeSent(false);
     setCode('');
@@ -102,15 +105,17 @@ export function EmailSignupPage() {
   const sendCode = async () => {
     if (!emailAvailable || sending) return;
     setSending(true);
+    const version = emailVersion.current;
     try {
       const result = await sendVerificationCode(normalized);
+      if (version !== emailVersion.current) return;
       setCodeSent(true);
       setCode('');
       setCodeError('');
       expiry.start(result.expiresIn);
       resend.start(result.resendAvailableIn);
     } catch (err) {
-      toast(errorMessage(err));
+      if (version === emailVersion.current) toast(errorMessage(err));
     } finally {
       setSending(false);
     }
@@ -123,12 +128,14 @@ export function EmailSignupPage() {
     setCodeError('');
     if (digits.length !== CODE_LENGTH || verifying.current) return;
     verifying.current = true;
+    const version = emailVersion.current;
     try {
       const result = await verifyCode(normalized, digits);
+      if (version !== emailVersion.current) return;
       setVerifiedToken(result.emailVerificationToken);
       expiry.stop();
     } catch (err) {
-      setCodeError(errorMessage(err));
+      if (version === emailVersion.current) setCodeError(errorMessage(err));
     } finally {
       verifying.current = false;
     }

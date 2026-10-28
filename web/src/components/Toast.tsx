@@ -23,6 +23,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<ToastItem | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const nextId = useRef(0);
+  /** 포커스·마우스가 토스트 위에 있는지 */
+  const holding = useRef({ focus: false, hover: false });
 
   const hide = useCallback((after: number) => {
     clearTimeout(timer.current);
@@ -33,15 +35,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (input: ToastInput | string) => {
       const item = typeof input === 'string' ? { message: input } : input;
       nextId.current += 1;
+      holding.current = { focus: false, hover: false };
       setToast({ ...item, id: nextId.current });
       hide(item.action ? SHOW_WITH_ACTION_MS : SHOW_MS);
     },
     [hide],
   );
 
-  // 링크에 포커스가 있거나 마우스를 올려 둔 동안에는 사라지지 않게 멈춘다
-  const pause = () => clearTimeout(timer.current);
-  const resume = () => hide(SHOW_MS);
+  // 링크에 포커스가 있거나 마우스를 올려 둔 동안에는 사라지지 않게 멈춘다.
+  // 둘 다 끝났을 때만 다시 센다 (포커스를 둔 채 마우스만 빼도 그대로)
+  const hold = (kind: 'focus' | 'hover', on: boolean) => {
+    holding.current[kind] = on;
+    if (on) clearTimeout(timer.current);
+    else if (!holding.current.focus && !holding.current.hover) hide(SHOW_MS);
+  };
 
   return (
     <ToastContext.Provider value={show}>
@@ -51,10 +58,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={toast.id}
             className={styles.toast}
-            onFocus={pause}
-            onBlur={resume}
-            onMouseEnter={pause}
-            onMouseLeave={resume}
+            onFocus={() => hold('focus', true)}
+            onBlur={() => hold('focus', false)}
+            onMouseEnter={() => hold('hover', true)}
+            onMouseLeave={() => hold('hover', false)}
           >
             {toast.check && (
               <span className={styles.check} aria-hidden="true">
