@@ -42,6 +42,16 @@ export const routes: RouteObject[] = [
         ],
       },
 
+      // 소셜로 처음 가입해 약관 동의가 남은 회원 / 프로필 설정이 남은 회원 (화면은 #16에서 만든다)
+      {
+        element: <RequireStep step="TERMS_REQUIRED" />,
+        children: [{ path: '/signup/terms', element: <ComingSoonPage title="약관 동의" /> }],
+      },
+      {
+        element: <RequireStep step="PROFILE_REQUIRED" />,
+        children: [{ path: '/profile/setup', element: <ComingSoonPage title="프로필 설정" /> }],
+      },
+
       // 로그인한 활성 회원
       {
         element: <RequireStep step="HOME" />,

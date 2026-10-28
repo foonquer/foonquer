@@ -36,6 +36,7 @@ export function TextField({
   const autoId = useId();
   const inputId = id ?? autoId;
   const messageId = `${inputId}-message`;
+  const hintId = `${inputId}-hint`;
   const [visible, setVisible] = useState(false);
 
   return (
@@ -54,7 +55,11 @@ export function TextField({
           onChange={(e) => onChange(e.target.value)}
           type={password ? (visible ? 'text' : 'password') : type}
           aria-invalid={status === 'error' || status === 'alert' ? true : undefined}
-          aria-describedby={message ? messageId : undefined}
+          aria-describedby={
+            [inputProps['aria-describedby'], message ? messageId : null, hint ? hintId : null]
+              .filter(Boolean)
+              .join(' ') || undefined
+          }
         />
         {right}
         {password && (
@@ -69,12 +74,22 @@ export function TextField({
         )}
       </div>
       {message && (
-        <p id={messageId} className={styles.message} data-status={status}>
+        <p
+          id={messageId}
+          className={styles.message}
+          data-status={status}
+          // 오류는 입력창에 포커스가 없어도 바로 읽어 준다
+          role={status === 'error' || status === 'alert' ? 'alert' : undefined}
+        >
           {status === 'ok' && '✓ '}
           {message}
         </p>
       )}
-      {hint && <p className={styles.hint}>{hint}</p>}
+      {hint && (
+        <p id={hintId} className={styles.hint}>
+          {hint}
+        </p>
+      )}
     </div>
   );
 }

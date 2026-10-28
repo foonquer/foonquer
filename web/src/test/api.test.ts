@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api, ApiError } from '../lib/api';
 import { getAccessToken, getSession, resetSessionForTest } from '../lib/session';
 import { fail, mockApi, ok } from './http';
@@ -105,6 +105,32 @@ describe('accessToken 만료 (TOKEN_EXPIRED)', () => {
     await expect(api.get('/users/me')).rejects.toMatchObject({ code: 'TOKEN_EXPIRED' });
     expect(getSession()).toEqual({ status: 'guest' });
     expect(getAccessToken()).toBeNull();
+  });
+});
+
+describe('재발급이 일시적으로 실패할 때', () => {
+  it('서버가 503이면 로그인 상태를 그대로 두고 원래 에러를 던진다', async () => {
+    mockApi({
+      'GET /users/me': fail(401, 'TOKEN_EXPIRED', '로그인이 만료되었어요.'),
+      'POST /auth/refresh': () => ({ status: 503, body: '<html>Service Unavailable</html>' }),
+    });
+
+    await expect(api.get('/users/me')).rejects.toMatchObject({ code: 'TOKEN_EXPIRED' });
+    expect(getSession()).toEqual({ status: 'authed', nextAction: 'HOME' });
+    expect(getAccessToken()).toBe('old-token');
+  });
+
+  it('서버에 닿지 않아도 로그인 상태를 그대로 둔다', async () => {
+    mockApi({ 'GET /users/me': fail(401, 'TOKEN_EXPIRED') });
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) =>
+      String(input).includes('/auth/refresh')
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : realFetch(input, init),
+    );
+
+    await expect(api.get('/users/me')).rejects.toMatchObject({ code: 'TOKEN_EXPIRED' });
+    expect(getSession()).toEqual({ status: 'authed', nextAction: 'HOME' });
   });
 });
 

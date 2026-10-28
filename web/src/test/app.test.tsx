@@ -45,6 +45,7 @@ describe('라우트 가드', () => {
     });
 
     expect(router.state.location.pathname).toBe('/signup/terms');
+    expect(screen.queryByText('페이지를 찾을 수 없어요')).not.toBeInTheDocument();
   });
 
   it('프로필 설정 전 회원은 프로필 설정 화면으로 보낸다', () => {
@@ -54,6 +55,7 @@ describe('라우트 가드', () => {
     });
 
     expect(router.state.location.pathname).toBe('/profile/setup');
+    expect(screen.queryByText('페이지를 찾을 수 없어요')).not.toBeInTheDocument();
   });
 
   it('로그인한 회원이 로그인 화면에 오면 원래 가려던 화면(없으면 홈)으로 보낸다', () => {
