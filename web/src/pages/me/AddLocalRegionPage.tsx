@@ -10,6 +10,7 @@ import { PageTitle } from '../../components/PageTitle';
 import { Screen } from '../../components/Screen';
 import { useToast } from '../../components/Toast';
 import { errorMessage } from '../../lib/api';
+import { formatDate } from '../../lib/format';
 import { eulReul } from '../../lib/korean';
 import { useAsync } from '../../lib/useAsync';
 import styles from './LocalRegions.module.css';
@@ -26,6 +27,18 @@ export function AddLocalRegionPage() {
   const items = list.data?.items ?? [];
   const first = items[0];
   const max = list.data?.maxCount ?? 3;
+  // 주소로 바로 들어와도 목록 화면과 같은 조건으로 막는다 (목록을 못 받으면 서버가 판단)
+  const blockedReason = !list.data
+    ? null
+    : !list.data.canChange
+      ? `이번 시즌에는 이미 내 동네를 바꿨어요.${
+          list.data.nextChangeAvailableAt
+            ? ` ${formatDate(list.data.nextChangeAvailableAt)}부터 다시 바꿀 수 있어요`
+            : ''
+        }`
+      : items.length >= max
+        ? `내 동네는 최대 ${max}곳까지예요. 다른 동네를 빼고 추가해 주세요`
+        : null;
 
   const pick = (dong: Dong) => {
     if (items.some((r) => r.regionId === dong.regionId)) {
@@ -52,7 +65,7 @@ export function AddLocalRegionPage() {
   return (
     <Screen
       footer={
-        <Button onClick={() => setConfirming(true)} disabled={!picked}>
+        <Button onClick={() => setConfirming(true)} disabled={!picked || !!blockedReason}>
           {picked ? `${picked.sigunguName} ${picked.dongName} 추가하기` : '선택 완료'}
         </Button>
       }
@@ -71,8 +84,8 @@ export function AddLocalRegionPage() {
       </div>
       <div className={styles.finder}>
         <DongFinder selectedIds={picked ? [picked.regionId] : []} onSelect={pick} />
-        <p className={styles.finderNote}>
-          최대 {max}곳 · 내 동네는 한 시즌에 한 번만 바꿀 수 있어요
+        <p className={styles.finderNote} data-warn={!!blockedReason}>
+          {blockedReason ?? `최대 ${max}곳 · 내 동네는 한 시즌에 한 번만 바꿀 수 있어요`}
         </p>
       </div>
 

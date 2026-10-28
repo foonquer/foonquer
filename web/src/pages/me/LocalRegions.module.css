@@ -77,7 +77,8 @@
   color: var(--mk-muted);
 }
 
-.note[data-warn='true'] {
+.note[data-warn='true'],
+.finderNote[data-warn='true'] {
   color: var(--mk-coral-text);
 }
 

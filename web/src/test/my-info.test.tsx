@@ -160,6 +160,33 @@ describe('내 동네 관리 (LOCAL-01·02·03)', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/me/regions'));
     expect(server.calls('POST /users/me/local-regions')[0].body).toEqual({ regionId: 13 });
   });
+
+  it('추가 화면으로 바로 들어와도 이번 시즌에 이미 바꿨으면 추가를 막는다', async () => {
+    mockApi({
+      'GET /users/me/local-regions': ok(regions(false)),
+      'GET /regions/search': ok({
+        keyword: '성수',
+        items: [
+          {
+            regionId: 13,
+            dongName: '성수동',
+            sigunguId: 3,
+            sigunguName: '성동구',
+            fullName: '서울특별시 성동구 성수동',
+            centerLat: 37.54,
+            centerLng: 127.05,
+          },
+        ],
+        totalCount: 1,
+      }),
+    });
+    renderRoute('/me/regions/add');
+
+    expect(await screen.findByText(/2027.1.1부터 다시 바꿀 수 있어요/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('동 이름 검색'), { target: { value: '성수' } });
+    fireEvent.click(await screen.findByRole('button', { name: /성수동.*서울/ }));
+    expect(screen.getByRole('button', { name: '성동구 성수동 추가하기' })).toBeDisabled();
+  });
 });
 
 describe('설정·비밀번호 변경 (SET-05, AUTH-11)', () => {
@@ -179,6 +206,23 @@ describe('설정·비밀번호 변경 (SET-05, AUTH-11)', () => {
     await waitFor(() => expect(getSession().status).toBe('guest'));
     expect(server.calls('POST /auth/logout')).toHaveLength(1);
     await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/(login|onboarding)$/));
+  });
+
+  it('서버에서 로그아웃하지 못하면 로그인 상태를 유지하고 알려 준다', async () => {
+    mockApi({
+      'GET /users/me': ok(me),
+      'POST /auth/logout': fail(500, 'INTERNAL_SERVER_ERROR', '잠시 후 다시 시도해 주세요.'),
+    });
+    renderRoute('/me/settings');
+
+    expect(await screen.findByText('이메일 · 카카오')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /로그아웃/ }));
+    fireEvent.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: '로그아웃' }),
+    );
+
+    expect(await screen.findByText(/로그아웃하지 못했어요/)).toBeInTheDocument();
+    expect(getSession().status).toBe('authed');
   });
 
   it('소셜로만 가입한 계정은 비밀번호 변경 메뉴가 없다', async () => {

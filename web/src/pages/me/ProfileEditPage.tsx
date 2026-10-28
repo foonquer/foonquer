@@ -75,6 +75,8 @@ function ProfileForm({ me }: { me: MyProfile }) {
 
   useEffect(() => {
     if (!nicknameChanged || !value) return;
+    // 지난 입력의 응답이 늦게 와도 지금 화면에 쓰지 않는다
+    let alive = true;
     const timer = setTimeout(() => {
       if (value.length < 2 || value.length > NICKNAME_MAX) {
         setCheck({ nickname: value, status: 'error', message: '닉네임은 2~10자로 입력해 주세요.' });
@@ -90,16 +92,20 @@ function ProfileForm({ me }: { me: MyProfile }) {
       }
       checkNickname(value).then(
         ({ data, message }) =>
+          alive &&
           setCheck({
             nickname: value,
             status: data.available ? 'ok' : 'error',
             message: message.replace(/\.$/, ''),
           }),
         (err: unknown) =>
-          setCheck({ nickname: value, status: 'error', message: errorMessage(err) }),
+          alive && setCheck({ nickname: value, status: 'error', message: errorMessage(err) }),
       );
     }, CHECK_DELAY_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
   }, [value, nicknameChanged]);
 
   const current = nicknameChanged && check?.nickname === value ? check : null;

@@ -6,6 +6,7 @@ import { Dialog } from '../../components/Dialog';
 import { MenuList, MenuSection } from '../../components/MenuList';
 import { Screen } from '../../components/Screen';
 import { useToast } from '../../components/Toast';
+import { errorMessage } from '../../lib/api';
 import { getCurrentCoords } from '../../lib/geolocation';
 import { signOut } from '../../lib/session';
 import { useAsync } from '../../lib/useAsync';
@@ -77,9 +78,14 @@ export function SettingsPage() {
 
   const doLogout = async () => {
     setBusy(true);
-    // 서버 쿠키를 지우지 못해도(네트워크 등) 이 기기에서는 로그아웃한다
-    await logout().catch(() => undefined);
-    signOut(); // 라우트 가드가 로그인 화면으로 보낸다
+    try {
+      // 서버가 로그인 유지 쿠키를 지워야 새로 고침해도 다시 로그인되지 않는다
+      await logout();
+      signOut(); // 라우트 가드가 로그인 화면으로 보낸다
+    } catch (err) {
+      toast(`로그아웃하지 못했어요. ${errorMessage(err)}`);
+      setBusy(false);
+    }
   };
 
   return (
