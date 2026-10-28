@@ -123,6 +123,21 @@ describe('맛집 검색 결과', () => {
     expect(await screen.findByText('가양분식')).toBeInTheDocument();
   });
 
+  it('가까운 순 주소로 들어왔는데 위치가 없으면 기본 정렬로 보여 준다', async () => {
+    resetViewRegionForTest(GAYANG);
+    const server = mockApi({ 'GET /restaurants/search': page([card(1, '가양분식')], 1, false) });
+    const { router } = renderRoute('/search?keyword=칼국수&sort=DISTANCE');
+
+    expect(await screen.findByText('가양분식')).toBeInTheDocument();
+    expect(
+      screen.getByText('위치를 알 수 없어 현지인 인기 순으로 보여 드려요'),
+    ).toBeInTheDocument();
+    expect(router.state.location.search).not.toContain('sort=');
+    expect(server.calls('GET /restaurants/search').map((c) => c.query.get('sort'))).not.toContain(
+      'DISTANCE',
+    );
+  });
+
   it('더 보기 응답이 정렬을 바꾼 뒤에 오면 버린다', async () => {
     resetViewRegionForTest(GAYANG);
     const oldPage2 = deferred<ReturnType<typeof ok>>();
@@ -189,6 +204,26 @@ describe('추천 맛집 전체 목록', () => {
     renderRoute('/recommendations/list');
 
     fireEvent.click(await screen.findByRole('button', { name: '다시 시도' }));
+
+    expect(await screen.findByText('가양분식')).toBeInTheDocument();
+  });
+
+  it('위치 응답을 기다리지 않고 먼저 보여 준다', async () => {
+    silentGeolocation();
+    setMyCoordsForTest(undefined);
+    resetViewRegionForTest(GAYANG);
+    mockApi({
+      'GET /recommendations': ok({
+        type: 'LOCAL_POPULAR',
+        region: { regionId: 11, level: 3, dongName: '가양동', sigunguId: 2, sigunguName: '강서구' },
+        items: [card(1, '가양분식')],
+        page: 1,
+        size: 20,
+        totalCount: 1,
+        hasNext: false,
+      }),
+    });
+    renderRoute('/recommendations/list');
 
     expect(await screen.findByText('가양분식')).toBeInTheDocument();
   });

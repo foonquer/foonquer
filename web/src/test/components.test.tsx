@@ -34,7 +34,7 @@ describe('TextField', () => {
         message="사용할 수 있는 이메일이에요"
       />,
     );
-    expect(screen.getByText('✓ 사용할 수 있는 이메일이에요')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('✓ 사용할 수 있는 이메일이에요');
 
     rerender(
       <TextField
@@ -49,6 +49,7 @@ describe('TextField', () => {
     expect(screen.getByLabelText('이메일')).toHaveAccessibleDescription(
       '이메일 형식이 올바르지 않아요.',
     );
+    expect(screen.getByRole('alert')).toHaveTextContent('이메일 형식이 올바르지 않아요.');
   });
 });
 
@@ -199,6 +200,12 @@ describe('Toast', () => {
     act(() => vi.advanceTimersByTime(3000));
     expect(screen.getByText('가고 싶은 곳에 저장했어요')).toBeInTheDocument();
     fireEvent.focus(screen.getByRole('link', { name: '리스트 보기 ›' }));
+    act(() => vi.advanceTimersByTime(10000));
+    expect(screen.getByText('가고 싶은 곳에 저장했어요')).toBeInTheDocument();
+    // 포커스를 둔 채 마우스만 올렸다 빼도 사라지지 않는다
+    const box = screen.getByText('가고 싶은 곳에 저장했어요').parentElement!;
+    fireEvent.mouseEnter(box);
+    fireEvent.mouseLeave(box);
     act(() => vi.advanceTimersByTime(10000));
     expect(screen.getByText('가고 싶은 곳에 저장했어요')).toBeInTheDocument();
     fireEvent.blur(screen.getByRole('link', { name: '리스트 보기 ›' }));

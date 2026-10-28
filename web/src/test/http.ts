@@ -58,7 +58,9 @@ export function mockApi(handlers: Record<string, Handler>) {
         ? await route.handler(call)
         : route.handler
       : fail(404, 'NOT_MOCKED', `${call.method} ${call.path}`);
-    return new Response(JSON.stringify(reply.body), { status: reply.status });
+    // 문자열 본문은 그대로 보낸다 (HTML 오류 페이지 등 JSON이 아닌 응답)
+    const body = typeof reply.body === 'string' ? reply.body : JSON.stringify(reply.body);
+    return new Response(body, { status: reply.status });
   });
   vi.stubGlobal('fetch', fetchMock);
 
