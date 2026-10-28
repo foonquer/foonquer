@@ -28,6 +28,8 @@ export const SEOUL_CENTER = { lat: 37.5666, lng: 126.9784 };
 const saved = readJson<ViewRegion | null>(STORAGE_KEY, null);
 let state: RegionState = saved ? { status: 'ready', region: saved } : { status: 'idle' };
 const listeners = new Set<() => void>();
+/** 동네를 고르거나 로그아웃할 때마다 올린다. 그 전에 시작한 내 동네 조회의 늦은 응답은 버린다 */
+let generation = 0;
 
 function setState(next: RegionState) {
   state = next;
@@ -42,6 +44,7 @@ subscribeSession(() => {
     } catch {
       // 지우지 못해도 화면 상태는 비운다.
     }
+    generation += 1;
     setState({ status: 'idle' });
   }
 });
@@ -59,11 +62,16 @@ export function toViewRegion(dong: Dong): ViewRegion {
 /** 지역 선택 시트에서 고른 동네로 바꾼다 */
 export function setViewRegion(region: ViewRegion) {
   writeJson(STORAGE_KEY, region);
+  generation += 1;
   setState({ status: 'ready', region });
 }
 
 /** 내 동네 첫 번째 곳을 읽고(USER-04), 그 동의 중심 좌표를 찾는다(REGION-01) */
 async function loadMyFirstRegion() {
+  const started = ++generation;
+  const settle = (next: RegionState) => {
+    if (started === generation) setState(next);
+  };
   setState({ status: 'loading' });
   try {
     const me = await getMe();
@@ -71,7 +79,7 @@ async function loadMyFirstRegion() {
     if (!first) throw new Error('NO_LOCAL_REGION');
     const found = await searchDongs(`${first.sigunguName} ${first.dongName}`, 5).catch(() => null);
     const dong = found?.items.find((d) => d.regionId === first.regionId);
-    setState({
+    settle({
       status: 'ready',
       region: {
         regionId: first.regionId,
@@ -82,7 +90,7 @@ async function loadMyFirstRegion() {
       },
     });
   } catch (error) {
-    setState({ status: 'error', error });
+    settle({ status: 'error', error });
   }
 }
 
@@ -111,5 +119,6 @@ export const regionLabel = (r: { sigunguName: string; dongName: string }) =>
 
 /** 테스트에서 처음 상태로 */
 export function resetViewRegionForTest(region: ViewRegion | null = null) {
+  generation += 1;
   setState(region ? { status: 'ready', region } : { status: 'idle' });
 }

@@ -35,7 +35,10 @@ export function RecommendationListPage() {
   const { coords, ready } = useMyCoords();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<{ key: string; error: unknown } | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
+  /** 더 보기를 부르는 중인 조건 (조건이 바뀌면 버튼을 다시 쓸 수 있다) */
+  const [loadingMoreKey, setLoadingMoreKey] = useState<string | null>(null);
+  /** 오류 화면에서 다시 시도할 때 올린다 */
+  const [attempt, setAttempt] = useState(0);
   const [regionOpen, setRegionOpen] = useState(false);
 
   const key = JSON.stringify([type, region?.regionId, coords]);
@@ -53,7 +56,11 @@ export function RecommendationListPage() {
     if (!region || !ready) return;
     let alive = true;
     load(1).then(
-      (data) => alive && setLoaded({ key, ...data }),
+      (data) => {
+        if (!alive) return;
+        setLoaded({ key, ...data });
+        setError((prev) => (prev?.key === key ? null : prev));
+      },
       (err: unknown) => alive && setError({ key, error: err }),
     );
     return () => {
@@ -61,21 +68,27 @@ export function RecommendationListPage() {
     };
     // key가 조건을 모두 담고 있다
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, ready]);
+  }, [key, ready, attempt]);
 
   const current = loaded?.key === key ? loaded : null;
   const currentError = error?.key === key ? error.error : null;
 
   const loadMore = async () => {
     if (!current) return;
-    setLoadingMore(true);
+    const from = current;
+    setLoadingMoreKey(from.key);
     try {
-      const data = await load(current.page + 1);
-      setLoaded({ ...current, ...data, items: [...current.items, ...data.items] });
+      const data = await load(from.page + 1);
+      // 그사이 조건이 바뀌었거나 이미 다음 쪽을 붙였으면 버린다
+      setLoaded((prev) =>
+        prev?.key === from.key && prev.page === from.page
+          ? { ...prev, ...data, items: [...prev.items, ...data.items] }
+          : prev,
+      );
     } catch (err) {
       toast(errorMessage(err));
     } finally {
-      setLoadingMore(false);
+      setLoadingMoreKey((k) => (k === from.key ? null : k));
     }
   };
 
@@ -97,7 +110,13 @@ export function RecommendationListPage() {
         {regionError ? (
           <EmptyState title="내 동네를 불러오지 못했어요" onRetry={retry} />
         ) : currentError ? (
-          <EmptyState title={errorMessage(currentError)} />
+          <EmptyState
+            title={errorMessage(currentError)}
+            onRetry={() => {
+              setError(null);
+              setAttempt((a) => a + 1);
+            }}
+          />
         ) : !current ? (
           <Loading label="추천 맛집을 불러오는 중" />
         ) : current.items.length === 0 ? (
@@ -116,7 +135,12 @@ export function RecommendationListPage() {
               ))}
             </ol>
             {current.hasNext && (
-              <Button variant="white" size="sm" onClick={loadMore} disabled={loadingMore}>
+              <Button
+                variant="white"
+                size="sm"
+                onClick={loadMore}
+                disabled={loadingMoreKey === key}
+              >
                 더 보기
               </Button>
             )}

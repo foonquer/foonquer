@@ -55,10 +55,18 @@ export function SearchResults({ keyword, categoryId, categoryName, sort, scope }
   const { coords, ready } = useMyCoords();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<{ key: string; error: unknown } | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
+  /** 더 보기를 부르는 중인 조건 (조건이 바뀌면 버튼을 다시 쓸 수 있다) */
+  const [loadingMoreKey, setLoadingMoreKey] = useState<string | null>(null);
+  /** 오류 화면에서 다시 시도할 때 올린다 */
+  const [attempt, setAttempt] = useState(0);
   const [regionOpen, setRegionOpen] = useState(false);
 
-  const key = JSON.stringify([keyword, categoryId, sort, scope, region?.regionId, coords]);
+  // 검색 조건. 위치는 거리 표시에만 쓰여서(가까운 순 제외) 조건에 넣지 않는다:
+  // 위치가 늦게 오면 같은 조건으로 다시 받아 거리만 채운다.
+  const key = JSON.stringify([keyword, categoryId, sort, scope, region?.regionId]);
+  const coordsKey = JSON.stringify(coords);
+  // 가까운 순만 위치 응답을 기다린다
+  const canSearch = !!region && (sort !== 'DISTANCE' || ready);
   const query = (page: number) => ({
     keyword: keyword ?? undefined,
     categoryId: categoryId ?? undefined,
@@ -72,35 +80,42 @@ export function SearchResults({ keyword, categoryId, categoryName, sort, scope }
   });
 
   useEffect(() => {
-    if (!region || !ready) return;
+    if (!canSearch) return;
     let alive = true;
     searchRestaurants(query(1)).then(
-      ({ data, message }) => alive && setLoaded({ key, result: data, message }),
+      ({ data, message }) => {
+        if (!alive) return;
+        setLoaded({ key, result: data, message });
+        setError((prev) => (prev?.key === key ? null : prev));
+      },
       (err: unknown) => alive && setError({ key, error: err }),
     );
     return () => {
       alive = false;
     };
-    // key가 조건을 모두 담고 있다
+    // key·coordsKey가 조건을 모두 담고 있다
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, ready]);
+  }, [key, coordsKey, canSearch, attempt]);
 
   const current = loaded?.key === key ? loaded : null;
   const currentError = error?.key === key ? error.error : null;
 
   const loadMore = async () => {
     if (!current) return;
-    setLoadingMore(true);
+    const from = current;
+    setLoadingMoreKey(from.key);
     try {
-      const { data } = await searchRestaurants(query(current.result.page + 1));
-      setLoaded({
-        ...current,
-        result: { ...data, items: [...current.result.items, ...data.items] },
-      });
+      const { data } = await searchRestaurants(query(from.result.page + 1));
+      // 그사이 조건이 바뀌었거나 목록을 새로 받았으면 버린다
+      setLoaded((prev) =>
+        prev === from
+          ? { ...prev, result: { ...data, items: [...prev.result.items, ...data.items] } }
+          : prev,
+      );
     } catch (err) {
       toast(errorMessage(err));
     } finally {
-      setLoadingMore(false);
+      setLoadingMoreKey((k) => (k === from.key ? null : k));
     }
   };
 
@@ -136,7 +151,16 @@ export function SearchResults({ keyword, categoryId, categoryName, sort, scope }
 
   let body;
   if (regionError) body = <EmptyState title="내 동네를 불러오지 못했어요" onRetry={retry} />;
-  else if (currentError) body = <EmptyState title={errorMessage(currentError)} />;
+  else if (currentError)
+    body = (
+      <EmptyState
+        title={errorMessage(currentError)}
+        onRetry={() => {
+          setError(null);
+          setAttempt((a) => a + 1);
+        }}
+      />
+    );
   else if (!result) body = <Loading label="검색하는 중" />;
   else if (result.items.length === 0) {
     const guide = result.emptyGuide;
@@ -189,7 +213,7 @@ export function SearchResults({ keyword, categoryId, categoryName, sort, scope }
           ))}
         </ul>
         {result.hasNext && (
-          <Button variant="white" size="sm" onClick={loadMore} disabled={loadingMore}>
+          <Button variant="white" size="sm" onClick={loadMore} disabled={loadingMoreKey === key}>
             결과 더 보기
           </Button>
         )}
