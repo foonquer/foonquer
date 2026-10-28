@@ -220,6 +220,15 @@ describe('AUTH-02 POST /auth/email/verification-code', () => {
     expect(res.body.code).toBe('VERIFICATION_CODE_SEND_LIMIT');
   });
 
+  it('같은 IP에서 1분에 10번을 넘으면 이메일이 달라도 429 TOO_MANY_REQUESTS', async () => {
+    for (let i = 0; i < 10; i += 1) {
+      expect((await sendCode(`user${i}@email.com`)).status).toBe(200);
+    }
+    const res = await sendCode('user10@email.com');
+    expect(res.status).toBe(429);
+    expect(res.body.code).toBe('TOO_MANY_REQUESTS');
+  });
+
   it('메일 발송에 실패하면 500 EMAIL_SEND_FAILED이고 DB에 남기지 않는다', async () => {
     mockedSendMail.mockRejectedValueOnce(new Error('ses down'));
     vi.spyOn(console, 'error').mockImplementationOnce(() => undefined);
@@ -269,6 +278,26 @@ describe('AUTH-03 POST /auth/email/verification-code/verify', () => {
     // 무효가 된 뒤에는 맞는 코드도 받지 않는다.
     const after = await verify('new@email.com', lastCode());
     expect(after.body.code).toBe('VERIFICATION_ATTEMPTS_EXCEEDED');
+  });
+
+  it('틀린 코드를 동시에 여러 번 보내도 5번까지만 확인하고 코드를 무효화한다', async () => {
+    await sendCode('new@email.com');
+    const right = lastCode();
+    const wrong = right === '000000' ? '111111' : '000000';
+
+    const results = await Promise.all(
+      Array.from({ length: 7 }, () => verify('new@email.com', wrong)),
+    );
+
+    const codes = results.map((r) => r.body.code as string);
+    expect(codes.filter((c) => c === 'VERIFICATION_CODE_MISMATCH')).toHaveLength(4);
+    expect(codes.filter((c) => c === 'VERIFICATION_ATTEMPTS_EXCEEDED')).toHaveLength(3);
+    const row = await prisma.authTemporaryToken.findFirstOrThrow({
+      where: { tokenType: 'EMAIL_VERIFY' },
+    });
+    expect(row.payload).toMatchObject({ attempts: 5 });
+    expect(row.usedAt).not.toBeNull();
+    expect((await verify('new@email.com', right)).body.code).toBe('VERIFICATION_ATTEMPTS_EXCEEDED');
   });
 
   it('만료된 코드는 VERIFICATION_CODE_EXPIRED, 요청이 없으면 404', async () => {

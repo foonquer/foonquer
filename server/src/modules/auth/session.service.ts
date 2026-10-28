@@ -41,24 +41,30 @@ export async function loginWithEmail(email: string, password: string, now = new 
   }
 
   if (!(await verifySecret(password, member.password))) {
-    const updated = await prisma.member.update({
-      where: { id: member.id },
-      data: { loginFailCount: { increment: 1 } },
-      select: { loginFailCount: true },
-    });
-    if (updated.loginFailCount >= MAX_LOGIN_FAIL_COUNT) {
-      // 5번째 실패: 10분 잠그고 횟수는 0으로 (잠금이 풀리면 다시 1번부터)
-      const lockedUntil = new Date(now.getTime() + LOGIN_LOCK_MS);
-      await prisma.member.update({
+    // 틀린 로그인이 동시에 여러 번 와도 횟수가 5를 넘지 않게(CHECK 0~5) 한 문장으로 센다.
+    // 5번째 실패면 같은 문장에서 10분 잠그고 횟수는 0으로 (잠금이 풀리면 다시 1번부터).
+    // MySQL은 SET을 왼쪽부터 처리하므로 locked_until을 먼저 정한다.
+    const lockedUntil = new Date(now.getTime() + LOGIN_LOCK_MS);
+    const { changed, after } = await prisma.$transaction(async (tx) => {
+      const changed = await tx.$executeRaw`
+        UPDATE member
+        SET locked_until = IF(login_fail_count + 1 >= ${MAX_LOGIN_FAIL_COUNT}, ${lockedUntil}, locked_until),
+            login_fail_count = IF(login_fail_count + 1 >= ${MAX_LOGIN_FAIL_COUNT}, 0, login_fail_count + 1)
+        WHERE id = ${member.id} AND (locked_until IS NULL OR locked_until <= ${now})`;
+      const after = await tx.member.findUniqueOrThrow({
         where: { id: member.id },
-        data: { lockedUntil, loginFailCount: 0 },
+        select: { loginFailCount: true, lockedUntil: true },
       });
+      return { changed, after };
+    });
+    // 이번 실패로 잠겼거나, 그사이 다른 요청이 먼저 잠갔다
+    if (changed === 0 || (after.lockedUntil && after.lockedUntil > now)) {
       throw new AppError(AccountError.LOGIN_LOCKED, undefined, {
-        lockedUntil: toKstIso(lockedUntil),
+        lockedUntil: toKstIso(after.lockedUntil ?? lockedUntil),
       });
     }
     throw new AppError(AccountError.LOGIN_INVALID_CREDENTIALS, undefined, {
-      failCount: updated.loginFailCount,
+      failCount: after.loginFailCount,
       maxFailCount: MAX_LOGIN_FAIL_COUNT,
     });
   }
