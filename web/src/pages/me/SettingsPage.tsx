@@ -63,22 +63,22 @@ export function SettingsPage() {
   const methods = me.data?.loginMethods ?? [];
   const hasPassword = methods.includes('EMAIL');
 
+  // 화면에 보이는 권한은 오래된 값일 수 있어(변경을 지켜보지 못하는 브라우저) 누를 때마다 다시 확인한다
   const askLocation = () => {
-    if (permission === 'granted') {
-      toast('위치 권한이 켜져 있어요');
-      return;
-    }
+    const wasGranted = permission === 'granted';
     getCurrentCoords().then(
       () => {
         setPermission('granted');
-        toast('위치 권한을 켰어요');
+        toast(wasGranted ? '위치 권한이 켜져 있어요' : '위치 권한을 켰어요');
       },
-      (err: unknown) =>
+      (err: unknown) => {
+        if (err === 'DENIED') setPermission('denied');
         toast(
           err === 'DENIED'
             ? '주소창 왼쪽 자물쇠 아이콘에서 위치를 ‘허용’으로 바꿔 주세요'
             : '지금 위치를 찾지 못했어요',
-        ),
+        );
+      },
     );
   };
 
@@ -110,10 +110,17 @@ export function SettingsPage() {
         <MenuSection title="계정">
           <MenuList
             items={[
-              {
-                label: '연결된 계정',
-                value: methods.map((m) => LOGIN_METHOD_LABEL[m]).join(' · '),
-              },
+              // 못 불러왔으면 비밀번호 변경 메뉴를 보여 줄지 모르니, 다시 불러오게 한다
+              me.error
+                ? {
+                    label: '연결된 계정',
+                    value: '불러오지 못했어요 · 다시 시도',
+                    onClick: me.reload,
+                  }
+                : {
+                    label: '연결된 계정',
+                    value: methods.map((m) => LOGIN_METHOD_LABEL[m]).join(' · '),
+                  },
               ...(hasPassword ? [{ label: '비밀번호 변경', to: '/me/password' }] : []),
               { label: '로그아웃', onClick: () => setLogoutOpen(true) },
               { label: '회원 탈퇴', to: '/me/withdraw', muted: true },

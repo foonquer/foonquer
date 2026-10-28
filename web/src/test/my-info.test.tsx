@@ -242,6 +242,45 @@ describe('설정·비밀번호 변경 (SET-05, AUTH-11)', () => {
     Object.defineProperty(navigator, 'permissions', { value: undefined, configurable: true });
   });
 
+  it('계정 정보를 못 불러오면 알리고, 다시 불러오면 메뉴를 채운다', async () => {
+    let calls = 0;
+    mockApi({
+      'GET /users/me': () =>
+        ++calls === 1 ? fail(500, 'INTERNAL_SERVER_ERROR', '잠시 후 다시 시도해 주세요.') : ok(me),
+    });
+    renderRoute('/me/settings');
+
+    fireEvent.click(await screen.findByRole('button', { name: /불러오지 못했어요/ }));
+
+    expect(await screen.findByText('이메일 · 카카오')).toBeInTheDocument();
+    expect(screen.getByText('비밀번호 변경')).toBeInTheDocument();
+  });
+
+  it('위치 권한이 켜져 있다고 보여도 누르면 다시 확인한다', async () => {
+    const query = vi.fn(async () => ({
+      state: 'granted',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    Object.defineProperty(navigator, 'permissions', { value: { query }, configurable: true });
+    Object.defineProperty(navigator, 'geolocation', {
+      value: {
+        getCurrentPosition: (_ok: PositionCallback, err: PositionErrorCallback) =>
+          err({ code: 1, PERMISSION_DENIED: 1 } as GeolocationPositionError),
+      },
+      configurable: true,
+    });
+    mockApi({ 'GET /users/me': ok(me) });
+    renderRoute('/me/settings');
+
+    fireEvent.click(await screen.findByRole('button', { name: /위치 권한.*허용됨/ }));
+
+    expect(await screen.findByText(/위치를 ‘허용’으로 바꿔 주세요/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /위치 권한.*꺼짐/ })).toBeInTheDocument();
+    Object.defineProperty(navigator, 'permissions', { value: undefined, configurable: true });
+    Object.defineProperty(navigator, 'geolocation', { value: undefined, configurable: true });
+  });
+
   it('소셜로만 가입한 계정은 비밀번호 변경 메뉴가 없다', async () => {
     mockApi({ 'GET /users/me': ok({ ...me, email: null, loginMethods: ['KAKAO'] }) });
     renderRoute('/me/settings');
