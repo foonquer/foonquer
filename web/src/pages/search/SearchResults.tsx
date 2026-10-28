@@ -97,13 +97,27 @@ export function SearchResults({ keyword, categoryId, categoryName, sort, scope }
   useEffect(() => {
     if (!canSearch) return;
     let alive = true;
-    searchRestaurants(query(1)).then(
-      ({ data, message }) => {
+    // 같은 조건에서 위치만 바뀌어 다시 받을 때는 이미 펼친 쪽까지 받고,
+    // 실패하면 보던 결과는 그대로 두고 알리기만 한다
+    const shown = loaded?.key === key ? loaded : null;
+    Promise.all(
+      Array.from({ length: shown?.result.page ?? 1 }, (_, i) => searchRestaurants(query(i + 1))),
+    ).then(
+      (pages) => {
         if (!alive) return;
-        setLoaded({ key, result: data, message });
+        const last = pages[pages.length - 1].data;
+        setLoaded({
+          key,
+          result: { ...last, items: pages.flatMap((p) => p.data.items) },
+          message: pages[0].message,
+        });
         setError((prev) => (prev?.key === key ? null : prev));
       },
-      (err: unknown) => alive && setError({ key, error: err }),
+      (err: unknown) => {
+        if (!alive) return;
+        if (shown) toast(errorMessage(err));
+        else setError({ key, error: err });
+      },
     );
     return () => {
       alive = false;
