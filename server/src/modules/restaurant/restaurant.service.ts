@@ -1,0 +1,140 @@
+import { AppError } from '../../common/errors/app-error';
+import { distanceMeters } from '../../common/geo';
+import { type CurrentSeason, findCurrentSeason } from '../../common/season';
+import { toKstIso, toKstIsoOrNull } from '../../common/time';
+import { prisma } from '../../lib/prisma';
+import { businessStatusOf, parseBusinessHours } from './business-hours';
+import { loadMyStates, myStateOf } from './my-state';
+import { RestaurantError } from './restaurant.errors';
+import type { RestaurantLocationQuery } from './restaurant.schema';
+import { detailStatsOf, ratingOf } from './restaurant-stats';
+
+/** 숨김(H) 가게는 없는 것처럼 404. 폐업(C)은 기록 확인을 위해 보여 준다 */
+async function findVisibleRestaurant(restaurantId: bigint) {
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { id: restaurantId },
+    include: {
+      category: { select: { name: true } },
+      region: { select: { name: true } },
+      sigungu: { select: { name: true } },
+      restaurantStat: true,
+    },
+  });
+  if (!restaurant || restaurant.status === 'H') {
+    throw new AppError(RestaurantError.RESTAURANT_NOT_FOUND);
+  }
+  return restaurant;
+}
+
+/** 이번 시즌에 이 가게를 정복한 사람 수 (진행 중 시즌이 없으면 0) */
+function currentSeasonConquerorCount(restaurantId: bigint, season: CurrentSeason | null) {
+  if (!season) return Promise.resolve(0);
+  return prisma.conquest.count({ where: { restaurantId, seasonId: season.id } });
+}
+
+/** 정복을 만든 방문에 연결된 내 리뷰 (삭제한 리뷰는 없는 것으로 본다) */
+async function conquestReview(visitId: bigint) {
+  const review = await prisma.review.findUnique({
+    where: { visitId },
+    select: { id: true, scoreAvg: true, revisitIntent: true, content: true, status: true },
+  });
+  return review && review.status !== 'D' ? review : null;
+}
+
+/** 가게 정보, 내 정복 상태, 이번 시즌 정복자 수를 같이 읽는다 */
+async function loadContext(userId: bigint, restaurantId: bigint) {
+  const restaurant = await findVisibleRestaurant(restaurantId);
+  const season = await findCurrentSeason();
+  const [states, conquerorCount] = await Promise.all([
+    loadMyStates(userId, [restaurant.id], season),
+    currentSeasonConquerorCount(restaurant.id, season),
+  ]);
+  const state = myStateOf(states, restaurant.id);
+  const review =
+    state.conquestState === 'CONQUERED' && state.currentConquest
+      ? await conquestReview(state.currentConquest.visitId)
+      : null;
+  return { restaurant, state, conquerorCount, review };
+}
+
+/** MAP-02 가게 미리보기 */
+export async function getRestaurantPreview(
+  userId: bigint,
+  restaurantId: bigint,
+  from: RestaurantLocationQuery,
+  now = new Date(),
+) {
+  const { restaurant: r, state, conquerorCount, review } = await loadContext(userId, restaurantId);
+  const conquest = state.conquestState === 'CONQUERED' ? state.currentConquest : null;
+  const moving = state.conquestState === 'MOVING' ? state.movingVisit : null;
+
+  return {
+    restaurantId: r.id,
+    name: r.name,
+    categoryId: r.categoryId,
+    categoryName: r.category?.name ?? null,
+    sigunguName: r.sigungu.name,
+    dongName: r.region.name,
+    distanceM: distanceMeters(from, { lat: r.lat.toNumber(), lng: r.lng.toNumber() }),
+    rating: ratingOf(r.restaurantStat),
+    businessStatus: businessStatusOf(parseBusinessHours(r.businessHours), now),
+    currentSeasonConquerorCount: conquerorCount,
+    conquestState: state.conquestState,
+    conqueredInPastSeason: state.conqueredInPastSeason,
+    isSaved: state.isSaved,
+    myConquest: conquest
+      ? {
+          conqueredAt: toKstIso(conquest.conqueredAt),
+          myScore: review ? review.scoreAvg.toNumber() : null,
+          revisitIntent: review?.revisitIntent ?? null,
+          hasTextReview: !!review?.content,
+          reviewId: review?.id ?? null,
+        }
+      : null,
+    moving: moving ? { visitId: moving.id, verifiedAt: toKstIsoOrNull(moving.verifiedAt) } : null,
+  };
+}
+
+/** REST-01 음식점 상세 조회 */
+export async function getRestaurantDetail(
+  userId: bigint,
+  restaurantId: bigint,
+  from: RestaurantLocationQuery,
+  now = new Date(),
+) {
+  const { restaurant: r, state, conquerorCount, review } = await loadContext(userId, restaurantId);
+  const conquest = state.conquestState === 'CONQUERED' ? state.currentConquest : null;
+  const businessHours = parseBusinessHours(r.businessHours);
+
+  return {
+    restaurantId: r.id,
+    kakaoPlaceId: r.kakaoPlaceId,
+    name: r.name,
+    status: r.status,
+    categoryId: r.categoryId,
+    categoryName: r.category?.name ?? null,
+    kakaoCategoryName: r.kakaoCategoryName,
+    phone: r.phone,
+    roadAddress: r.roadAddress,
+    jibunAddress: r.jibunAddress,
+    sigunguName: r.sigungu.name,
+    dongName: r.region.name,
+    lat: r.lat.toNumber(),
+    lng: r.lng.toNumber(),
+    distanceM: distanceMeters(from, { lat: r.lat.toNumber(), lng: r.lng.toNumber() }),
+    kakaoPlaceUrl: `https://place.map.kakao.com/${r.kakaoPlaceId}`,
+    businessHours,
+    businessStatus: businessStatusOf(businessHours, now),
+    rating: ratingOf(r.restaurantStat),
+    stats: { ...detailStatsOf(r.restaurantStat), currentSeasonConquerorCount: conquerorCount },
+    my: {
+      conquestState: state.conquestState,
+      conqueredInPastSeason: state.conqueredInPastSeason,
+      conqueredAt: conquest ? toKstIso(conquest.conqueredAt) : null,
+      myScore: conquest && review ? review.scoreAvg.toNumber() : null,
+      myReviewId: conquest && review ? review.id : null,
+      movingVisitId: state.conquestState === 'MOVING' ? (state.movingVisit?.id ?? null) : null,
+      isSaved: state.isSaved,
+    },
+  };
+}
