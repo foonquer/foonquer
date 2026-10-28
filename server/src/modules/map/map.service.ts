@@ -59,19 +59,21 @@ export async function getMapRestaurants(userId: bigint, q: MapRestaurantsQuery) 
   const kakaoSynced = await syncKakaoPlaces(bounds);
   const season = await findCurrentSeason();
 
-  const conquered = (negate: boolean) =>
-    season
-      ? Prisma.sql`AND ${negate ? Prisma.sql`NOT` : Prisma.empty} EXISTS (
-          SELECT 1 FROM conquest q
-          WHERE q.restaurant_id = r.id AND q.user_id = ${userId} AND q.season_id = ${season.id})`
-      : negate
-        ? Prisma.empty
-        : Prisma.sql`AND FALSE`;
+  // 내 정복 상태 필터 (loadMyStates와 같은 기준): 별점 대기 방문(visit.status = V)이 있으면
+  // 이번 시즌에 정복했어도 MOVING이라 CONQUERED에서 빼고 NOT_CONQUERED에 넣는다.
+  const conqueredNow = season
+    ? Prisma.sql`EXISTS (
+        SELECT 1 FROM conquest q
+        WHERE q.restaurant_id = r.id AND q.user_id = ${userId} AND q.season_id = ${season.id})`
+    : Prisma.sql`FALSE`;
+  const moving = Prisma.sql`EXISTS (
+    SELECT 1 FROM visit v
+    WHERE v.restaurant_id = r.id AND v.user_id = ${userId} AND v.status = 'V')`;
   const conquestFilter =
     q.conquestState === 'CONQUERED'
-      ? conquered(false)
+      ? Prisma.sql`AND ${conqueredNow} AND NOT ${moving}`
       : q.conquestState === 'NOT_CONQUERED'
-        ? conquered(true)
+        ? Prisma.sql`AND (NOT ${conqueredNow} OR ${moving})`
         : Prisma.empty;
 
   const centerLat = (q.swLat + q.neLat) / 2;

@@ -60,7 +60,9 @@ foonquer/
 │   │   │   ├── auth/        # requireAuth(), accessToken(JWT), 약관 동의 확인
 │   │   │   ├── middlewares/ # validate(), rateLimit(), notFound, errorHandler
 │   │   │   ├── time.ts      # KST 시각 변환
-│   │   │   └── pagination.ts
+│   │   │   ├── pagination.ts
+│   │   │   ├── geo.ts       # 두 좌표 사이 거리(m)
+│   │   │   └── ttl-cache.ts # 정해진 시간 동안만 기억하는 메모리 캐시 (카카오 응답 캐시)
 │   │   ├── modules/         # 도메인별 router · service · schema · errors
 │   │   │   ├── auth/        # 이메일·소셜 로그인, 토큰, 비밀번호
 │   │   │   ├── user/        # 프로필, 내 동네
@@ -271,7 +273,7 @@ pnpm -C server db:migrate                                       # 적용
 | `KAKAO_CLIENT_SECRET` | 카카오 로그인 Client Secret (콘솔에서 켰을 때만) | 비워 둔다 |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 구글 OAuth 클라이언트 | Google Cloud 콘솔 |
 
-> **카카오 로컬 API**: 지도(MAP-01)·맛집 검색(SEARCH-02)은 카카오 장소 검색으로 우리 DB에 없는 가게를 저장한 뒤 DB 기준으로 응답한다. 같은 영역·같은 검색어는 24시간 동안 서버 메모리에 캐시해 카카오를 다시 부르지 않는다(하루 호출 한도). 카카오가 실패해도 에러 대신 DB 결과만 준다. 카카오 개발자 콘솔에서 이 앱의 **카카오맵 API(지도·로컬)를 활성화**해야 로컬 API가 응답한다.
+> **카카오 로컬 API**: 지도(MAP-01)·맛집 검색(SEARCH-02)은 카카오 장소 검색으로 우리 DB에 없는 가게를 저장한 뒤 DB 기준으로 응답한다. 같은 영역·같은 검색어는 24시간 동안 서버 메모리에 캐시해 카카오를 다시 부르지 않는다(하루 호출 한도). 카카오가 실패해도 에러 대신 DB 결과만 준다. 카카오는 한 번 검색에 분류(음식점·카페)마다 최대 45곳까지만 주므로, 가게가 아주 많은 동네에서 지도를 넓게 보면 일부 가게는 지도를 확대해 그 영역을 다시 볼 때 저장된다. 카카오 개발자 콘솔에서 이 앱의 **카카오맵 API(지도·로컬)를 활성화**해야 로컬 API가 응답한다.
 
 > **소셜 로그인 Redirect URI**: 카카오·구글 콘솔에 `{API_BASE_URL}/api/v1/auth/oauth/kakao/callback`, `{API_BASE_URL}/api/v1/auth/oauth/google/callback`을 글자 하나까지 똑같이 등록한다. 로그인이 끝나면 서버가 `{FRONTEND_URL}/oauth/callback?code=…`(실패 시 `?error=…`)로 보내므로 웹에 그 페이지가 있어야 한다. 웹은 받은 code로 `POST /api/v1/auth/oauth/exchange`를 부른다.
 

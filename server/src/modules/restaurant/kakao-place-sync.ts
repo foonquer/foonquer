@@ -19,6 +19,24 @@ function coordinate(value: string) {
   return Number.isFinite(n) ? n.toFixed(7) : null;
 }
 
+/** 가게 하나씩 처리할 때 동시에 진행할 개수 (DB 연결 풀 10개, 카카오 호출 수를 넘지 않게) */
+const CONCURRENCY = 5;
+
+/** items를 limit개씩 동시에 처리한다 (결과 순서는 items와 같다) */
+async function mapLimited<T, R>(items: T[], limit: number, run: (item: T) => Promise<R>) {
+  const results: R[] = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      results[index] = await run(items[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 /**
  * 가게의 동·구 찾기. 지번 주소("서울 강서구 가양동 1487")의 구·동 이름으로 먼저 찾고,
  * 못 찾으면 좌표 → 법정동 코드(카카오 coord2regioncode)로 보완한다. 서울이 아니면 null.
@@ -63,25 +81,12 @@ export async function saveKakaoPlaces(places: KakaoPlace[]) {
   });
   const byKakaoId = new Map(existing.map((r) => [r.kakaoPlaceId, r]));
 
-  const inserts: {
-    kakaoPlaceId: string;
-    name: string;
-    categoryId: number;
-    kakaoCategoryName: string | null;
-    phone: string | null;
-    roadAddress: string | null;
-    jibunAddress: string | null;
-    regionId: number;
-    sigunguId: number;
-    lat: string;
-    lng: string;
-  }[] = [];
-
-  for (const place of unique) {
+  // 가게마다 갱신·동 찾기(카카오 호출일 수 있음)를 기다리면 가게 수만큼 느려지므로 몇 개씩 동시에 처리한다.
+  const results = await mapLimited(unique, CONCURRENCY, async (place) => {
     const lat = coordinate(place.y);
     const lng = coordinate(place.x);
     const name = text(place.place_name, 100);
-    if (!lat || !lng || !name) continue;
+    if (!lat || !lng || !name) return null;
     const fields = {
       name,
       phone: text(place.phone, 20),
@@ -104,12 +109,12 @@ export async function saveKakaoPlaces(places: KakaoPlace[]) {
           data: { ...fields, lat, lng },
         });
       }
-      continue;
+      return null;
     }
 
     const area: DongWithSigungu | null = await resolveDong(place, lat, lng);
-    if (!area) continue;
-    inserts.push({
+    if (!area) return null;
+    return {
       kakaoPlaceId: place.id,
       ...fields,
       categoryId: categoryIdOf(place.category_name ?? '', place.category_group_code ?? ''),
@@ -118,8 +123,9 @@ export async function saveKakaoPlaces(places: KakaoPlace[]) {
       sigunguId: area.sigungu.id,
       lat,
       lng,
-    });
-  }
+    };
+  });
+  const inserts = results.filter((row) => row !== null);
 
   // 같은 가게를 동시에 저장하려 하면 kakao_place_id unique에 걸리므로 겹치는 행은 건너뛴다.
   if (inserts.length > 0) {
