@@ -16,9 +16,9 @@ export default defineConfig({
         lang: 'ko',
         start_url: '/',
         display: 'standalone',
-        // 아이콘·색은 임시값. 디자인이 정해지면 public/의 아이콘과 함께 바꾼다.
-        theme_color: '#FF7F6B',
-        background_color: '#FFFFFF',
+        // 색은 Figma 값(진초록·바탕색). 아이콘은 임시값이라 디자인이 정해지면 public/의 아이콘을 바꾼다.
+        theme_color: '#2F5D3D',
+        background_color: '#F1F4EE',
         icons: [
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
           { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
