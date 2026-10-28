@@ -1,0 +1,77 @@
+/* Figma S-02: 건너뛰기(top 54) / 그림 카드 346×380 (top 96) / 점(top 504) / 제목(top 528) / 설명(top 610) */
+.top {
+  display: flex;
+  justify-content: flex-end;
+  height: 52px;
+  padding: 10px var(--mk-side) 0;
+}
+
+.skip {
+  height: 24px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mk-subtle);
+}
+
+.viewport {
+  overflow: hidden;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.track {
+  display: flex;
+  transition: transform 0.3s ease;
+}
+
+.slide {
+  flex: 0 0 100%;
+  padding: 0 var(--mk-side);
+}
+
+.card {
+  display: block;
+  width: 100%;
+  max-width: 346px;
+  aspect-ratio: 346 / 380;
+  border-radius: 28px;
+  pointer-events: none;
+}
+
+.dots {
+  display: flex;
+  gap: 5px;
+  margin-top: 28px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--mk-dot);
+  transition: width 0.2s;
+}
+
+.dot[data-active='true'] {
+  width: 18px;
+  background: var(--mk-green);
+}
+
+.title {
+  margin-top: 18px;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.78px;
+  color: var(--mk-ink);
+  white-space: pre-line;
+}
+
+.body {
+  margin-top: 12px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+  white-space: pre-line;
+  word-break: keep-all;
+}
