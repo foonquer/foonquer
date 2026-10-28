@@ -191,13 +191,22 @@ describe('프로필 설정 (S-04 ~ S-07)', () => {
   });
 
   it('동네를 찾는 동안에는 결과 수 대신 불러오는 표시를 보여 준다', async () => {
-    profileApi();
+    // 응답을 테스트가 정한 때에 보낸다
+    let answer!: () => void;
+    const answered = new Promise<void>((resolve) => (answer = resolve));
+    profileApi({
+      'GET /regions/search': async () => {
+        await answered;
+        return ok({ keyword: '가양', items: [GAYANG], totalCount: 1 });
+      },
+    });
     renderRoute('/profile/setup', { session });
     await goToRegionStep();
 
     fireEvent.change(screen.getByLabelText('동 이름 검색'), { target: { value: '가양' } });
     expect(await screen.findByRole('status', { name: '동네를 찾는 중' })).toBeInTheDocument();
     expect(screen.getByText(/'가양' 검색 결과/).querySelector('span')).toBeNull();
+    answer();
     await screen.findByRole('button', { name: /가양동.*서울/ });
     expect(screen.queryByRole('status', { name: '동네를 찾는 중' })).not.toBeInTheDocument();
   });
