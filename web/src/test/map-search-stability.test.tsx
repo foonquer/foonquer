@@ -229,6 +229,77 @@ describe('추천 맛집 전체 목록', () => {
   });
 });
 
+describe('위치가 늦게 올 때', () => {
+  /** 테스트가 정한 때에 위치를 알려 주는 브라우저 */
+  function lateGeolocation() {
+    let give!: (lat: number, lng: number) => void;
+    Object.defineProperty(navigator, 'geolocation', {
+      value: {
+        getCurrentPosition: (ok: PositionCallback) => {
+          give = (lat, lng) =>
+            ok({ coords: { latitude: lat, longitude: lng } } as GeolocationPosition);
+        },
+      },
+      configurable: true,
+    });
+    setMyCoordsForTest(undefined);
+    return (lat: number, lng: number) => act(() => give(lat, lng));
+  }
+
+  const recoPage = (items: unknown[], pageNo: number, hasNext: boolean) =>
+    ok({
+      type: 'LOCAL_POPULAR',
+      region: { regionId: 11, level: 3, dongName: '가양동', sigunguId: 2, sigunguName: '강서구' },
+      items,
+      page: pageNo,
+      size: 20,
+      totalCount: 2,
+      hasNext,
+    });
+
+  it('펼친 쪽까지 거리를 붙여 다시 받는다', async () => {
+    const give = lateGeolocation();
+    resetViewRegionForTest(GAYANG);
+    const server = mockApi({
+      'GET /recommendations': ({ query }) =>
+        query.get('page') === '2'
+          ? recoPage([card(2, '둘째집')], 2, false)
+          : recoPage([card(1, '첫째집')], 1, true),
+    });
+    renderRoute('/recommendations/list');
+
+    fireEvent.click(await screen.findByRole('button', { name: '더 보기' }));
+    expect(await screen.findByText('둘째집')).toBeInTheDocument();
+
+    await give(37.56, 126.85);
+    await waitFor(() =>
+      expect(server.calls('GET /recommendations').filter((c) => c.query.has('lat'))).toHaveLength(
+        2,
+      ),
+    );
+    expect(screen.getByText('첫째집')).toBeInTheDocument();
+    expect(screen.getByText('둘째집')).toBeInTheDocument();
+  });
+
+  it('다시 받다가 실패해도 보던 목록은 그대로 두고 알린다', async () => {
+    const give = lateGeolocation();
+    resetViewRegionForTest(GAYANG);
+    mockApi({
+      'GET /recommendations': ({ query }) =>
+        query.has('lat')
+          ? fail(500, 'INTERNAL_SERVER_ERROR', '잠시 후 다시 시도해 주세요.')
+          : recoPage([card(1, '첫째집')], 1, false),
+    });
+    renderRoute('/recommendations/list');
+    expect(await screen.findByText('첫째집')).toBeInTheDocument();
+
+    await give(37.56, 126.85);
+
+    expect(await screen.findByText('잠시 후 다시 시도해 주세요.')).toBeInTheDocument();
+    expect(screen.getByText('첫째집')).toBeInTheDocument();
+  });
+});
+
 describe('영업 상태 문구', () => {
   it('닫혀 있으면 여는 시각 전·쉬는 시간·닫은 뒤를 모두 "영업시간 외"로 쓴다', () => {
     const closed = { isOpen: false, todayOpenTime: '11:00', todayCloseTime: '21:00' };
