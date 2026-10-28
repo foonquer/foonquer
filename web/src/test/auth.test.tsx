@@ -114,6 +114,45 @@ describe('이메일 회원가입 (S-03-2)', () => {
     });
   });
 
+  it('인증 확인 중에 이메일을 바꾸면 늦게 온 인증 결과를 쓰지 않는다', async () => {
+    let answer!: () => void;
+    const answered = new Promise<void>((resolve) => (answer = resolve));
+    mockApi({
+      'GET /auth/email/availability': ok(
+        { email: 'new@email.com', available: true, reason: null, provider: null },
+        '사용할 수 있는 이메일이에요.',
+      ),
+      'POST /auth/email/verification-code': ok({
+        email: 'new@email.com',
+        expiresIn: 300,
+        resendAvailableIn: 60,
+      }),
+      'POST /auth/email/verification-code/verify': async () => {
+        await answered;
+        return ok({ emailVerificationToken: 'verified', expiresIn: 1800 });
+      },
+    });
+    renderRoute('/signup/email', { session: guest });
+
+    type('이메일', 'new@email.com');
+    fireEvent.click(
+      await screen.findByRole('button', { name: '인증 코드 받기' }, { timeout: 2000 }),
+    );
+    await screen.findByLabelText('인증 코드');
+    type('인증 코드', '123456');
+    type('이메일', 'other@email.com');
+    answer();
+
+    await new Promise((r) => setTimeout(r, 50));
+    // 바뀐 이메일은 아직 인증 전이라 나머지를 다 채워도 가입할 수 없다
+    type('비밀번호', 'password1');
+    type('비밀번호 확인', 'password1');
+    fireEvent.click(screen.getByLabelText('[필수] 서비스 이용약관'));
+    fireEvent.click(screen.getByLabelText('[필수] 개인정보 수집·이용'));
+    fireEvent.click(screen.getByLabelText('[필수] 위치기반 서비스 이용약관'));
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+  });
+
   it('이미 가입한 이메일이면 서버 문구를 보여 주고 인증 코드를 받을 수 없다', async () => {
     mockApi({
       'GET /auth/email/availability': ok(
