@@ -37,24 +37,42 @@ declare global {
 
 let loading: Promise<KakaoMaps> | null = null;
 
-/** SDK 스크립트를 붙이고 kakao.maps를 준다. 실패하면 다음에 다시 시도할 수 있게 비운다 */
+/**
+ * SDK가 이만큼 안에 준비되지 않으면 실패로 본다 (ms).
+ * 도메인을 등록하지 않았거나 하위 스크립트가 막히면 maps.load 콜백이 영영 오지 않는다.
+ */
+const LOAD_TIMEOUT_MS = 10_000;
+
+/** SDK 스크립트를 붙이고 kakao.maps를 준다. 실패하면 붙인 스크립트를 떼고, 다음에 다시 시도할 수 있게 비운다 */
 export function loadKakaoMaps(appKey: string): Promise<KakaoMaps> {
+  let script: HTMLScriptElement | null = null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
   loading ??= new Promise<KakaoMaps>((resolve, reject) => {
+    const fail = () => reject(new Error('KAKAO_MAP_LOAD_FAILED'));
+    timer = setTimeout(fail, LOAD_TIMEOUT_MS);
     const ready = () => window.kakao!.maps.load(() => resolve(window.kakao!.maps));
     if (window.kakao?.maps) {
       ready();
       return;
     }
-    const script = document.createElement('script');
+    script = document.createElement('script');
     script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(appKey)}&autoload=false`;
     script.async = true;
-    script.onload = () =>
-      window.kakao?.maps ? ready() : reject(new Error('KAKAO_MAP_LOAD_FAILED'));
-    script.onerror = () => reject(new Error('KAKAO_MAP_LOAD_FAILED'));
+    script.addEventListener('load', () => (window.kakao?.maps ? ready() : fail()), { once: true });
+    script.addEventListener('error', fail, { once: true });
     document.head.append(script);
-  }).catch((err: unknown) => {
-    loading = null;
-    throw err;
-  });
+  }).then(
+    (maps) => {
+      clearTimeout(timer);
+      return maps;
+    },
+    (err: unknown) => {
+      clearTimeout(timer);
+      script?.remove();
+      loading = null;
+      throw err;
+    },
+  );
   return loading;
 }

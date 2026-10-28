@@ -1,5 +1,6 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useModalFocus } from '../lib/a11y';
 import styles from './BottomSheet.module.css';
 
 type Props = {
@@ -16,6 +17,8 @@ type Props = {
 
 /** 아래에서 올라오는 시트. 바깥(덮개)을 누르거나 Esc를 누르면 닫힌다 */
 export function BottomSheet({ open, onClose, children, label, height, dim = 'strong' }: Props) {
+  const sheet = useRef<HTMLElement>(null);
+  useModalFocus(open, sheet);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -26,14 +29,11 @@ export function BottomSheet({ open, onClose, children, label, height, dim = 'str
   if (!open) return null;
   return createPortal(
     <div className={styles.layer}>
-      <button
-        type="button"
-        className={styles.dim}
-        data-dim={dim}
-        aria-label="닫기"
-        onClick={onClose}
-      />
+      {/* 덮개는 마우스·터치로만 닫는다 (키보드는 Esc). Tab 정지점이 되지 않게 한다 */}
+      <div className={styles.dim} data-dim={dim} onClick={onClose} aria-hidden="true" />
       <section
+        ref={sheet}
+        tabIndex={-1}
         className={styles.sheet}
         role="dialog"
         aria-modal="true"

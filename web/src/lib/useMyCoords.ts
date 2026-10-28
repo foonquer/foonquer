@@ -10,10 +10,12 @@ let pending: Promise<Coords | null> | null = null;
 /** 내 위치를 한 번만 묻고 앱이 켜져 있는 동안 기억한다. 권한이 없거나 실패하면 null */
 export function requestMyCoords(): Promise<Coords | null> {
   if (cached !== undefined) return Promise.resolve(cached);
-  pending ??= getCurrentCoords(WAIT_MS).then(
-    (coords) => (cached = coords),
-    () => (cached = null),
-  );
+  // getCurrentPosition의 timeout은 권한 팝업에 답하기 전 시간을 세지 않아서, 기다리는 시간은 따로 잰다.
+  // 시간이 지나면 이번 실행 동안은 거리 없이 보여 준다 (나중에 허용해도 다시 묻지 않는다).
+  pending ??= Promise.race([
+    getCurrentCoords(WAIT_MS).catch(() => null),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), WAIT_MS)),
+  ]).then((coords) => (cached = coords));
   return pending;
 }
 

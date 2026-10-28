@@ -1,4 +1,5 @@
 import check from '../assets/icons/check.svg';
+import { radioGroupKeyDown, radioTabIndex } from '../lib/a11y';
 import styles from './ChoiceGroup.module.css';
 
 type Option<T> = { value: T; label: string };
@@ -37,6 +38,14 @@ export function ChoiceGroup<T extends string | number>({
         role="radiogroup"
         aria-label={label}
         style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}
+        onKeyDown={(e) =>
+          radioGroupKeyDown(
+            e,
+            options.map((o) => o.value),
+            value,
+            onChange,
+          )
+        }
       >
         {options.map((option) => {
           const selected = option.value === value;
@@ -46,6 +55,7 @@ export function ChoiceGroup<T extends string | number>({
               type="button"
               role="radio"
               aria-checked={selected}
+              tabIndex={radioTabIndex(option.value, value, options[0].value)}
               className={styles.option}
               data-size={size}
               style={{ height }}

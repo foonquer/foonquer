@@ -176,6 +176,16 @@ describe('소셜 로그인 콜백', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
     expect(await screen.findByText('로그인을 취소했어요.')).toBeInTheDocument();
   });
+
+  it('모르는 오류 코드면 기본 실패 문구를 보여 준다', async () => {
+    mockApi({});
+    const { router } = renderRoute('/oauth/callback?error=toString', { session: guest });
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
+    expect(
+      await screen.findByText('소셜 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.'),
+    ).toBeInTheDocument();
+  });
 });
 
 describe('비밀번호 찾기·재설정 (S-03-3 ~ S-03-9)', () => {
@@ -218,6 +228,14 @@ describe('비밀번호 찾기·재설정 (S-03-3 ~ S-03-9)', () => {
       newPassword: 'newpass123',
       newPasswordConfirm: 'newpass123',
     });
+  });
+
+  it('로그인한 상태에서도 비밀번호 찾기 화면을 열 수 있다 (만료된 링크에서 다시 받기)', async () => {
+    mockApi({});
+    const { router } = renderRoute('/password/forgot');
+
+    expect(await screen.findByRole('button', { name: '재설정 메일 보내기' })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/password/forgot');
   });
 
   it('만료된 링크면 링크 만료 화면을 보여 준다', async () => {

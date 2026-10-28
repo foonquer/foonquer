@@ -36,7 +36,11 @@ export function OAuthCallbackPage() {
     const code = params.get('code');
     const error = params.get('error');
     if (!code) {
-      fail(ERROR_MESSAGES[error ?? ''] ?? ERROR_MESSAGES.SOCIAL_LOGIN_FAILED);
+      fail(
+        error && Object.hasOwn(ERROR_MESSAGES, error)
+          ? ERROR_MESSAGES[error]
+          : ERROR_MESSAGES.SOCIAL_LOGIN_FAILED,
+      );
       return;
     }
 

@@ -1,6 +1,7 @@
-import { useEffect, useId, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from './Button';
+import { useModalFocus } from '../lib/a11y';
 import styles from './Dialog.module.css';
 
 type Props = {
@@ -28,6 +29,8 @@ export function Dialog({
   busy,
 }: Props) {
   const titleId = useId();
+  const box = useRef<HTMLElement>(null);
+  useModalFocus(open, box);
 
   useEffect(() => {
     if (!open) return;
@@ -41,6 +44,8 @@ export function Dialog({
     <div className={styles.layer}>
       <div className={styles.dim} onClick={onCancel} aria-hidden="true" />
       <section
+        ref={box}
+        tabIndex={-1}
         className={styles.dialog}
         role="alertdialog"
         aria-modal="true"
