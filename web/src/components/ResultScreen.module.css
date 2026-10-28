@@ -1,0 +1,63 @@
+/* Figma S-03-4: 아이콘 원 96 (top 160), 제목 Bold 22 (top 288), 설명 14 (top 326), 안내 카드 (top 408) */
+.body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 62px var(--mk-side) 24px;
+  text-align: center;
+}
+
+.iconCircle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 48px;
+  background: var(--mk-park);
+}
+
+.iconCircle img {
+  width: 56px;
+  height: 56px;
+}
+
+.title {
+  margin-top: 32px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.description {
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  color: var(--mk-muted);
+  white-space: pre-line;
+  word-break: keep-all;
+}
+
+.info {
+  width: 100%;
+  margin-top: 38px;
+  padding: 16px 18px 24px;
+  border-radius: 20px;
+  background: var(--mk-white);
+  text-align: left;
+}
+
+.infoTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.bullets {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--mk-muted);
+}

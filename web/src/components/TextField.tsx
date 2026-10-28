@@ -11,6 +11,8 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> &
   status?: FieldStatus;
   /** 입력창 아래 문구. ok면 앞에 ✓가 붙는다 */
   message?: ReactNode;
+  /** 문구 색을 입력창 상태와 다르게 (예: 테두리는 기본, 문구는 초록 ✓) */
+  messageStatus?: FieldStatus;
   /** message 아래 작은 회색 안내 */
   hint?: ReactNode;
   /** 입력창 오른쪽 끝 (글자 수, 남은 시간, 버튼) */
@@ -25,6 +27,7 @@ export function TextField({
   onChange,
   status = 'default',
   message,
+  messageStatus,
   hint,
   right,
   password,
@@ -37,6 +40,7 @@ export function TextField({
   const inputId = id ?? autoId;
   const messageId = `${inputId}-message`;
   const [visible, setVisible] = useState(false);
+  const tone = messageStatus ?? status;
 
   return (
     <div className={`${styles.field} ${className ?? ''}`}>
@@ -69,8 +73,8 @@ export function TextField({
         )}
       </div>
       {message && (
-        <p id={messageId} className={styles.message} data-status={status}>
-          {status === 'ok' && '✓ '}
+        <p id={messageId} className={styles.message} data-status={tone}>
+          {tone === 'ok' && '✓ '}
           {message}
         </p>
       )}

@@ -1,0 +1,73 @@
+/* Figma: 흰 카드, 안쪽 16, 둥글기 20, 줄 사이 12 */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 20px;
+  background: var(--mk-white);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.item {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.check {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+}
+
+.check[data-off='true'] {
+  border: 1.5px solid var(--mk-check-off);
+  border-radius: 11px;
+  background: var(--mk-white);
+}
+
+.row:has(input:focus-visible) .check,
+.item:has(input:focus-visible) .check {
+  outline: 2px solid var(--mk-green);
+  outline-offset: 2px;
+  border-radius: 11px;
+}
+
+.all {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.divider {
+  height: 1px;
+  background: var(--mk-divider);
+}
+
+.label {
+  font-size: 13px;
+  color: var(--mk-muted);
+}
+
+.more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-right: -6px;
+}
+
+.more img {
+  width: 6.6px;
+  height: 11.6px;
+}
