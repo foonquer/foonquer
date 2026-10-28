@@ -4,6 +4,7 @@ import type { Dong } from '../../api/regions';
 import { completeProfile, type AgeGroup, type Gender, type Welcome } from '../../api/users';
 import { useToast } from '../../components/Toast';
 import { ApiError, errorMessage } from '../../lib/api';
+import { getSession, setNextAction, subscribeSession } from '../../lib/session';
 import { InfoStep } from './InfoStep';
 import { NicknameStep } from './NicknameStep';
 import { RegionStep } from './RegionStep';
@@ -19,6 +20,18 @@ export type ProfileDraft = {
 const STEPS = ['nickname', 'info', 'region'] as const;
 type Step = (typeof STEPS)[number];
 
+type Completed = { welcome: Welcome; draft: ProfileDraft };
+
+/**
+ * 저장을 마친 S-07 내용. 다른 화면에 갔다 돌아와도 같은 완료 화면을 보여 준다 (이 탭 메모리에만).
+ * 홈으로 넘어가거나(nextAction이 바뀜) 로그아웃하면 지운다.
+ */
+let completed: Completed | null = null;
+subscribeSession(() => {
+  const session = getSession();
+  if (session.status !== 'authed' || session.nextAction !== 'PROFILE_REQUIRED') completed = null;
+});
+
 /**
  * 프로필 설정 S-04 닉네임 → S-05 성별·나이대 → S-06 내 동네 → (USER-03 저장) → S-07 가입 완료.
  * 단계는 주소(?step=)에 남겨 브라우저 뒤로 가기로 이전 단계로 갈 수 있게 한다.
@@ -33,7 +46,7 @@ export function ProfileSetupPage() {
     ageGroup: null,
     regions: [],
   });
-  const [welcome, setWelcome] = useState<{ welcome: Welcome; draft: ProfileDraft } | null>(null);
+  const [welcome, setWelcome] = useState<Completed | null>(() => completed);
   const [saving, setSaving] = useState(false);
 
   const update = (patch: Partial<ProfileDraft>) => setDraft((d) => ({ ...d, ...patch }));
@@ -58,8 +71,14 @@ export function ProfileSetupPage() {
       });
       // 아직 nextAction을 HOME으로 바꾸지 않는다 (바꾸면 라우트 가드가 바로 홈으로 보낸다).
       // S-07에서 "첫 맛집 찾으러 가기"를 누를 때 바꾼다.
-      setWelcome({ welcome: result.welcome, draft });
+      completed = { welcome: result.welcome, draft };
+      setWelcome(completed);
     } catch (err) {
+      // 이미 완료한 회원 (다른 탭에서 마쳤거나 완료 화면 내용을 잃었을 때)은 홈으로
+      if (err instanceof ApiError && err.code === 'PROFILE_ALREADY_COMPLETED') {
+        setNextAction('HOME');
+        return;
+      }
       toast(errorMessage(err));
       // 그사이 닉네임을 누가 가져갔으면 닉네임 단계로
       if (err instanceof ApiError && err.code === 'NICKNAME_DUPLICATE') goTo('nickname');
