@@ -13,6 +13,8 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> &
   message?: ReactNode;
   /** 문구 색을 입력창 상태와 다르게 (예: 테두리는 기본, 문구는 초록 ✓) */
   messageStatus?: FieldStatus;
+  /** 문구 뒤에 붙는 버튼 등 (읽어 주는 영역 밖이라 바뀌어도 다시 읽지 않는다) */
+  messageAction?: ReactNode;
   /** message 아래 작은 회색 안내 */
   hint?: ReactNode;
   /** 입력창 오른쪽 끝 (글자 수, 남은 시간, 버튼) */
@@ -28,6 +30,7 @@ export function TextField({
   status = 'default',
   message,
   messageStatus,
+  messageAction,
   hint,
   right,
   password,
@@ -78,17 +81,18 @@ export function TextField({
         )}
       </div>
       {message && (
-        <p
-          id={messageId}
-          className={styles.message}
-          data-status={tone}
-          // 오류는 바로, 확인 결과(✓)는 하던 일을 끊지 않고 읽어 준다
-          role={
-            tone === 'error' || tone === 'alert' ? 'alert' : tone === 'ok' ? 'status' : undefined
-          }
-        >
-          {tone === 'ok' && '✓ '}
-          {message}
+        <p className={styles.message} data-status={tone}>
+          <span
+            id={messageId}
+            // 오류는 바로, 확인 결과(✓)는 하던 일을 끊지 않고 읽어 준다
+            role={
+              tone === 'error' || tone === 'alert' ? 'alert' : tone === 'ok' ? 'status' : undefined
+            }
+          >
+            {tone === 'ok' && '✓ '}
+            {message}
+          </span>
+          {messageAction}
         </p>
       )}
       {hint && (

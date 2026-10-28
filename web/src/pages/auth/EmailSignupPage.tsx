@@ -173,9 +173,11 @@ export function EmailSignupPage() {
     }
   };
 
-  const emailMessage = codeSent ? (
+  const emailMessage = codeSent ? '인증 코드를 보냈어요' : emailCheck?.message;
+  // 남은 초가 매초 바뀌므로 읽어 주는 문구와 따로 둔다
+  const resendButton = codeSent && (
     <>
-      인증 코드를 보냈어요 ·
+      {' ·'}
       <button
         type="button"
         className={styles.resend}
@@ -185,8 +187,6 @@ export function EmailSignupPage() {
         코드 다시 보내기{resend.running ? ` (${resend.remaining}초 후)` : ''}
       </button>
     </>
-  ) : (
-    emailCheck?.message
   );
 
   return (
@@ -211,6 +211,7 @@ export function EmailSignupPage() {
             onChange={changeEmail}
             status={codeSent ? 'default' : (emailCheck?.status ?? 'default')}
             message={emailMessage}
+            messageAction={resendButton}
             messageStatus={codeSent ? 'ok' : undefined}
             right={
               emailAvailable && !codeSent ? (
