@@ -33,6 +33,8 @@ export function NicknameStep({ nickname: initial, onNext }: Props) {
 
   useEffect(() => {
     if (!value) return;
+    // 지난 입력의 응답이 늦게 와도 지금 화면에 쓰지 않는다
+    let alive = true;
     const timer = setTimeout(() => {
       const problem = ruleMessage(value);
       if (problem) {
@@ -41,6 +43,7 @@ export function NicknameStep({ nickname: initial, onNext }: Props) {
       }
       checkNickname(value).then(
         ({ data, message }) =>
+          alive &&
           setCheck({
             nickname: value,
             status: data.available ? 'ok' : 'error',
@@ -50,10 +53,13 @@ export function NicknameStep({ nickname: initial, onNext }: Props) {
                 : message.replace(/\.$/, ''),
           }),
         (err: unknown) =>
-          setCheck({ nickname: value, status: 'error', message: errorMessage(err) }),
+          alive && setCheck({ nickname: value, status: 'error', message: errorMessage(err) }),
       );
     }, CHECK_DELAY_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
   }, [value]);
 
   const current = check?.nickname === value ? check : null;

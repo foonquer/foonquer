@@ -141,6 +141,37 @@ describe('프로필 설정 (S-04 ~ S-07)', () => {
     expect(server.calls('GET /users/nickname/availability')).toHaveLength(0);
   });
 
+  it('성별·나이대는 방향키로 고르고, 고른 칸만 Tab으로 들어온다', async () => {
+    profileApi();
+    renderRoute('/profile/setup', { session });
+    fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '아기깨비' } });
+    await screen.findByText(/사용할 수 있는/, {}, { timeout: 2000 });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+
+    const female = await screen.findByRole('radio', { name: '여성' });
+    expect(female).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('radio', { name: '남성' })).toHaveAttribute('tabindex', '-1');
+
+    female.focus();
+    fireEvent.keyDown(female, { key: 'ArrowRight' });
+    const male = screen.getByRole('radio', { name: '남성' });
+    expect(male).toHaveAttribute('aria-checked', 'true');
+    expect(male).toHaveAttribute('tabindex', '0');
+    expect(male).toHaveFocus();
+  });
+
+  it('동네를 찾는 동안에는 결과 수 대신 불러오는 표시를 보여 준다', async () => {
+    profileApi();
+    renderRoute('/profile/setup', { session });
+    await goToRegionStep();
+
+    fireEvent.change(screen.getByLabelText('동 이름 검색'), { target: { value: '가양' } });
+    expect(await screen.findByRole('status', { name: '동네를 찾는 중' })).toBeInTheDocument();
+    expect(screen.getByText(/'가양' 검색 결과/).querySelector('span')).toBeNull();
+    await screen.findByRole('button', { name: /가양동.*서울/ });
+    expect(screen.queryByRole('status', { name: '동네를 찾는 중' })).not.toBeInTheDocument();
+  });
+
   it('내 동네는 3곳까지 고를 수 있고, 고른 동네를 다시 누르면 빠진다', async () => {
     profileApi();
     renderRoute('/profile/setup', { session });

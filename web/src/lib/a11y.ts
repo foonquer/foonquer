@@ -61,7 +61,10 @@ export function radioGroupKeyDown<T>(
   current: T | null,
   onChange: (value: T) => void,
 ) {
-  const index = current === null ? -1 : values.indexOf(current);
+  const buttons = e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]');
+  // 아직 아무것도 안 골랐으면 지금 포커스가 있는 칸에서 출발한다
+  const focused = Array.from(buttons).findIndex((b) => b === document.activeElement);
+  const index = current === null ? focused : values.indexOf(current);
   let next: number | null = null;
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (index + 1) % values.length;
   if (e.key === 'ArrowLeft' || e.key === 'ArrowUp')
@@ -71,7 +74,6 @@ export function radioGroupKeyDown<T>(
   if (next === null) return;
   e.preventDefault();
   onChange(values[next]);
-  const buttons = e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]');
   buttons[next]?.focus();
 }
 

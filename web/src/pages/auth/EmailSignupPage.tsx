@@ -59,6 +59,8 @@ export function EmailSignupPage() {
   // AUTH-01 이메일 중복 확인 (쓰다 멈추면)
   useEffect(() => {
     if (!normalized) return;
+    // 지난 입력의 응답이 늦게 와도 지금 화면에 쓰지 않는다
+    let alive = true;
     const timer = setTimeout(() => {
       if (!isEmail(normalized)) {
         setCheck({ email: normalized, status: 'error', message: '이메일 형식이 올바르지 않아요.' });
@@ -66,16 +68,20 @@ export function EmailSignupPage() {
       }
       checkEmail(normalized).then(
         ({ data, message }) =>
+          alive &&
           setCheck({
             email: normalized,
             status: data.available ? 'ok' : 'error',
             message: trimPeriod(message),
           }),
         (err: unknown) =>
-          setCheck({ email: normalized, status: 'error', message: errorMessage(err) }),
+          alive && setCheck({ email: normalized, status: 'error', message: errorMessage(err) }),
       );
     }, CHECK_DELAY_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
   }, [normalized]);
 
   const emailCheck = check?.email === normalized ? check : null;

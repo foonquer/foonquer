@@ -50,7 +50,6 @@ export const routes: RouteObject[] = [
           { path: '/login', element: <LoginPage /> },
           { path: '/login/email', element: <EmailLoginPage /> },
           { path: '/signup/email', element: <EmailSignupPage /> },
-          { path: '/password/forgot', element: <ForgotPasswordPage /> },
           { path: '/oauth/link', element: <AccountLinkPage /> },
         ],
       },
@@ -58,6 +57,8 @@ export const routes: RouteObject[] = [
       // 로그인 여부와 상관없이 (서버가 보내는 주소: 소셜 로그인 콜백, 비밀번호 재설정 메일 링크)
       { path: '/oauth/callback', element: <OAuthCallbackPage /> }, // ?code= | ?error=
       { path: '/password/reset', element: <ResetPasswordPage /> }, // ?token=
+      // 재설정 링크가 만료되면 로그인한 상태에서도 다시 메일을 받으러 온다
+      { path: '/password/forgot', element: <ForgotPasswordPage /> },
       // 약관 전문은 가입 화면에서도 연다 (다른 사람 담당, 준비 중)
       { path: '/terms', element: <ComingSoonPage title="이용약관 · 개인정보 처리방침" /> }, // ?type=
 
