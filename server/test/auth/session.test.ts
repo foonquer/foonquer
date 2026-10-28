@@ -105,6 +105,30 @@ describe('AUTH-05 POST /auth/login', () => {
     expect((await login('junhyung@email.com', PASSWORD)).status).toBe(200);
   });
 
+  it('4번 틀린 상태에서 틀린 로그인이 동시에 와도 500 없이 잠그고 횟수는 0으로 둔다', async () => {
+    const member = await emailMember({ loginFailCount: 4 });
+
+    const results = await Promise.all([
+      login('junhyung@email.com', 'wrong1234'),
+      login('junhyung@email.com', 'wrong1234'),
+      login('junhyung@email.com', 'wrong1234'),
+    ]);
+
+    expect(results.map((r) => r.status)).toEqual([423, 423, 423]);
+    const row = await prisma.member.findUniqueOrThrow({ where: { id: member.id } });
+    expect(row.loginFailCount).toBe(0);
+    expect(row.lockedUntil!.getTime()).toBeGreaterThan(Date.now() + 9 * 60 * 1000);
+  });
+
+  it('같은 IP에서 1분에 20번을 넘으면 429 TOO_MANY_REQUESTS', async () => {
+    for (let i = 0; i < 20; i += 1) {
+      expect((await login(`nobody${i}@email.com`, 'wrong1234')).status).toBe(401);
+    }
+    const res = await login('nobody@email.com', 'wrong1234');
+    expect(res.status).toBe(429);
+    expect(res.body.code).toBe('TOO_MANY_REQUESTS');
+  });
+
   it('가입하지 않은 이메일·소셜 전용 계정은 같은 코드로 답하고 failCount는 null', async () => {
     await createMember({ email: 'social@email.com', password: null });
 

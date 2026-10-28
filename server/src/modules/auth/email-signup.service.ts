@@ -1,6 +1,7 @@
 import { MemberStatus } from '../../common/auth/member-status';
 import { randomDigits, randomToken } from '../../common/crypto';
 import { AppError } from '../../common/errors/app-error';
+import type { ErrorCodeDef } from '../../common/errors/error-codes';
 import { Prisma } from '../../generated/prisma/client';
 import { sendMail } from '../../lib/mailer';
 import { prisma } from '../../lib/prisma';
@@ -155,45 +156,53 @@ export async function sendVerificationCode(email: string, now = new Date()) {
   };
 }
 
+type VerifyResult =
+  | { kind: 'error'; error: ErrorCodeDef }
+  | { kind: 'mismatch'; remainingAttempts: number }
+  | { kind: 'ok'; emailVerificationToken: string };
+
 /** AUTH-03 이메일 인증 코드 확인 → 회원가입용 emailVerificationToken 발급 */
 export async function verifyEmailCode(email: string, code: string, now = new Date()) {
-  const row = await prisma.authTemporaryToken.findFirst({
+  const latest = await prisma.authTemporaryToken.findFirst({
     where: { tokenType: 'EMAIL_VERIFY', payload: { path: '$.email', equals: email } },
     orderBy: { id: 'desc' },
+    select: { id: true },
   });
-  if (!row) throw new AppError(AccountError.VERIFICATION_REQUEST_NOT_FOUND);
+  if (!latest) throw new AppError(AccountError.VERIFICATION_REQUEST_NOT_FOUND);
 
-  const payload = readPayload<EmailVerifyPayload>(row);
-  const state = tokenState(row, now);
-  if (state === 'used') {
-    if (payload.attempts >= VERIFICATION_MAX_ATTEMPTS) {
-      throw new AppError(AccountError.VERIFICATION_ATTEMPTS_EXCEEDED);
+  // 같은 코드 요청이 동시에 여러 번 와도 시도 횟수를 하나씩 세도록 행을 잠그고 확인한다.
+  // 틀린 횟수는 저장해야 하므로 트랜잭션 안에서는 던지지 않고 결과만 돌려준다.
+  const result = await prisma.$transaction(async (tx): Promise<VerifyResult> => {
+    await tx.$queryRaw`SELECT id FROM auth_temporary_token WHERE id = ${latest.id} FOR UPDATE`;
+    const row = await tx.authTemporaryToken.findUniqueOrThrow({ where: { id: latest.id } });
+    const payload = readPayload<EmailVerifyPayload>(row);
+    const state = tokenState(row, now);
+    if (state === 'used') {
+      return {
+        kind: 'error',
+        error:
+          payload.attempts >= VERIFICATION_MAX_ATTEMPTS
+            ? AccountError.VERIFICATION_ATTEMPTS_EXCEEDED
+            : AccountError.VERIFICATION_REQUEST_NOT_FOUND,
+      };
     }
-    throw new AppError(AccountError.VERIFICATION_REQUEST_NOT_FOUND);
-  }
-  if (state === 'expired') throw new AppError(AccountError.VERIFICATION_CODE_EXPIRED);
+    if (state === 'expired')
+      return { kind: 'error', error: AccountError.VERIFICATION_CODE_EXPIRED };
 
-  if (!(await verifySecret(code, payload.codeHash))) {
-    const attempts = payload.attempts + 1;
-    const exceeded = attempts >= VERIFICATION_MAX_ATTEMPTS;
-    await prisma.authTemporaryToken.update({
-      where: { id: row.id },
-      data: { payload: { ...payload, attempts }, usedAt: exceeded ? now : undefined },
-    });
-    if (exceeded) throw new AppError(AccountError.VERIFICATION_ATTEMPTS_EXCEEDED);
-    const remainingAttempts = VERIFICATION_MAX_ATTEMPTS - attempts;
-    throw new AppError(
-      AccountError.VERIFICATION_CODE_MISMATCH,
-      `인증 코드가 맞지 않아요. (${remainingAttempts}번 남았어요)`,
-      { remainingAttempts },
-    );
-  }
-
-  const emailVerificationToken = randomToken();
-  await prisma.$transaction(async (tx) => {
-    if (!(await consumeTemporaryToken(tx, row.id, now))) {
-      throw new AppError(AccountError.VERIFICATION_REQUEST_NOT_FOUND);
+    if (!(await verifySecret(code, payload.codeHash))) {
+      const attempts = payload.attempts + 1;
+      const exceeded = attempts >= VERIFICATION_MAX_ATTEMPTS;
+      await tx.authTemporaryToken.update({
+        where: { id: row.id },
+        data: { payload: { ...payload, attempts }, usedAt: exceeded ? now : undefined },
+      });
+      return exceeded
+        ? { kind: 'error', error: AccountError.VERIFICATION_ATTEMPTS_EXCEEDED }
+        : { kind: 'mismatch', remainingAttempts: VERIFICATION_MAX_ATTEMPTS - attempts };
     }
+
+    await tx.authTemporaryToken.update({ where: { id: row.id }, data: { usedAt: now } });
+    const emailVerificationToken = randomToken();
     const verified: EmailVerifiedPayload = { email };
     await createTemporaryToken(tx, {
       token: emailVerificationToken,
@@ -202,9 +211,22 @@ export async function verifyEmailCode(email: string, code: string, now = new Dat
       expiresInSeconds: EMAIL_VERIFIED_EXPIRES_IN,
       now,
     });
+    return { kind: 'ok', emailVerificationToken };
   });
 
-  return { emailVerificationToken, expiresIn: EMAIL_VERIFIED_EXPIRES_IN };
+  if (result.kind === 'error') throw new AppError(result.error);
+  if (result.kind === 'mismatch') {
+    const { remainingAttempts } = result;
+    throw new AppError(
+      AccountError.VERIFICATION_CODE_MISMATCH,
+      `인증 코드가 맞지 않아요. (${remainingAttempts}번 남았어요)`,
+      { remainingAttempts },
+    );
+  }
+  return {
+    emailVerificationToken: result.emailVerificationToken,
+    expiresIn: EMAIL_VERIFIED_EXPIRES_IN,
+  };
 }
 
 /** AUTH-04 이메일 회원가입 → status P 회원 + 약관 동의 + 로그인 */

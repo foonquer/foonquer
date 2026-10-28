@@ -60,7 +60,9 @@ foonquer/
 │   │   │   ├── auth/        # requireAuth(), accessToken(JWT), 약관 동의 확인
 │   │   │   ├── middlewares/ # validate(), rateLimit(), notFound, errorHandler
 │   │   │   ├── time.ts      # KST 시각 변환
-│   │   │   └── pagination.ts
+│   │   │   ├── pagination.ts
+│   │   │   ├── geo.ts       # 두 좌표 사이 거리(m)
+│   │   │   └── ttl-cache.ts # 정해진 시간 동안만 기억하는 메모리 캐시 (카카오 응답 캐시)
 │   │   ├── modules/         # 도메인별 router · service · schema · errors
 │   │   │   ├── auth/        # 이메일·소셜 로그인, 토큰, 비밀번호
 │   │   │   ├── user/        # 프로필, 내 동네
@@ -285,7 +287,7 @@ pnpm -C server db:migrate                                       # 적용
 | `COOKIE_SECURE` | 쿠키 Secure 속성 (`true`/`false`) | `true` |
 | `TEST_DATABASE_URL` | 테스트 DB 주소. 이름이 `_test`로 끝나야 한다 | 비워 두면 `mysql://root:password@localhost:3307/foonquer_test` |
 | `FRONTEND_URL` | 웹 주소. 비밀번호 재설정 메일 링크(`{FRONTEND_URL}/password/reset?token=`)·소셜 로그인 콜백에 쓴다 | `http://localhost:5173` |
-| `MAIL_DRIVER` | `console`(메일 대신 서버 로그에 출력) / `ses`(AWS SES로 발송) | `console` |
+| `MAIL_DRIVER` | `console`(메일 대신 서버 로그에 출력) / `ses`(AWS SES로 발송). 운영(`NODE_ENV=production`)에서는 `ses`가 아니면 서버가 시작하지 않는다 | `console` |
 | `MAIL_FROM` | 보내는 사람 주소. SES에서 인증한 도메인·주소여야 한다 (`ses`일 때 필수) | 비워 둔다 |
 | `AWS_REGION` | SES·S3 리전 | `ap-northeast-2` |
 | `IMAGE_BASE_URL` | 프로필·리뷰 사진 공개 주소(CloudFront). 비우면 사진 URL을 `null`로 준다 | 비워 둔다 |
@@ -295,7 +297,7 @@ pnpm -C server db:migrate                                       # 적용
 | `KAKAO_CLIENT_SECRET` | 카카오 로그인 Client Secret (콘솔에서 켰을 때만) | 비워 둔다 |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 구글 OAuth 클라이언트 | Google Cloud 콘솔 |
 
-> **카카오 로컬 API**: 지도(MAP-01)·맛집 검색(SEARCH-02)은 카카오 장소 검색으로 우리 DB에 없는 가게를 저장한 뒤 DB 기준으로 응답한다. 같은 영역·같은 검색어는 24시간 동안 서버 메모리에 캐시해 카카오를 다시 부르지 않는다(하루 호출 한도). 카카오가 실패해도 에러 대신 DB 결과만 준다. 카카오 개발자 콘솔에서 이 앱의 **카카오맵 API(지도·로컬)를 활성화**해야 로컬 API가 응답한다.
+> **카카오 로컬 API**: 지도(MAP-01)·맛집 검색(SEARCH-02)은 카카오 장소 검색으로 우리 DB에 없는 가게를 저장한 뒤 DB 기준으로 응답한다. 같은 영역·같은 검색어는 24시간 동안 서버 메모리에 캐시해 카카오를 다시 부르지 않는다(하루 호출 한도). 카카오가 실패해도 에러 대신 DB 결과만 준다. 카카오는 한 번 검색에 분류(음식점·카페)마다 최대 45곳까지만 주므로, 가게가 아주 많은 동네에서 지도를 넓게 보면 일부 가게는 지도를 확대해 그 영역을 다시 볼 때 저장된다. 카카오 개발자 콘솔에서 이 앱의 **카카오맵 API(지도·로컬)를 활성화**해야 로컬 API가 응답한다.
 
 > **소셜 로그인 Redirect URI**: 카카오·구글 콘솔에 `{API_BASE_URL}/api/v1/auth/oauth/kakao/callback`, `{API_BASE_URL}/api/v1/auth/oauth/google/callback`을 글자 하나까지 똑같이 등록한다. 로그인이 끝나면 서버가 `{FRONTEND_URL}/oauth/callback?code=…`(실패 시 `?error=…`)로 보내므로 웹에 그 페이지가 있어야 한다. 웹은 받은 code로 `POST /api/v1/auth/oauth/exchange`를 부른다.
 
@@ -418,6 +420,8 @@ router.post('/', requireAuth(), validate({ body: createReviewSchema }), async (r
 ### 요청 횟수 제한
 
 같은 IP의 요청 수를 제한할 때는 `rateLimit({ windowMs, limit })`(`common/middlewares/rate-limit.ts`)을 라우트에 붙인다. 넘으면 429 `TOO_MANY_REQUESTS`. 서버 1대의 메모리에 세므로 서버를 여러 대로 늘리면 Redis 같은 저장소로 바꿔야 한다.
+
+지금 붙어 있는 제한 (같은 IP, 1분): 이메일 중복 확인 30번, 인증 코드 메일 10번, 인증 코드 확인 30번, 로그인 20번, 비밀번호 재설정 메일 10번.
 
 <br>
 

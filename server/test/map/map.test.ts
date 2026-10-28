@@ -303,6 +303,22 @@ describe('MAP-01 GET /map/restaurants — 조회·필터', () => {
     expect(await names('NOT_CONQUERED')).toEqual(['미정복', '이동중']);
   });
 
+  it('이번 시즌에 정복한 가게라도 별점 대기 방문이 있으면 이동 중이라 NOT_CONQUERED 쪽에 나온다', async () => {
+    const season = await createActiveSeason();
+    const me = await createMember();
+    const again = await createRestaurant({ name: '다시방문', lat: 37.5665, lng: 126.845 });
+    await createConquest(me.id, again, season.id);
+    await createVisit(me.id, again.id, { status: 'V', seasonId: season.id });
+
+    const conquered = await getMap(me.id, { ...BOUNDS, conquestState: 'CONQUERED' });
+    const notConquered = await getMap(me.id, { ...BOUNDS, conquestState: 'NOT_CONQUERED' });
+
+    expect(conquered.body.data.items).toEqual([]);
+    expect(notConquered.body.data.items).toEqual([
+      expect.objectContaining({ name: '다시방문', conquestState: 'MOVING' }),
+    ]);
+  });
+
   it('진행 중 시즌이 없으면 정복한 곳 필터는 빈 목록', async () => {
     const me = await createMember();
     await createRestaurant({ lat: 37.5665, lng: 126.845 });
