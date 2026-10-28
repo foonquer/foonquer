@@ -32,7 +32,7 @@ export function RecommendationListPage() {
   const [params, setParams] = useSearchParams();
   const type = parseRecoType(params.get('type'));
   const { region, error: regionError, retry } = useViewRegion();
-  const { coords, ready } = useMyCoords();
+  const { coords } = useMyCoords();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<{ key: string; error: unknown } | null>(null);
   /** 더 보기를 부르는 중인 조건 (조건이 바뀌면 버튼을 다시 쓸 수 있다) */
@@ -41,7 +41,10 @@ export function RecommendationListPage() {
   const [attempt, setAttempt] = useState(0);
   const [regionOpen, setRegionOpen] = useState(false);
 
-  const key = JSON.stringify([type, region?.regionId, coords]);
+  // 위치는 거리 표시에만 쓰여서 조건에 넣지 않는다: 먼저 위치 없이 보여 주고,
+  // 위치가 오면 같은 조건으로 다시 받아 거리만 채운다.
+  const key = JSON.stringify([type, region?.regionId]);
+  const coordsKey = JSON.stringify(coords);
   const load = (page: number) =>
     getRecommendations({
       type,
@@ -53,7 +56,7 @@ export function RecommendationListPage() {
     });
 
   useEffect(() => {
-    if (!region || !ready) return;
+    if (!region) return;
     let alive = true;
     load(1).then(
       (data) => {
@@ -66,9 +69,9 @@ export function RecommendationListPage() {
     return () => {
       alive = false;
     };
-    // key가 조건을 모두 담고 있다
+    // key·coordsKey가 조건을 모두 담고 있다
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, ready, attempt]);
+  }, [key, coordsKey, attempt]);
 
   const current = loaded?.key === key ? loaded : null;
   const currentError = error?.key === key ? error.error : null;
@@ -79,11 +82,9 @@ export function RecommendationListPage() {
     setLoadingMoreKey(from.key);
     try {
       const data = await load(from.page + 1);
-      // 그사이 조건이 바뀌었거나 이미 다음 쪽을 붙였으면 버린다
+      // 그사이 조건이 바뀌었거나 목록을 새로 받았으면 버린다
       setLoaded((prev) =>
-        prev?.key === from.key && prev.page === from.page
-          ? { ...prev, ...data, items: [...prev.items, ...data.items] }
-          : prev,
+        prev === from ? { ...prev, ...data, items: [...prev.items, ...data.items] } : prev,
       );
     } catch (err) {
       toast(errorMessage(err));

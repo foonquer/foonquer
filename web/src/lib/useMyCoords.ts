@@ -26,7 +26,7 @@ export function requestMyCoords(): Promise<Coords | null> {
 export function useMyCoords() {
   const [coords, setCoords] = useState<Coords | null | undefined>(cached);
   useEffect(() => {
-    if (cached !== undefined) return;
+    // 이미 받아 두었어도 부른다: 첫 렌더와 effect 사이에 다른 화면이 받아 왔을 수 있다
     let alive = true;
     void requestMyCoords().then((c) => alive && setCoords(c));
     return () => {

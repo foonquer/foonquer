@@ -65,8 +65,23 @@ export function SearchResults({ keyword, categoryId, categoryName, sort, scope }
   // 위치가 늦게 오면 같은 조건으로 다시 받아 거리만 채운다.
   const key = JSON.stringify([keyword, categoryId, sort, scope, region?.regionId]);
   const coordsKey = JSON.stringify(coords);
-  // 가까운 순만 위치 응답을 기다린다
-  const canSearch = !!region && (sort !== 'DISTANCE' || ready);
+  // 가까운 순만 위치를 기다린다 (서버가 위치 없이는 거절한다)
+  const canSearch = !!region && (sort !== 'DISTANCE' || !!coords);
+
+  // 가까운 순 주소로 바로 들어왔는데 위치를 받지 못했으면 기본 정렬로
+  const noDistance = sort === 'DISTANCE' && ready && !coords;
+  useEffect(() => {
+    if (!noDistance) return;
+    toast('위치를 알 수 없어 현지인 인기 순으로 보여 드려요');
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('sort');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [noDistance, toast, setParams]);
   const query = (page: number) => ({
     keyword: keyword ?? undefined,
     categoryId: categoryId ?? undefined,
