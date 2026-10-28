@@ -98,13 +98,14 @@ export function refreshAccessToken(): Promise<boolean> {
   return refreshing;
 }
 
-function subscribe(listener: () => void) {
+/** 로그인 상태가 바뀔 때마다 listener를 부른다 (React 밖에서 쓸 때) */
+export function subscribeSession(listener: () => void) {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
 
 export function useSession() {
-  return useSyncExternalStore(subscribe, getSession);
+  return useSyncExternalStore(subscribeSession, getSession);
 }
 
 /** 테스트에서 로그인 상태를 정한다 */
