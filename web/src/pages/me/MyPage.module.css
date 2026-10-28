@@ -1,0 +1,83 @@
+/* Figma 내 정보: 제목 Bold 22 (top 51) / 프로필 카드 (top 100) / 메뉴 / 공지·고객센터 버튼 */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 var(--mk-side);
+}
+
+.title {
+  flex: 1;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.bell {
+  display: flex;
+  padding: 4px;
+}
+
+.settings {
+  padding: 6px 12px;
+  border-radius: 14px;
+  background: var(--mk-white);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 var(--mk-side) 24px;
+}
+
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  background: var(--mk-white);
+}
+
+.profileText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.nickname {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: var(--mk-ink);
+}
+
+.profileSub {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.etc {
+  display: flex;
+  gap: 10px;
+}
+
+.etc a {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  border-radius: 16px;
+  background: var(--mk-white);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}

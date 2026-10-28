@@ -1,0 +1,7 @@
+/* Figma 설정: 묶음 제목 Bold 13 회색 / 흰 카드 / 묶음 사이 약 24 */
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 4px var(--mk-side) 32px;
+}
