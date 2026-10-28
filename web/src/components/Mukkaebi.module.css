@@ -1,0 +1,17 @@
+.avatar {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--mk-cream);
+}
+
+/* Figma: 먹깨비 그림이 동그라미보다 13% 크고 위로 살짝 올라가 있다 */
+.image {
+  position: absolute;
+  top: -14%;
+  left: -6.7%;
+  width: 113.4%;
+  max-width: none;
+}

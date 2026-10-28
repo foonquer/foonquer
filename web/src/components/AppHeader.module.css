@@ -1,0 +1,41 @@
+/* Figma: 뒤로가기 44px 상자(left 12), 제목 left 62 Bold 18 */
+.header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 56px;
+  padding: 0 var(--mk-side) 0 62px;
+}
+
+/* 탭 첫 화면처럼 뒤로 가기가 없으면 제목을 왼쪽 여백에 맞춘다 */
+.header[data-back='false'] {
+  padding-left: var(--mk-side);
+}
+
+.back {
+  position: absolute;
+  top: 6px;
+  left: 12px;
+  width: 44px;
+  height: 44px;
+  padding-left: 1px;
+  color: var(--mk-forest);
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 400;
+  text-align: center;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--mk-ink);
+  white-space: nowrap;
+}
+
+.right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}

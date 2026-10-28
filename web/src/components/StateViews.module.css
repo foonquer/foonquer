@@ -1,0 +1,58 @@
+.center {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 240px;
+  padding: 24px var(--mk-side);
+  text-align: center;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--mk-park);
+  border-top-color: var(--mk-green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Figma 결과 없음: 연두 원 150px 안에 먹깨비 */
+.circle {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  margin-bottom: 24px;
+  border-radius: 50%;
+  background: var(--mk-park);
+}
+
+.mukkaebi {
+  position: absolute;
+  top: 4px;
+  left: 8.5px;
+  width: 133px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.description {
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  color: var(--mk-muted);
+  white-space: pre-line;
+}

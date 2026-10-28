@@ -1,0 +1,51 @@
+.layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.dim {
+  position: absolute;
+  inset: 0;
+  background: var(--mk-dim);
+  cursor: default;
+}
+
+.dim[data-dim='light'] {
+  background: rgba(27, 34, 27, 0.35);
+}
+
+.sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 40px);
+  padding: 28px var(--mk-side) calc(24px + var(--mk-safe-bottom));
+  border-radius: 24px 24px 0 0;
+  background: var(--mk-white);
+  overflow-y: auto;
+  animation: slide-up 0.2s ease-out;
+}
+
+.handle {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  width: 40px;
+  height: 4px;
+  margin-left: -20px;
+  border-radius: 2px;
+  background: #d9ded5;
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0.6;
+  }
+}

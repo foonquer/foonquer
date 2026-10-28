@@ -1,0 +1,22 @@
+/* Figma: 34px 높이, 둥글기 17, 사이 12px */
+.row {
+  display: flex;
+  gap: 12px;
+}
+
+.chip {
+  flex: 1;
+  height: 34px;
+  border-radius: 17px;
+  background: var(--mk-white);
+  color: var(--mk-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.chip[aria-checked='true'] {
+  background: var(--mk-forest);
+  color: var(--mk-white);
+}
