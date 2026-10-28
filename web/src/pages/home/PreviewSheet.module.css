@@ -1,0 +1,111 @@
+/* Figma 가게 미리보기 시트: 썸네일 72 (left 20, top 28) / 이름 Bold 19 / 요약 상자 (top 114) / 버튼 50 (top 190) */
+.loading {
+  height: 200px;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  margin: 0 -2px;
+}
+
+.head {
+  display: flex;
+  gap: 14px;
+}
+
+.thumb {
+  position: relative;
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--mk-cream);
+}
+
+.thumb img {
+  position: absolute;
+  top: -2.5px;
+  left: -50.5px;
+  width: 173px;
+  max-width: none;
+}
+
+.info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.name {
+  overflow: hidden;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--mk-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rating {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mk-ink);
+}
+
+.star {
+  color: var(--mk-star);
+}
+
+.meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 11px 14px 12px;
+  border-radius: 14px;
+  background: var(--mk-bg);
+}
+
+.summaryTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.summaryText {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.buttons > button:first-child {
+  flex: 0 0 120px;
+  width: auto;
+}
+
+.buttons > button:last-child {
+  flex: 1;
+  width: auto;
+}

@@ -1,0 +1,160 @@
+/* Figma 홈: 위 흰 영역 (프로필 54 · 검색창 44) / 지도 (나머지, 하단 탭 위까지) */
+.page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 73px - max(20px, var(--mk-safe-bottom)));
+  min-height: 520px;
+}
+
+.top {
+  padding: calc(5px + var(--mk-safe-top)) var(--mk-side) 13px;
+  background: var(--mk-white);
+}
+
+.profileRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nickname {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--mk-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 44px;
+  margin-right: -6px;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 44px;
+  margin-top: 16px;
+  padding: 0 18px;
+  border-radius: 22px;
+  background: var(--mk-bg);
+  font-size: 14px;
+  color: var(--mk-muted);
+}
+
+.mapArea {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  background: var(--mk-bg);
+}
+
+.overlayTop {
+  position: absolute;
+  top: 16px;
+  right: var(--mk-side);
+  left: var(--mk-side);
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.overlayTop > * {
+  pointer-events: auto;
+}
+
+.legend {
+  display: flex;
+  gap: 10px;
+  margin-top: 7px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.legendConquered {
+  color: var(--mk-forest);
+}
+
+.legendUnconquered {
+  color: var(--mk-coral);
+}
+
+.notice {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  z-index: 3;
+  padding: 6px 12px;
+  border-radius: 14px;
+  background: var(--mk-toast);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mk-white);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+/* 정복하기 버튼: 흰 테두리 84×65 안 초록 원 64 + 아래 라벨 */
+.fab {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 96px;
+  height: 81px;
+  transform: translateX(-50%);
+}
+
+.fabCircle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 65px;
+  border-radius: 33px;
+  background: var(--mk-white);
+  box-shadow: 0 5px 8px rgba(33, 61, 41, 0.09);
+}
+
+.fabCircle::before {
+  position: absolute;
+  top: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 32px;
+  background: var(--mk-green);
+  content: '';
+}
+
+.fabCircle img {
+  position: relative;
+  margin-top: -1px;
+}
+
+.fabLabel {
+  position: absolute;
+  bottom: 0;
+  width: 96px;
+  height: 23px;
+  border-radius: 11px;
+  background: var(--mk-forest);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 23px;
+  color: var(--mk-white);
+  text-align: center;
+}

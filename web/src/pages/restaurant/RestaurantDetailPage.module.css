@@ -1,0 +1,203 @@
+/* Figma 음식점 상세: 그림 346×154 (top 109) / 이름 Bold 24 (top 280) / 정보 카드 (top 388) / 항목별 평가 (top 464) / 리뷰 (top 574) */
+.content {
+  display: flex;
+  flex-direction: column;
+  padding: 17px var(--mk-side) 24px;
+}
+
+.hero {
+  width: 100%;
+  height: 154px;
+  object-fit: cover;
+  border-radius: 20px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 17px;
+}
+
+.name {
+  min-width: 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--mk-ink);
+  word-break: keep-all;
+}
+
+.ratingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.rating {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--mk-forest);
+}
+
+.star {
+  color: var(--mk-star);
+}
+
+.gap {
+  display: inline-block;
+  width: 12px;
+}
+
+.myScore {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+.meta {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+}
+
+.infoCard,
+.statsCard {
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: var(--mk-white);
+}
+
+.infoCard {
+  margin-top: 20px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.address {
+  color: var(--mk-ink);
+}
+
+.hours {
+  margin-top: 4px;
+  color: var(--mk-forest);
+}
+
+.hours[data-closed='true'] {
+  color: var(--mk-coral-text);
+}
+
+.links {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.links a {
+  text-decoration: underline;
+}
+
+.statsCard {
+  padding: 12px 14px 10px;
+}
+
+.statsHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.visitRates {
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.scores {
+  display: flex;
+  margin-top: 10px;
+}
+
+.score {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 44px;
+  border-radius: 10px;
+}
+
+.value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.score[data-highlight='true'] {
+  background: #f1f6ee;
+}
+
+.score[data-highlight='true'] .value {
+  color: var(--mk-forest);
+}
+
+.reviewHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 18px;
+}
+
+.reviewHead h3 {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.reviewHead a {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mk-green);
+}
+
+.reviewNote {
+  margin-top: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--mk-white);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+}
+
+.footer {
+  display: flex;
+  gap: 12px;
+}
+
+.footer > button:first-child {
+  flex: 0 0 112px;
+  width: auto;
+}
+
+.footer > button:last-child {
+  flex: 1;
+  width: auto;
+}
