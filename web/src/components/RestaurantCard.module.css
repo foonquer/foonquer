@@ -1,0 +1,60 @@
+/* Figma 음식점 카드 346×86: 사진 62 (left 12) / 이름 Bold 16 / 종류·거리 12 / 별점·재방문 Medium 12 초록 */
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-height: 86px;
+  padding: 12px 14px 12px 12px;
+  border-radius: 18px;
+  background: var(--mk-white);
+}
+
+.thumb {
+  position: relative;
+  flex-shrink: 0;
+  width: 62px;
+  height: 62px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--mk-photo);
+}
+
+.thumb img {
+  position: absolute;
+  top: -1.5px;
+  left: -10px;
+  width: 82px;
+  max-width: none;
+}
+
+.text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding-top: 1px;
+}
+
+.name {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--mk-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+}
+
+.score {
+  margin-top: 1px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--mk-forest);
+}

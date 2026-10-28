@@ -1,0 +1,19 @@
+/* Figma 지역 선택 시트 (높이 668): 제목 (top 28) / 검색창 (top 64) / 선택 완료 (top 584) */
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--mk-ink);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: 9px;
+}
+
+.done {
+  margin-top: 16px;
+}
