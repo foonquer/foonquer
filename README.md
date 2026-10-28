@@ -65,6 +65,9 @@ foonquer/
 │   │   │   ├── auth/        # 이메일·소셜 로그인, 토큰, 비밀번호
 │   │   │   ├── user/        # 프로필, 내 동네
 │   │   │   ├── region/      # 동 검색 (data/seoul-regions.json = 서울 구·법정동 원본)
+│   │   │   ├── map/         # 지도 영역 음식점
+│   │   │   ├── restaurant/  # 가게 미리보기·상세, 카카오 가게 저장 규칙, 카테고리 매핑, 내 정복 상태
+│   │   │   ├── search/      # 검색 홈, 맛집 검색, 추천 (data/similar-keywords.json = 비슷한 메뉴표)
 │   │   │   └── health/
 │   │   ├── types/           # Express Request 타입 확장 (req.auth)
 │   │   └── generated/       # Prisma가 만드는 코드 (커밋하지 않음)
@@ -268,6 +271,8 @@ pnpm -C server db:migrate                                       # 적용
 | `KAKAO_CLIENT_SECRET` | 카카오 로그인 Client Secret (콘솔에서 켰을 때만) | 비워 둔다 |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 구글 OAuth 클라이언트 | Google Cloud 콘솔 |
 
+> **카카오 로컬 API**: 지도(MAP-01)·맛집 검색(SEARCH-02)은 카카오 장소 검색으로 우리 DB에 없는 가게를 저장한 뒤 DB 기준으로 응답한다. 같은 영역·같은 검색어는 24시간 동안 서버 메모리에 캐시해 카카오를 다시 부르지 않는다(하루 호출 한도). 카카오가 실패해도 에러 대신 DB 결과만 준다. 카카오 개발자 콘솔에서 이 앱의 **카카오맵 API(지도·로컬)를 활성화**해야 로컬 API가 응답한다.
+
 > **소셜 로그인 Redirect URI**: 카카오·구글 콘솔에 `{API_BASE_URL}/api/v1/auth/oauth/kakao/callback`, `{API_BASE_URL}/api/v1/auth/oauth/google/callback`을 글자 하나까지 똑같이 등록한다. 로그인이 끝나면 서버가 `{FRONTEND_URL}/oauth/callback?code=…`(실패 시 `?error=…`)로 보내므로 웹에 그 페이지가 있어야 한다. 웹은 받은 code로 `POST /api/v1/auth/oauth/exchange`를 부른다.
 
 > 로컬에서 회원가입을 해 보면 인증 코드 메일이 `pnpm -C server dev`를 띄운 터미널에 `[mail:console]`로 찍힌다.
@@ -399,7 +404,7 @@ router.post('/', requireAuth(), validate({ body: createReviewSchema }), async (r
 - 로컬 Docker MySQL(3307)이 켜져 있으면 따로 할 것이 없다. 테스트를 시작할 때 `test/global-setup.ts`가 테스트 DB를 만들고, 마이그레이션을 적용하고(`prisma migrate deploy`), 카테고리 같은 기본 데이터를 넣는다.
 - 다른 DB를 쓰려면 `TEST_DATABASE_URL`을 지정한다. 실수로 개발 DB를 비우지 않도록 DB 이름이 `_test`로 끝나지 않으면 테스트가 시작하지 않는다.
 - 테스트는 매번 `resetDb()`로 테이블을 비운다(카테고리·지역 같은 기본 데이터는 남김). 같은 DB를 쓰므로 테스트 파일은 하나씩 차례로 돈다.
-- 외부 API(카카오, 메일 등)는 `vi.mock()`으로 바꿔서 실제로 호출하지 않는다.
+- 외부 API(카카오, 메일 등)는 `vi.mock()`으로 바꿔서 실제로 호출하지 않는다. 카카오 로컬 API는 `test/helpers/kakao.ts`의 `stubKakao()`로 흉내 낸다.
 - GitHub Actions CI도 MySQL 8.4 컨테이너를 띄워 같은 방식으로 돈다.
 
 ```ts
