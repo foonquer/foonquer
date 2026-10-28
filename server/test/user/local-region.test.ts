@@ -295,6 +295,31 @@ describe('LOCAL-03 DELETE /users/me/local-regions/{localRegionId}', () => {
     expect(res.body.message).toBe('내 동네는 최소 1곳 있어야 해요.');
   });
 
+  it('2곳일 때 서로 다른 동네를 동시에 빼도 1곳은 남는다', async () => {
+    const me = await createMember();
+    await giveLocalRegions(me.id, [GAYANG, YEOKSAM]);
+
+    const results = await Promise.all([
+      remove(me.id, await localRegionIdOf(me.id, GAYANG)),
+      remove(me.id, await localRegionIdOf(me.id, YEOKSAM)),
+    ]);
+
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    expect(results.find((r) => r.status === 409)?.body.code).toBe('LOCAL_REGION_MIN_REQUIRED');
+    expect(await prisma.memberLocalRegion.count({ where: { userId: me.id } })).toBe(1);
+  });
+
+  it('같은 동네를 동시에 두 번 빼면 한 번만 빠지고 다른 요청은 404', async () => {
+    const me = await createMember();
+    await giveLocalRegions(me.id, [GAYANG, YEOKSAM, SINDANG]);
+    const id = await localRegionIdOf(me.id, YEOKSAM);
+
+    const results = await Promise.all([remove(me.id, id), remove(me.id, id)]);
+
+    expect(results.map((r) => r.status).sort()).toEqual([200, 404]);
+    expect(await prisma.memberLocalRegion.count({ where: { userId: me.id } })).toBe(2);
+  });
+
   it('이번 시즌에 이미 바꿨으면 409 LOCAL_REGION_CHANGE_LIMITED', async () => {
     await createActiveSeason();
     const me = await createMember({ localChangedAt: new Date() });

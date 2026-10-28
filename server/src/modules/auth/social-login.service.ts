@@ -189,7 +189,9 @@ export async function exchangeOAuthResult(oauthResultCode: string, now = new Dat
           userId: member.id,
           provider: profile.provider,
           providerId: profile.providerId,
-          email: profile.email,
+          // 제공자가 검증하지 않은 이메일은 저장하지 않는다. 저장하면 나중에 같은 이메일로 들어온
+          // 다른 사람의 검증된 로그인이 이 회원을 계정 연동 대상으로 고를 수 있다.
+          email: profile.emailVerified ? profile.email : null,
           regDate: now,
         },
       });

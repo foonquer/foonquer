@@ -99,15 +99,8 @@ export const accountLinkBody = z.object({
     .min(1, { error: 'ACCOUNT_LINK_TOKEN_REQUIRED' }),
 });
 
-/** AUTH-15 (네 항목 모두 보내야 하고 필수 3개는 true) */
-export const consentsBody = z
-  .object({
-    terms: z.boolean(),
-    privacy: z.boolean(),
-    location: z.boolean(),
-    marketing: z.boolean(),
-  })
-  .refine((c) => c.terms && c.privacy && c.location, { error: 'REQUIRED_CONSENT_MISSING' });
+/** AUTH-15 (네 항목 모두 보내야 하고 필수 3개는 true). 회원가입(AUTH-04)의 consents와 같은 규칙 */
+export const consentsBody = consentsField;
 
 /** SET-05 */
 export const passwordChangeBody = z

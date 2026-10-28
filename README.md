@@ -261,7 +261,7 @@ pnpm -C server db:migrate                                       # 적용
 | `COOKIE_SECURE` | 쿠키 Secure 속성 (`true`/`false`) | `true` |
 | `TEST_DATABASE_URL` | 테스트 DB 주소. 이름이 `_test`로 끝나야 한다 | 비워 두면 `mysql://root:password@localhost:3307/foonquer_test` |
 | `FRONTEND_URL` | 웹 주소. 비밀번호 재설정 메일 링크(`{FRONTEND_URL}/password/reset?token=`)·소셜 로그인 콜백에 쓴다 | `http://localhost:5173` |
-| `MAIL_DRIVER` | `console`(메일 대신 서버 로그에 출력) / `ses`(AWS SES로 발송) | `console` |
+| `MAIL_DRIVER` | `console`(메일 대신 서버 로그에 출력) / `ses`(AWS SES로 발송). 운영(`NODE_ENV=production`)에서는 `ses`가 아니면 서버가 시작하지 않는다 | `console` |
 | `MAIL_FROM` | 보내는 사람 주소. SES에서 인증한 도메인·주소여야 한다 (`ses`일 때 필수) | 비워 둔다 |
 | `AWS_REGION` | SES·S3 리전 | `ap-northeast-2` |
 | `IMAGE_BASE_URL` | 프로필·리뷰 사진 공개 주소(CloudFront). 비우면 사진 URL을 `null`로 준다 | 비워 둔다 |
@@ -394,6 +394,8 @@ router.post('/', requireAuth(), validate({ body: createReviewSchema }), async (r
 ### 요청 횟수 제한
 
 같은 IP의 요청 수를 제한할 때는 `rateLimit({ windowMs, limit })`(`common/middlewares/rate-limit.ts`)을 라우트에 붙인다. 넘으면 429 `TOO_MANY_REQUESTS`. 서버 1대의 메모리에 세므로 서버를 여러 대로 늘리면 Redis 같은 저장소로 바꿔야 한다.
+
+지금 붙어 있는 제한 (같은 IP, 1분): 이메일 중복 확인 30번, 인증 코드 메일 10번, 인증 코드 확인 30번, 로그인 20번, 비밀번호 재설정 메일 10번.
 
 <br>
 

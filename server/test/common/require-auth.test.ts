@@ -49,6 +49,38 @@ describe('requireAuth() 토큰 확인', () => {
     expect(res.body.code).toBe('TOKEN_INVALID');
   });
 
+  it('같은 비밀키로 서명했어도 accessToken이 아니거나(typ) 회원 id가 잘못되면 401 TOKEN_INVALID', async () => {
+    const member = await createMember();
+    const secret = process.env.JWT_ACCESS_SECRET ?? '';
+    const tokens = [
+      jwt.sign({}, secret, { subject: member.id.toString() }), // typ 없음
+      jwt.sign({ typ: 'refresh' }, secret, { subject: member.id.toString() }), // 다른 용도
+      jwt.sign({ typ: 'access' }, secret), // sub 없음
+      jwt.sign({ typ: 'access' }, secret, { subject: 'abc' }),
+      jwt.sign({ typ: 'access' }, secret, { subject: '0' }),
+    ];
+
+    for (const token of tokens) {
+      const res = await request(app).get('/active').set('Authorization', `Bearer ${token}`);
+      expect(res.status).toBe(401);
+      expect(res.body.code).toBe('TOKEN_INVALID');
+    }
+  });
+
+  it('Bearer 뒤에 토큰이 없으면 TOKEN_REQUIRED, 토큰이 둘 이상이면 TOKEN_INVALID', async () => {
+    const member = await createMember();
+
+    const empty = await request(app).get('/active').set('Authorization', 'Bearer');
+    expect(empty.status).toBe(401);
+    expect(empty.body.code).toBe('TOKEN_REQUIRED');
+
+    const two = await request(app)
+      .get('/active')
+      .set('Authorization', `${bearer(member.id)} extra`);
+    expect(two.status).toBe(401);
+    expect(two.body.code).toBe('TOKEN_INVALID');
+  });
+
   it('만료된 토큰이면 401 TOKEN_EXPIRED', async () => {
     const member = await createMember();
     const expired = jwt.sign({ typ: 'access' }, process.env.JWT_ACCESS_SECRET ?? '', {

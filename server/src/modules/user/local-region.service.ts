@@ -137,13 +137,15 @@ export async function addLocalRegion(userId: bigint, regionId: number, now = new
 /** LOCAL-03 내 동네 삭제. 남은 동네 순서를 0부터 다시 매긴다 (0번을 지우면 다음 동네가 기본) */
 export async function removeLocalRegion(userId: bigint, localRegionId: number, now = new Date()) {
   return prisma.$transaction(async (tx) => {
+    // 회원 행을 먼저 잠근 뒤 대상과 개수를 읽는다. 잠그기 전에 읽으면 그 시점의 스냅샷을 보게 되어,
+    // 서로 다른 동네를 동시에 빼는 두 요청이 모두 "2곳 남음"으로 보고 둘 다 지울 수 있다.
+    const { localChangedAt, season } = await lockMember(tx, userId);
     const target = await tx.memberLocalRegion.findFirst({
       where: { id: BigInt(localRegionId), userId },
       select: { id: true },
     });
     if (!target) throw new AppError(UserError.LOCAL_REGION_NOT_FOUND);
 
-    const { localChangedAt, season } = await lockMember(tx, userId);
     const count = await tx.memberLocalRegion.count({ where: { userId } });
     if (count <= LOCAL_REGION_MIN) throw new AppError(UserError.LOCAL_REGION_MIN_REQUIRED);
     assertCanChange(localChangedAt, season);
