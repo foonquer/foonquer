@@ -31,6 +31,14 @@ import { exchangeOAuthResult, linkSocialAccount } from './social-login.service';
 /** /api/v1/auth — 로그인 없이 부르는 회원가입·로그인 API */
 export const authRouter = Router();
 
+// 같은 IP 요청 횟수 제한. 이메일별 발송 제한·계정별 로그인 잠금과 별도로,
+// 여러 이메일·계정을 돌려 가며 보내는 요청(메일 폭탄, 코드·비밀번호 대입)을 막는다.
+const PER_MINUTE = 60_000;
+const sendMailLimit = rateLimit({ windowMs: PER_MINUTE, limit: 10 });
+const verifyCodeLimit = rateLimit({ windowMs: PER_MINUTE, limit: 30 });
+const loginLimit = rateLimit({ windowMs: PER_MINUTE, limit: 20 });
+const resetMailLimit = rateLimit({ windowMs: PER_MINUTE, limit: 10 });
+
 /** 재발급 실패(401·403)면 브라우저의 refreshToken 쿠키도 지운다 */
 async function withCookieCleanup<T>(res: Response, run: () => Promise<T>) {
   try {
@@ -58,6 +66,7 @@ authRouter.get(
 // AUTH-02 이메일 인증 코드 발송
 authRouter.post(
   '/email/verification-code',
+  sendMailLimit,
   validate({ body: verificationCodeSendBody }),
   async (req, res) => {
     const { email } = req.body as z.infer<typeof verificationCodeSendBody>;
@@ -69,6 +78,7 @@ authRouter.post(
 // AUTH-03 이메일 인증 코드 확인
 authRouter.post(
   '/email/verification-code/verify',
+  verifyCodeLimit,
   validate({ body: verificationCodeVerifyBody }),
   async (req, res) => {
     const { email, code } = req.body as z.infer<typeof verificationCodeVerifyBody>;
@@ -87,6 +97,7 @@ authRouter.post('/signup', validate({ body: signupBody }), async (req, res) => {
 // AUTH-05 이메일 로그인
 authRouter.post(
   '/login',
+  loginLimit,
   validate({ body: loginBody }, { validationMessage: '이메일과 비밀번호를 입력해 주세요.' }),
   async (req, res) => {
     const { email, password } = req.body as z.infer<typeof loginBody>;
@@ -115,6 +126,7 @@ authRouter.post('/logout', async (req, res) => {
 // AUTH-12 비밀번호 재설정 메일 발송
 authRouter.post(
   '/password/reset-email',
+  resetMailLimit,
   validate({ body: passwordResetEmailBody }),
   async (req, res) => {
     const { email } = req.body as z.infer<typeof passwordResetEmailBody>;
