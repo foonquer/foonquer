@@ -84,11 +84,13 @@ foonquer/
 ├── web/                     # 웹 (Vite + React + PWA)
 │   ├── src/
 │   │   ├── main.tsx         # 앱 시작
-│   │   ├── router.tsx       # 화면 경로 목록
-│   │   ├── pages/           # 화면 (HomePage, NotFoundPage …)
-│   │   ├── lib/api.ts       # 서버 호출 함수 (공통 응답 형식 처리)
-│   │   ├── styles/          # 전역 CSS
-│   │   └── test/            # Vitest + Testing Library
+│   │   ├── router.tsx       # 화면 경로 목록 (로그인 단계별 가드, 하단 탭, 준비 중 화면 자리)
+│   │   ├── pages/           # 화면
+│   │   ├── components/      # 공통 컴포넌트 (헤더, 버튼, 입력창, 시트, 확인창, 토스트, 하단 탭 …)
+│   │   ├── lib/             # api.ts(서버 호출), session.ts(로그인 상태), useAsync.ts(데이터 불러오기)
+│   │   ├── assets/          # Figma에서 내려받은 아이콘·일러스트 SVG
+│   │   ├── styles/          # 전역 CSS, Figma 색 변수(--mk-*)
+│   │   └── test/            # Vitest + Testing Library (http.ts: 가짜 서버, render.tsx: 경로로 화면 그리기)
 │   ├── public/              # 아이콘, favicon (PWA 아이콘은 임시)
 │   ├── vite.config.ts       # PWA 설정, /api 개발 프록시
 │   └── vercel.json          # Vercel 배포 설정
@@ -113,6 +115,28 @@ modules/review/
 ```ts
 // routes.ts
 router.use('/reviews', reviewRouter);
+```
+
+### 웹 화면 만들기
+
+화면은 `web/src/pages/`에 만들고 `router.tsx`에 경로를 붙인다. 아직 없는 화면은 `ComingSoonPage`(준비 중) 자리가 있으니 그 `element`만 바꾸면 된다.
+
+- **스타일**: 화면마다 CSS Module(`XxxPage.module.css`)을 쓰고, 색은 `styles/global.css`의 Figma 변수(`var(--mk-green)` 등)만 쓴다. 글꼴은 Pretendard.
+- **서버 호출**: `api.get/post/patch/delete`는 성공하면 `data`를, 실패하면 `ApiError`(`code`, `message`, `data`)를 던진다. 메시지까지 필요하면 `api.call()`. 로그인 토큰은 알아서 붙고, `TOKEN_EXPIRED`면 한 번 재발급한 뒤 다시 보낸다.
+- **로그인 상태**: accessToken은 메모리에만 두고 refreshToken은 서버의 httpOnly 쿠키다. 앱을 열면 `POST /auth/refresh`로 로그인을 복구한다. 로그인 API가 성공하면 `signIn(accessToken, nextAction)`만 부르면 라우트 가드가 다음 화면(약관 동의·프로필 설정·홈)으로 보낸다.
+- **화면 데이터**: `useAsync(() => api.get(...), [deps])` → `{ data, error, loading, reload }`.
+- **공통 컴포넌트**: `Screen`(화면 틀·하단 버튼), `AppHeader`(‹ 제목), `Button`, `TextField`, `BottomSheet`, `Dialog`, `useToast()`, `FilterChips`, `EmptyState`, `Loading`.
+
+```tsx
+export function MyReviewsPage() {
+  const { data, error, reload } = useAsync(() => api.get<ReviewList>('/users/me/reviews'), []);
+  return (
+    <Screen>
+      <AppHeader title="내 리뷰" />
+      {error ? <EmptyState title={errorMessage(error)} onRetry={reload} /> : /* data로 목록 */ null}
+    </Screen>
+  );
+}
 ```
 
 <br>
@@ -419,6 +443,8 @@ it('내 프로필을 조회한다', async () => {
   expect(res.body.data.id).toBe(Number(member.id));
 });
 ```
+
+웹 테스트(`pnpm -C web test`)는 `src/test/http.ts`의 `mockApi()`로 서버 응답을 흉내 내고, `renderRoute('/경로')`로 실제 라우트에서 화면을 그린다.
 
 <br>
 
