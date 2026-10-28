@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mockApi, ok } from './http';
+import { act } from 'react';
+import { fail, mockApi, ok } from './http';
 import { renderRoute } from './render';
 
 const session = { status: 'authed', nextAction: 'PROFILE_REQUIRED' } as const;
@@ -104,6 +105,35 @@ describe('프로필 설정 (S-04 ~ S-07)', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: '첫 맛집 찾으러 가기' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+  });
+
+  it('가입 완료 화면에서 다른 화면에 갔다 와도 완료 화면을 다시 보여 준다', async () => {
+    profileApi();
+    const { router } = renderRoute('/profile/setup', { session });
+    await goToRegionStep();
+    await searchAndPick('가양', '가양동');
+    fireEvent.click(screen.getByRole('button', { name: '1곳으로 시작하기' }));
+    expect(await screen.findByText('강서구 초보 탐방러')).toBeInTheDocument();
+
+    // 약관 화면 주소로 갔다가 라우트 가드가 프로필 설정으로 돌려보낸다 (화면을 새로 그림)
+    await act(() => router.navigate('/signup/terms'));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/profile/setup'));
+    expect(await screen.findByText('강서구 초보 탐방러')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '첫 맛집 찾으러 가기' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+  });
+
+  it('이미 프로필 설정을 마친 회원이면 홈으로 보낸다', async () => {
+    profileApi({
+      'POST /users/me/profile': fail(409, 'PROFILE_ALREADY_COMPLETED', '이미 프로필을 설정했어요.'),
+    });
+    const { router } = renderRoute('/profile/setup', { session });
+    await goToRegionStep();
+    await searchAndPick('가양', '가양동');
+    fireEvent.click(screen.getByRole('button', { name: '1곳으로 시작하기' }));
+
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
   });
 
