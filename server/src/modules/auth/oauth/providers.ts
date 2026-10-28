@@ -82,7 +82,8 @@ async function requestJson(url: string, init: RequestInit): Promise<Record<strin
 function form(values: Record<string, string | undefined>) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(values)) {
-    if (value !== undefined) params.set(key, value);
+    // 비워 둔 설정(KAKAO_CLIENT_SECRET= 등)은 보내지 않는다 (requireConfig와 같은 기준)
+    if (value) params.set(key, value);
   }
   return params;
 }
