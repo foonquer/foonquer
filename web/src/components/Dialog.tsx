@@ -13,7 +13,7 @@ type Props = {
   confirmLabel: string;
   onCancel: () => void;
   onConfirm: () => void;
-  /** 확인을 누른 뒤 처리 중 */
+  /** 확인을 누른 뒤 처리 중 (이동안은 닫을 수 없다) */
   busy?: boolean;
 };
 
@@ -33,16 +33,16 @@ export function Dialog({
   useModalFocus(open, box);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || busy) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onCancel]);
+  }, [open, busy, onCancel]);
 
   if (!open) return null;
   return createPortal(
     <div className={styles.layer}>
-      <div className={styles.dim} onClick={onCancel} aria-hidden="true" />
+      <div className={styles.dim} onClick={busy ? undefined : onCancel} aria-hidden="true" />
       <section
         ref={box}
         tabIndex={-1}
@@ -60,7 +60,7 @@ export function Dialog({
           </p>
         ))}
         <div className={styles.buttons}>
-          <Button variant="gray" size="sm" onClick={onCancel}>
+          <Button variant="gray" size="sm" onClick={onCancel} disabled={busy}>
             {cancelLabel}
           </Button>
           <Button size="sm" onClick={onConfirm} disabled={busy}>

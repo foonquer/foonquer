@@ -130,6 +130,25 @@ describe('Dialog', () => {
     expect(onCancel).toHaveBeenCalled();
   });
 
+  it('처리 중에는 취소·Esc·바깥 누르기로 닫지 않는다', () => {
+    const onCancel = vi.fn();
+    render(
+      <Dialog
+        open
+        title="로그아웃할까요?"
+        confirmLabel="로그아웃"
+        onCancel={onCancel}
+        onConfirm={() => {}}
+        busy
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: '취소' })).toBeDisabled();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.click(document.querySelector('[aria-hidden="true"]')!);
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
   it('열리면 포커스를 확인창 안으로 옮기고, Tab이 밖으로 나가지 않으며, 닫히면 원래 자리로 돌려준다', () => {
     function Remove() {
       const [open, setOpen] = useState(false);
@@ -208,8 +227,11 @@ describe('Toast', () => {
     fireEvent.mouseLeave(box);
     act(() => vi.advanceTimersByTime(10000));
     expect(screen.getByText('가고 싶은 곳에 저장했어요')).toBeInTheDocument();
+    // 다 떠나면 링크가 있는 토스트의 시간(5초)만큼 더 보여 준다
     fireEvent.blur(screen.getByRole('link', { name: '리스트 보기 ›' }));
     act(() => vi.advanceTimersByTime(3000));
+    expect(screen.getByText('가고 싶은 곳에 저장했어요')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(2000));
     expect(screen.queryByText('가고 싶은 곳에 저장했어요')).not.toBeInTheDocument();
   });
 });

@@ -47,7 +47,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const hold = (kind: 'focus' | 'hover', on: boolean) => {
     holding.current[kind] = on;
     if (on) clearTimeout(timer.current);
-    else if (!holding.current.focus && !holding.current.hover) hide(SHOW_MS);
+    else if (!holding.current.focus && !holding.current.hover)
+      hide(toast?.action ? SHOW_WITH_ACTION_MS : SHOW_MS);
   };
 
   return (
