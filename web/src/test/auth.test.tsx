@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { getAccessToken } from '../lib/session';
 import { fail, mockApi, ok } from './http';
@@ -117,7 +117,7 @@ describe('이메일 회원가입 (S-03-2)', () => {
   it('인증 확인 중에 이메일을 바꾸면 늦게 온 인증 결과를 쓰지 않는다', async () => {
     let answer!: () => void;
     const answered = new Promise<void>((resolve) => (answer = resolve));
-    mockApi({
+    const server = mockApi({
       'GET /auth/email/availability': ok(
         { email: 'new@email.com', available: true, reason: null, provider: null },
         '사용할 수 있는 이메일이에요.',
@@ -139,18 +139,23 @@ describe('이메일 회원가입 (S-03-2)', () => {
       await screen.findByRole('button', { name: '인증 코드 받기' }, { timeout: 2000 }),
     );
     await screen.findByLabelText('인증 코드');
+    // 보냈다는 문구만 읽어 주고, 매초 바뀌는 다시 보내기 버튼은 그 밖에 둔다
+    expect(screen.getByText('✓ 인증 코드를 보냈어요')).toHaveAttribute('role', 'status');
+    expect(screen.getByRole('button', { name: /코드 다시 보내기/ })).not.toHaveAttribute('role');
     type('인증 코드', '123456');
+    await waitFor(() =>
+      expect(server.calls('POST /auth/email/verification-code/verify')).toHaveLength(1),
+    );
     type('이메일', 'other@email.com');
-    answer();
+    await act(async () => answer());
 
-    await new Promise((r) => setTimeout(r, 50));
     // 바뀐 이메일은 아직 인증 전이라 나머지를 다 채워도 가입할 수 없다
     type('비밀번호', 'password1');
     type('비밀번호 확인', 'password1');
     fireEvent.click(screen.getByLabelText('[필수] 서비스 이용약관'));
     fireEvent.click(screen.getByLabelText('[필수] 개인정보 수집·이용'));
     fireEvent.click(screen.getByLabelText('[필수] 위치기반 서비스 이용약관'));
-    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeDisabled());
   });
 
   it('이미 가입한 이메일이면 서버 문구를 보여 주고 인증 코드를 받을 수 없다', async () => {
