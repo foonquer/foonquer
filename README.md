@@ -198,7 +198,8 @@ http://localhost:3000/api/v1/health 에서 `{"success":true,"data":{"status":"ok
 pnpm -C web dev
 ```
 
-http://localhost:5173 에서 "서버 연결됨"이 보이면 웹과 서버가 연결된 것이다. 개발 중에는 웹의 `/api` 요청을 Vite가 `localhost:3000`으로 넘겨 준다 (CORS 설정 불필요).
+http://localhost:5173 을 연다. 개발 중에는 웹의 `/api` 요청을 Vite가 `localhost:3000`으로 넘겨 준다 (CORS 설정 불필요).
+서버와 이어졌는지는 브라우저 개발자 도구 Network 탭에서 보면 된다. 앱을 열 때 부르는 `/api/v1/auth/refresh`가 **401**(로그인 전이라 정상)이면 연결된 것이고, 500이면 서버가 꺼져 있는 것이다.
 
 <br>
 
