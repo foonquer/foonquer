@@ -1,0 +1,39 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  /* 하단 탭에 내용이 가리지 않게 */
+  padding-bottom: calc(73px + max(20px, var(--mk-safe-bottom)));
+}
+
+/* Figma: 흰 바탕 93px (탭 18px 아래로 55px + 홈 막대 영역) */
+.tabBar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 18px 0 max(20px, var(--mk-safe-bottom));
+  background: var(--mk-white);
+}
+
+.tab {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: 55px;
+  color: var(--mk-muted);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tab[aria-current='page'] {
+  color: var(--mk-forest);
+  font-weight: 700;
+}

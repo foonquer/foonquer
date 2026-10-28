@@ -1,0 +1,55 @@
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow: hidden;
+  background: var(--mk-forest);
+}
+
+/* Figma 390px 화면을 가운데에 두고 핀·글자를 그 안에 놓는다 */
+.canvas {
+  position: relative;
+  width: 390px;
+  max-width: 100%;
+  height: 100%;
+  margin: 0 auto;
+}
+
+.pin {
+  position: absolute;
+  filter: drop-shadow(0 4px 6.4px rgba(33, 61, 41, 0.09));
+}
+
+.title {
+  position: absolute;
+  top: calc(300 / 844 * 100%);
+  right: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+}
+
+.logo {
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: -1.76px;
+  color: var(--mk-cream);
+}
+
+.tagline {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--mk-green-soft);
+}
+
+/* 큰 먹깨비가 화면 아래로 반쯤 걸쳐 있다 */
+.mukkaebi {
+  position: absolute;
+  bottom: -120px;
+  left: 50%;
+  width: 343px;
+  max-width: none;
+  transform: translateX(-50%);
+}
