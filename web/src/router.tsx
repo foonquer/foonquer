@@ -12,8 +12,13 @@ import { OnboardingPage } from './pages/auth/OnboardingPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { TermsPage } from './pages/auth/TermsPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
+import { HomePage } from './pages/home/HomePage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ProfileSetupPage } from './pages/profile-setup/ProfileSetupPage';
+import { RecommendationListPage } from './pages/recommendations/RecommendationListPage';
+import { RecommendationsPage } from './pages/recommendations/RecommendationsPage';
+import { RestaurantDetailPage } from './pages/restaurant/RestaurantDetailPage';
+import { SearchPage } from './pages/search/SearchPage';
 
 /**
  * 다른 사람이 맡은 화면 자리 (준비 중). 화면을 만들면 element만 바꾼다.
@@ -80,13 +85,17 @@ export const routes: RouteObject[] = [
           {
             element: <TabLayout />,
             children: [
-              { path: '/', element: <ComingSoonPage title="홈" tab /> },
+              { path: '/', element: <HomePage /> },
               { path: '/ranking', element: <ComingSoonPage title="랭킹/현황" tab /> },
-              { path: '/recommendations', element: <ComingSoonPage title="추천맛집" tab /> },
+              { path: '/recommendations', element: <RecommendationsPage /> }, // ?type=
               { path: '/list', element: <ComingSoonPage title="맛집 리스트" tab /> },
               { path: '/me', element: <ComingSoonPage title="내 정보" tab /> },
             ],
           },
+          { path: '/search', element: <SearchPage /> }, // ?keyword= | ?categoryId=&category=
+          { path: '/restaurants/:restaurantId', element: <RestaurantDetailPage /> },
+          { path: '/recommendations/list', element: <RecommendationListPage /> }, // ?type=
+          { path: '/me/settings', element: <ComingSoonPage title="설정" /> },
           ...placeholders,
         ],
       },

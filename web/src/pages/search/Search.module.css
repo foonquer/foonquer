@@ -1,0 +1,249 @@
+/* Figma 홈 검색: 검색창 48 (top 112) / 지역 선택 (top 172) / 최근 검색 (top 232) / 음식 종류 (top 332) */
+.content {
+  display: flex;
+  flex-direction: column;
+  padding: 12px var(--mk-side) 24px;
+}
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 48px;
+  padding: 0 18px;
+  border-radius: 24px;
+  background: var(--mk-white);
+}
+
+.searchBar input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--mk-ink);
+}
+
+.searchBar input::placeholder {
+  color: var(--mk-muted);
+}
+
+.searchBar input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.searchBar:focus-within {
+  box-shadow: 0 0 0 1.5px var(--mk-green);
+}
+
+.regionRow {
+  margin-top: 12px;
+}
+
+.section {
+  margin-top: 25px;
+}
+
+.sectionTitle {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.recent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 13px;
+}
+
+.recentChip {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  border-radius: 17px;
+  background: var(--mk-white);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.recentChip > button:first-child {
+  height: 100%;
+  padding: 0 6px 0 16px;
+}
+
+.recentRemove {
+  height: 100%;
+  padding: 0 14px 0 6px;
+  font-size: 9px;
+  color: var(--mk-subtle);
+}
+
+.bigTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.subTitle {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--mk-muted);
+}
+
+.categories {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.category {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  height: 64px;
+  border-radius: 16px;
+  background: var(--mk-white);
+}
+
+.categoryName {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mk-forest);
+  white-space: nowrap;
+}
+
+.categoryCount {
+  font-size: 11px;
+  color: var(--mk-subtle);
+}
+
+.banner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+  padding: 20px 18px 18px;
+  border-radius: 22px;
+  background: var(--mk-park);
+  color: var(--mk-forest);
+}
+
+.bannerTitle {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.bannerText {
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.bannerArrow {
+  position: absolute;
+  top: 49px;
+  right: 22px;
+}
+
+/* 검색 결과: 정렬 칩 (top 180) / 제목 Bold 18 (top 248) / 카드 (top 314, 사이 8) */
+.sortRow {
+  margin-top: 20px;
+}
+
+.results {
+  display: flex;
+  flex-direction: column;
+}
+
+.resultTitle {
+  margin-top: 30px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.resultNote {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 12px;
+}
+
+/* 검색 결과 없음: 원 150 (top 210) / 제목 Bold 20 (top 390) / 설명 14 (top 424) / 칩 (top 492) */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 50px;
+  text-align: center;
+}
+
+.emptyCircle {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: var(--mk-park);
+}
+
+.emptyCircle img {
+  position: absolute;
+  top: 4px;
+  left: 8.5px;
+  width: 133px;
+}
+
+.emptyTitle {
+  margin-top: 30px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--mk-ink);
+  word-break: keep-all;
+}
+
+.emptyText {
+  margin-top: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  color: var(--mk-muted);
+  white-space: pre-line;
+}
+
+.emptyChips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.emptyChips button {
+  padding: 8px 14px;
+  border-radius: 16px;
+  background: var(--mk-white);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mk-ink);
+}
+
+.emptyChips button:first-child {
+  font-weight: 700;
+  color: var(--mk-green);
+}
