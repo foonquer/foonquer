@@ -171,12 +171,24 @@ docker run -d --name foonquer-mysql -p 3307:3306 -e MYSQL_ROOT_PASSWORD=password
 
 ### 3. 환경변수
 
-`server/.env.example`을 복사해 `server/.env`를 만든다. 위 Docker 설정 그대로면 고칠 것이 없다.
+`server/.env.example`을 복사해 `server/.env`를 만들고, 웹은 `web/.env.example`을 복사해 `web/.env.local`을 만든다. 위 Docker 설정 그대로면 서버는 켜진다.
 
 ```bash
 cp server/.env.example server/.env                 # macOS / Linux
+cp web/.env.example web/.env.local
 Copy-Item server\.env.example server\.env          # Windows PowerShell
+Copy-Item web\.env.example web\.env.local
 ```
+
+키가 필요한 기능은 아래 값을 채워야 동작한다. 키는 저장소에 올리지 않고 팀 채널로 따로 주고받는다.
+
+| 기능 | 넣을 값 | 비워 두면 |
+| --- | --- | --- |
+| 지도·맛집 검색에 카카오 가게 불러오기, 카카오 로그인 | `server/.env`의 `KAKAO_REST_API_KEY` | DB에 있는 가게만 보이고(처음엔 없음) 카카오 로그인이 안 된다 |
+| 구글 로그인 | `server/.env`의 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 구글 로그인이 안 된다 |
+| 홈 카카오 지도 | `web/.env.local`의 `VITE_KAKAO_MAP_KEY` | 가게 위치만 점으로 보여 주는 간단한 지도 |
+
+이메일 회원가입·로그인은 키 없이 된다 (인증 코드는 서버 터미널에 찍힌다).
 
 ### 4. 테이블 만들기와 기본 데이터
 
@@ -201,7 +213,8 @@ http://localhost:3000/api/v1/health 에서 `{"success":true,"data":{"status":"ok
 pnpm -C web dev
 ```
 
-http://localhost:5173 에서 "서버 연결됨"이 보이면 웹과 서버가 연결된 것이다. 개발 중에는 웹의 `/api` 요청을 Vite가 `localhost:3000`으로 넘겨 준다 (CORS 설정 불필요).
+http://localhost:5173 을 연다. 개발 중에는 웹의 `/api` 요청을 Vite가 `localhost:3000`으로 넘겨 준다 (CORS 설정 불필요).
+서버와 이어졌는지는 브라우저 개발자 도구 Network 탭에서 보면 된다. 앱을 열 때 부르는 `/api/v1/auth/refresh`가 **401**(로그인 전이라 정상)이면 연결된 것이고, 500이면 서버가 꺼져 있는 것이다.
 
 <br>
 
