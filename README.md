@@ -87,8 +87,10 @@ foonquer/
 │   ├── src/
 │   │   ├── main.tsx         # 앱 시작
 │   │   ├── router.tsx       # 화면 경로 목록 (로그인 단계별 가드, 하단 탭, 준비 중 화면 자리)
-│   │   ├── pages/           # 화면
+│   │   ├── pages/           # 화면 (auth/: 로그인·회원가입·비밀번호, profile-setup/: 프로필 설정 …)
+│   │   ├── api/             # 도메인별 서버 호출 함수와 응답 타입 (auth.ts, users.ts, regions.ts …)
 │   │   ├── components/      # 공통 컴포넌트 (헤더, 버튼, 입력창, 시트, 확인창, 토스트, 하단 탭 …)
+│   │   ├── data/            # 화면에서 쓰는 고정 데이터 (서울 구·동 목록)
 │   │   ├── lib/             # api.ts(서버 호출), session.ts(로그인 상태), useAsync.ts(데이터 불러오기)
 │   │   ├── assets/          # Figma에서 내려받은 아이콘·일러스트 SVG
 │   │   ├── styles/          # 전역 CSS, Figma 색 변수(--mk-*)
@@ -127,7 +129,7 @@ router.use('/reviews', reviewRouter);
 - **서버 호출**: `api.get/post/patch/delete`는 성공하면 `data`를, 실패하면 `ApiError`(`code`, `message`, `data`)를 던진다. 메시지까지 필요하면 `api.call()`. 로그인 토큰은 알아서 붙고, `TOKEN_EXPIRED`면 한 번 재발급한 뒤 다시 보낸다.
 - **로그인 상태**: accessToken은 메모리에만 두고 refreshToken은 서버의 httpOnly 쿠키다. 앱을 열면 `POST /auth/refresh`로 로그인을 복구한다. 로그인 API가 성공하면 `signIn(accessToken, nextAction)`만 부르면 라우트 가드가 다음 화면(약관 동의·프로필 설정·홈)으로 보낸다.
 - **화면 데이터**: `useAsync(() => api.get(...), [deps])` → `{ data, error, loading, reload }`.
-- **공통 컴포넌트**: `Screen`(화면 틀·하단 버튼), `AppHeader`(‹ 제목), `Button`, `TextField`, `BottomSheet`, `Dialog`, `useToast()`, `FilterChips`, `EmptyState`, `Loading`.
+- **공통 컴포넌트**: `Screen`(화면 틀·하단 버튼), `AppHeader`(‹ 제목), `PageTitle`(큰 제목·설명), `Button`, `TextField`, `ChoiceGroup`(성별·나이대 같은 버튼 고르기), `BottomSheet`, `Dialog`, `useToast()`, `FilterChips`, `ResultScreen`(메일 발송·완료 안내), `DongFinder`(동 검색·현재 위치·구/동 목록), `ConsentCard`(약관 동의), `EmptyState`, `Loading`.
 
 ```tsx
 export function MyReviewsPage() {
