@@ -28,16 +28,22 @@ function useLocationPermission() {
   const [state, setState] = useState<LocationPermission>('unknown');
   useEffect(() => {
     let status: PermissionStatus | null = null;
+    // 조회가 끝나기 전에 화면을 떠났으면 리스너를 붙이지 않는다
+    let alive = true;
     const update = () => status && setState(status.state as LocationPermission);
     navigator.permissions
       ?.query({ name: 'geolocation' })
       .then((s) => {
+        if (!alive) return;
         status = s;
         update();
         s.addEventListener('change', update);
       })
       .catch(() => undefined);
-    return () => status?.removeEventListener('change', update);
+    return () => {
+      alive = false;
+      status?.removeEventListener('change', update);
+    };
   }, []);
   return [state, setState] as const;
 }

@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { getAccessToken, getSession } from '../lib/session';
 import { fail, mockApi, ok } from './http';
 import { renderRoute } from './render';
@@ -223,6 +223,23 @@ describe('설정·비밀번호 변경 (SET-05, AUTH-11)', () => {
 
     expect(await screen.findByText(/로그아웃하지 못했어요/)).toBeInTheDocument();
     expect(getSession().status).toBe('authed');
+  });
+
+  it('위치 권한 조회가 끝나기 전에 화면을 떠나면 권한 변경을 지켜보지 않는다', async () => {
+    let answer!: (status: PermissionStatus) => void;
+    const query = vi.fn(() => new Promise<PermissionStatus>((resolve) => (answer = resolve)));
+    Object.defineProperty(navigator, 'permissions', { value: { query }, configurable: true });
+    const status = { state: 'granted', addEventListener: vi.fn(), removeEventListener: vi.fn() };
+    mockApi({ 'GET /users/me': ok(me) });
+
+    const view = renderRoute('/me/settings');
+    await waitFor(() => expect(query).toHaveBeenCalled());
+    view.unmount();
+    answer(status as unknown as PermissionStatus);
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(status.addEventListener).not.toHaveBeenCalled();
+    Object.defineProperty(navigator, 'permissions', { value: undefined, configurable: true });
   });
 
   it('소셜로만 가입한 계정은 비밀번호 변경 메뉴가 없다', async () => {
