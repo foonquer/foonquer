@@ -8,6 +8,7 @@ import mukkaebi from '../assets/illust/mukkaebi.svg';
 import seoulDongs from '../data/seoul-dongs.json';
 import { errorMessage } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { Loading } from './StateViews';
 import { useToast } from './Toast';
 import styles from './DongFinder.module.css';
 
@@ -135,15 +136,17 @@ type ResultsProps = { keyword: string; selectedIds: number[]; onSelect: (dong: D
 
 /** REGION-01 결과 목록 */
 function DongResults({ keyword, selectedIds, onSelect }: ResultsProps) {
-  const { data, error } = useAsync(() => searchDongs(keyword, 50), [keyword]);
+  const { data, error, loading } = useAsync(() => searchDongs(keyword, 50), [keyword]);
   const words = keyword.split(/\s+/);
 
   return (
     <div className={styles.panel}>
       <p className={styles.count}>
-        '{keyword}' 검색 결과 <span>{data?.totalCount ?? 0}</span>
+        '{keyword}' 검색 결과 {!loading && data && <span>{data.totalCount}</span>}
       </p>
-      {error ? (
+      {loading ? (
+        <Loading label="동네를 찾는 중" />
+      ) : error ? (
         <p className={styles.notice}>{errorMessage(error)}</p>
       ) : data && data.items.length === 0 ? (
         <p className={styles.notice}>찾는 동네가 없어요. 서울의 동 이름으로 찾아 주세요.</p>

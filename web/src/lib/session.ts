@@ -83,7 +83,9 @@ export function refreshAccessToken(): Promise<boolean> {
         signIn(body.data.accessToken, body.data.nextAction);
         return true;
       }
-      signOut();
+      // 서버가 refreshToken을 거절했을 때(401·403)만 로그아웃한다.
+      // 배포 중 502·503, 429, JSON이 아닌 응답 같은 일시적 실패는 로그인 상태를 그대로 둔다.
+      if (res.status === 401 || res.status === 403 || session.status === 'loading') signOut();
       return false;
     } catch {
       // 서버에 닿지 않았다. 로그인 중이던 정보는 지우지 않고 실패만 알린다.

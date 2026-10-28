@@ -74,6 +74,35 @@ describe('FilterChips', () => {
     fireEvent.click(screen.getByRole('radio', { name: '재방문 많음' }));
     expect(onChange).toHaveBeenCalledWith('REVISIT');
   });
+
+  it('고른 칩만 Tab으로 들어오고 방향키로 옮겨 고른다', () => {
+    function Sort() {
+      const [value, setValue] = useState('LOCAL_POPULAR');
+      return (
+        <FilterChips
+          label="정렬"
+          value={value}
+          onChange={setValue}
+          options={[
+            { value: 'LOCAL_POPULAR', label: '현지인 인기' },
+            { value: 'REVISIT', label: '재방문 많음' },
+            { value: 'DISTANCE', label: '가까운 순' },
+          ]}
+        />
+      );
+    }
+    render(<Sort />);
+    const first = screen.getByRole('radio', { name: '현지인 인기' });
+    expect(first).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('radio', { name: '재방문 많음' })).toHaveAttribute('tabindex', '-1');
+
+    fireEvent.keyDown(first, { key: 'ArrowLeft' });
+    const last = screen.getByRole('radio', { name: '가까운 순' });
+    expect(last).toHaveAttribute('aria-checked', 'true');
+    expect(last).toHaveFocus();
+    fireEvent.keyDown(last, { key: 'ArrowRight' });
+    expect(first).toHaveAttribute('aria-checked', 'true');
+  });
 });
 
 describe('Dialog', () => {
@@ -98,6 +127,40 @@ describe('Dialog', () => {
     expect(onConfirm).toHaveBeenCalled();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onCancel).toHaveBeenCalled();
+  });
+
+  it('열리면 포커스를 확인창 안으로 옮기고, Tab이 밖으로 나가지 않으며, 닫히면 원래 자리로 돌려준다', () => {
+    function Remove() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button onClick={() => setOpen(true)}>빼기 열기</button>
+          <Dialog
+            open={open}
+            title="뺄까요?"
+            confirmLabel="빼기"
+            onCancel={() => setOpen(false)}
+            onConfirm={() => setOpen(false)}
+          />
+        </>
+      );
+    }
+    render(<Remove />);
+    const trigger = screen.getByRole('button', { name: '빼기 열기' });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const cancel = screen.getByRole('button', { name: '취소' });
+    const confirm = screen.getByRole('button', { name: '빼기' });
+    expect(cancel).toHaveFocus();
+    confirm.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(cancel).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(confirm).toHaveFocus();
+
+    fireEvent.click(cancel);
+    expect(trigger).toHaveFocus();
   });
 });
 
@@ -132,6 +195,13 @@ describe('Toast', () => {
     expect(screen.getByText('가고 싶은 곳에 저장했어요')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '리스트 보기 ›' })).toHaveAttribute('href', '/list');
 
+    // 링크가 있는 토스트는 5초 동안 보이고, 링크에 포커스가 있으면 사라지지 않는다
+    act(() => vi.advanceTimersByTime(3000));
+    expect(screen.getByText('가고 싶은 곳에 저장했어요')).toBeInTheDocument();
+    fireEvent.focus(screen.getByRole('link', { name: '리스트 보기 ›' }));
+    act(() => vi.advanceTimersByTime(10000));
+    expect(screen.getByText('가고 싶은 곳에 저장했어요')).toBeInTheDocument();
+    fireEvent.blur(screen.getByRole('link', { name: '리스트 보기 ›' }));
     act(() => vi.advanceTimersByTime(3000));
     expect(screen.queryByText('가고 싶은 곳에 저장했어요')).not.toBeInTheDocument();
   });
