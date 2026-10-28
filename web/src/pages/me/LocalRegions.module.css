@@ -1,0 +1,96 @@
+/* Figma 내 동네 관리: 칩 (top 108) / 제목 (top 146) / 목록 카드 (top 267) / 안내 (top 420) */
+.content {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0 24px;
+}
+
+.chip {
+  align-self: flex-start;
+  margin: 0 var(--mk-side);
+  padding: 5px 12px;
+  border-radius: 99px;
+  background: var(--mk-green-100);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.title {
+  margin-top: 4px;
+}
+
+.list {
+  margin: 30px var(--mk-side) 0;
+  padding: 6px 20px;
+  border-radius: 20px;
+  background: var(--mk-white);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+}
+
+.row + .row {
+  border-top: 1px solid #e8ebe5;
+}
+
+.text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dong {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.gu {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.remove {
+  padding: 7px 14px;
+  border: 1px solid #dbe2d8;
+  border-radius: 999px;
+  background: var(--mk-white);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.remove:disabled {
+  color: var(--mk-disabled-text);
+}
+
+.note {
+  margin: 14px calc(var(--mk-side) + 2px) 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+}
+
+.note[data-warn='true'] {
+  color: var(--mk-coral-text);
+}
+
+/* 내 동네 추가 */
+.finder {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 30px var(--mk-side) 0;
+}
+
+.finderNote {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #8b938d;
+}

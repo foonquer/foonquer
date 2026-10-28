@@ -13,6 +13,12 @@ import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { TermsPage } from './pages/auth/TermsPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
 import { HomePage } from './pages/home/HomePage';
+import { AddLocalRegionPage } from './pages/me/AddLocalRegionPage';
+import { ChangePasswordPage } from './pages/me/ChangePasswordPage';
+import { LocalRegionsPage } from './pages/me/LocalRegionsPage';
+import { MyPage } from './pages/me/MyPage';
+import { ProfileEditPage } from './pages/me/ProfileEditPage';
+import { SettingsPage } from './pages/me/SettingsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ProfileSetupPage } from './pages/profile-setup/ProfileSetupPage';
 import { RecommendationListPage } from './pages/recommendations/RecommendationListPage';
@@ -89,13 +95,17 @@ export const routes: RouteObject[] = [
               { path: '/ranking', element: <ComingSoonPage title="랭킹/현황" tab /> },
               { path: '/recommendations', element: <RecommendationsPage /> }, // ?type=
               { path: '/list', element: <ComingSoonPage title="맛집 리스트" tab /> },
-              { path: '/me', element: <ComingSoonPage title="내 정보" tab /> },
+              { path: '/me', element: <MyPage /> },
             ],
           },
           { path: '/search', element: <SearchPage /> }, // ?keyword= | ?categoryId=&category=
           { path: '/restaurants/:restaurantId', element: <RestaurantDetailPage /> },
           { path: '/recommendations/list', element: <RecommendationListPage /> }, // ?type=
-          { path: '/me/settings', element: <ComingSoonPage title="설정" /> },
+          { path: '/me/profile', element: <ProfileEditPage /> },
+          { path: '/me/settings', element: <SettingsPage /> },
+          { path: '/me/regions', element: <LocalRegionsPage /> },
+          { path: '/me/regions/add', element: <AddLocalRegionPage /> },
+          { path: '/me/password', element: <ChangePasswordPage /> },
           ...placeholders,
         ],
       },
