@@ -45,10 +45,14 @@ const aspects = z
 
 const content = z.string().trim().max(300, { error: 'REVIEW_CONTENT_TOO_LONG' });
 
+const IMAGE_KEY_ERROR = { error: 'INVALID_IMAGE_KEY' } as const;
 const imageKeys = z
-  .array(z.string().min(1).max(255))
+  .array(
+    z.string(IMAGE_KEY_ERROR).min(1, IMAGE_KEY_ERROR).max(255, IMAGE_KEY_ERROR),
+    IMAGE_KEY_ERROR,
+  )
   .max(MAX_REVIEW_IMAGES, { error: 'TOO_MANY_IMAGES' })
-  .refine((keys) => new Set(keys).size === keys.length, { error: 'TOO_MANY_IMAGES' });
+  .refine((keys) => new Set(keys).size === keys.length, IMAGE_KEY_ERROR);
 
 export const visitParams = z.object({ visitId: z.coerce.number().int().positive() });
 export const reviewParams = z.object({ reviewId: z.coerce.number().int().positive() });

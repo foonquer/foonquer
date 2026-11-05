@@ -24,12 +24,16 @@ export const locationCheckBody = z.object({
 export type LocationCheckBody = z.infer<typeof locationCheckBody>;
 
 /** VISIT-02 — 갤러리 사진의 EXIF는 프론트가 읽어서 보낸다 (브라우저가 지우면 없음) */
-export const onSiteBody = z.object({
-  sitePhotoKey: z.string().min(1).max(255),
-  photoTakenAt: z.iso.datetime({ offset: true }).optional(),
-  photoLat: lat.optional(),
-  photoLng: lng.optional(),
-});
+// 사진 위치는 한국 밖일 수도 있어서 범위만 보고(가게와 멀면 서비스에서 PHOTO_MISMATCH), 위도·경도는 함께 보낸다
+const COORD_ERROR = { error: 'INVALID_COORDINATE' } as const;
+export const onSiteBody = z
+  .object({
+    sitePhotoKey: z.string().min(1).max(255),
+    photoTakenAt: z.iso.datetime({ offset: true }).optional(),
+    photoLat: z.number(COORD_ERROR).min(-90, COORD_ERROR).max(90, COORD_ERROR).optional(),
+    photoLng: z.number(COORD_ERROR).min(-180, COORD_ERROR).max(180, COORD_ERROR).optional(),
+  })
+  .refine((b) => (b.photoLat === undefined) === (b.photoLng === undefined), COORD_ERROR);
 export type OnSiteBody = z.infer<typeof onSiteBody>;
 
 /** VISIT-03 */

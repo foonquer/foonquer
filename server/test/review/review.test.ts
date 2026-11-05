@@ -222,6 +222,15 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
     expect((await post({ detailScores: { taste: 5 } })).body.code).toBe('INVALID_DETAIL_SCORES');
     expect((await post({})).body.code).toBe('REVIEW_DETAIL_EMPTY');
     expect((await post({ content: 'a'.repeat(301) })).body.code).toBe('REVIEW_CONTENT_TOO_LONG');
+    const key = `review/${me.id}/a.jpg`;
+    for (const imageKeys of [[''], [key, key]]) {
+      const res = await post({ content: '사진', imageKeys });
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('INVALID_IMAGE_KEY');
+    }
+    expect((await post({ content: '사진', imageKeys: Array(6).fill(key) })).body.code).toBe(
+      'TOO_MANY_IMAGES',
+    );
   });
 
   it('음식점 리뷰 목록: 차단한 사람 제외, 작성자 신뢰 온도·칭호·로컬 표시, 별로예요 수는 없다', async () => {
@@ -394,5 +403,58 @@ describe('REVIEW-08·09 도움돼요·별로예요', () => {
     expect(
       await prisma.pointHistory.count({ where: { userId: writer.id, reason: 'HELPFUL_RECEIVED' } }),
     ).toBe(3);
+
+    // 취소하고 다시 눌러도 이번 달 한도(이미 준 3번)는 그대로다
+    for (const r of reviews.slice(0, 3)) {
+      const res = await request(app)
+        .delete(`/api/v1/reviews/${r.id}/reaction`)
+        .set('Authorization', bearer(fan.id));
+      expect(res.status).toBe(200);
+    }
+    await request(app)
+      .delete(`/api/v1/reviews/${reviews[3].id}/reaction`)
+      .set('Authorization', bearer(fan.id));
+    await react(fan.id, reviews[3].id, 'HELPFUL');
+    expect(
+      (
+        await prisma.reviewReaction.findUniqueOrThrow({
+          where: { reviewId_userId: { reviewId: reviews[3].id, userId: fan.id } },
+        })
+      ).isCounted,
+    ).toBe(false);
+    // 같은 리뷰를 다시 누르면 그 리뷰는 원래대로 계산에 들어간다
+    await react(fan.id, reviews[0].id, 'HELPFUL');
+    expect(
+      (
+        await prisma.reviewReaction.findUniqueOrThrow({
+          where: { reviewId_userId: { reviewId: reviews[0].id, userId: fan.id } },
+        })
+      ).isCounted,
+    ).toBe(true);
+    expect(
+      await prisma.pointHistory.count({ where: { userId: writer.id, reason: 'HELPFUL_RECEIVED' } }),
+    ).toBe(3);
+  });
+
+  it('여러 사람이 동시에 눌러도 도움돼요 수가 맞고 500이 나지 않는다', async () => {
+    const season = await createActiveSeason(3);
+    const writer = await createMember();
+    const shop = await createRestaurant();
+    const visit = await verified(writer.id, shop.id, season.id);
+    await rate(writer.id, visit.id, 4);
+    const review = await prisma.review.findUniqueOrThrow({ where: { visitId: visit.id } });
+    const fans = await Promise.all([1, 2, 3, 4].map(() => createMember()));
+    const results = await Promise.all(
+      [...fans, fans[0]].map((f) =>
+        request(app)
+          .put(`/api/v1/reviews/${review.id}/reaction`)
+          .set('Authorization', bearer(f.id))
+          .send({ type: 'HELPFUL' }),
+      ),
+    );
+    expect(results.map((r) => r.status)).toEqual([200, 200, 200, 200, 200]);
+    expect((await prisma.review.findUniqueOrThrow({ where: { id: review.id } })).helpfulCount).toBe(
+      4,
+    );
   });
 });

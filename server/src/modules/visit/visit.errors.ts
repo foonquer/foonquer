@@ -48,6 +48,7 @@ export const VisitError = defineErrors({
 export const FAIL_MESSAGES: Record<string, string> = {
   UNREADABLE: '영수증을 읽기 어려워요. 밝은 곳에서 영수증 전체가 보이게 다시 찍어 주세요.',
   DUPLICATE: '이미 인증한 영수증이에요.',
+  ALREADY_VERIFIED: '이 가게는 오늘 이미 인증했거나, 별점을 남기지 않은 인증이 있어요.',
   STORE_MISMATCH: '영수증의 가게 정보가 달라요. 인증할 가게가 맞는지 확인해 주세요.',
   EXPIRED: '결제한 지 7일이 지난 영수증은 인증할 수 없어요.',
   TOO_FAR: '가게에서 너무 멀어요.',
