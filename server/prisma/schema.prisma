@@ -16,10 +16,8 @@ datasource db {
 
 model Member {
   id                      BigInt                   @id @default(autoincrement())
-  /// 이메일 로그인 id · 소셜로만 가입하면 null 가능
-  email                   String?                  @unique @db.VarChar(255)
-  /// bcrypt 해시 · 소셜 전용 계정은 null
-  password                String?                  @db.VarChar(255)
+  /// 카카오 회원번호 (카카오 로그인이 주는 사용자 고유 id) — 로그인은 카카오 하나만 쓴다. 탈퇴하면 비워서 같은 카카오 계정으로 다시 가입할 수 있게 한다
+  kakaoId                 String?                  @unique @map("kakao_id") @db.VarChar(20)
   /// 2~10자 (한글·영문·숫자) · 프로필 설정(S-04) 전에는 null
   nickname                String?                  @unique @db.VarChar(10)
   /// 닉네임은 30일에 한 번만 변경 가능 — 이 값으로 확인
@@ -42,20 +40,15 @@ model Member {
   rankAlarm               Boolean                  @default(true) @map("rank_alarm")
   /// 이벤트·혜택 알림 — 켜고 끌 때 member_consent(MARKETING)도 함께 기록
   marketingAlarm          Boolean                  @default(false) @map("marketing_alarm")
-  /// 이메일 로그인 연속 실패 횟수 — 5번이면 잠금, 성공하면 0
-  loginFailCount          Int                      @default(0) @map("login_fail_count") @db.TinyInt
-  /// 로그인 잠금 해제 시각 (5번 실패 → 10분)
-  lockedUntil             DateTime?                @map("locked_until")
   /// P 프로필 설정 전 / A 활성 / S 이용 정지 / D 탈퇴
   status                  String                   @default("P") @db.Char(1)
   lastLoginAt             DateTime?                @map("last_login_at")
   regDate                 DateTime                 @default(now()) @map("reg_date")
   updateDate              DateTime?                @updatedAt @map("update_date")
-  /// 탈퇴 시각 — 탈퇴하면 email·nickname을 비워 다른 사람이 쓸 수 있게 한다
+  /// 탈퇴 시각 — 탈퇴하면 kakao_id·nickname을 비워 같은 카카오 계정으로 다시 가입하거나 다른 사람이 닉네임을 쓸 수 있게 한다
   deleteDate              DateTime?                @map("delete_date")
   memberLocalRegions      MemberLocalRegion[]
   memberWithdrawals       MemberWithdrawal[]
-  socialAccounts          SocialAccount[]
   refreshTokens           RefreshToken[]
   memberConsents          MemberConsent[]
   pushSubscriptions       PushSubscription[]
@@ -118,22 +111,6 @@ model MemberWithdrawal {
   @@map("member_withdrawal")
 }
 
-model SocialAccount {
-  id         BigInt   @id @default(autoincrement())
-  userId     BigInt   @map("user_id")
-  /// K 카카오 / G 구글
-  provider   String   @db.Char(1)
-  /// 소셜 서비스가 주는 사용자 고유 id
-  providerId String   @map("provider_id") @db.VarChar(255)
-  email      String?  @db.VarChar(255)
-  regDate    DateTime @default(now()) @map("reg_date")
-  user       Member   @relation(fields: [userId], references: [id])
-
-  @@unique([provider, providerId], map: "social_account_provider_uk")
-  @@unique([userId, provider], map: "social_account_user_provider_uk")
-  @@map("social_account")
-}
-
 model RefreshToken {
   id        BigInt    @id @default(autoincrement())
   userId    BigInt    @map("user_id")
@@ -153,9 +130,9 @@ model RefreshToken {
 model AuthTemporaryToken {
   id        BigInt    @id @default(autoincrement())
   tokenHash String    @unique @map("token_hash") @db.Char(64)
-  /// EMAIL_VERIFY 이메일 인증 코드(6자리, 5분) / EMAIL_VERIFIED 인증 완료 토큰(회원가입에 사용, 30분) / PASSWORD_RESET 비밀번호 재설정 링크(30분) / OAUTH_RESULT 소셜 콜백 결과 교환 코드(1분) / ACCOUNT_LINK 같은 이메일 계정 연동 토큰(5분)
+  /// OAUTH_RESULT 카카오 로그인 콜백 결과 교환 코드(1분)
   tokenType String    @map("token_type") @db.VarChar(20)
-  /// EMAIL_VERIFY { email, codeHash, attempts } / EMAIL_VERIFIED { email } / PASSWORD_RESET { userId } / OAUTH_RESULT { provider, providerId, email, emailVerified } / ACCOUNT_LINK { targetUserId, provider, providerId, email }
+  /// OAUTH_RESULT { kakaoId }
   payload   Json
   expiresAt DateTime  @map("expires_at")
   usedAt    DateTime? @map("used_at")
@@ -958,7 +935,7 @@ model PolicyDocument {
   @@map("policy_document")
 }
 
-/// 고객센터 1:1 문의. 답변이 달리면 notification(INQUIRY_ANSWER)과 이메일로 알린다
+/// 고객센터 1:1 문의. 답변이 달리면 앱 알림(notification INQUIRY_ANSWER)으로만 알린다 (이메일은 받지 않는다)
 model Inquiry {
   id         BigInt    @id @default(autoincrement())
   userId     BigInt    @map("user_id")
