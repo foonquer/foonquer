@@ -303,16 +303,12 @@ describe('USER-03 POST /users/me/profile', () => {
 });
 
 describe('USER-04 GET /users/me', () => {
-  it('내 프로필과 로그인 방법·내 동네를 준다', async () => {
+  it('내 프로필과 내 동네를 준다', async () => {
     const me = await createMember({
-      email: 'me@example.com',
-      password: 'hashed',
+      kakaoId: 'kakao-1',
       nickname: '내닉네임',
       gender: 'M',
       ageGroup: 30,
-    });
-    await prisma.socialAccount.create({
-      data: { userId: me.id, provider: 'K', providerId: 'kakao-1', email: 'me@example.com' },
     });
     const gayang = await prisma.region.findUniqueOrThrow({ where: { code: GAYANG } });
     await prisma.memberLocalRegion.create({
@@ -324,8 +320,6 @@ describe('USER-04 GET /users/me', () => {
     expect(res.body.message).toBe('내 프로필을 조회했어요.');
     expect(res.body.data).toEqual({
       id: Number(me.id),
-      email: 'me@example.com',
-      loginMethods: ['EMAIL', 'KAKAO'],
       nickname: '내닉네임',
       nicknameChangeableAt: null,
       profileImageUrl: null,
@@ -338,15 +332,10 @@ describe('USER-04 GET /users/me', () => {
     });
   });
 
-  it('소셜로만 가입했으면 email은 null, 사진이 있으면 CUSTOM', async () => {
+  it('사진이 있으면 CUSTOM과 사진 주소를 준다', async () => {
     const me = await createMember({ profileImageKey: 'profile/1/a.webp' });
-    await prisma.socialAccount.create({
-      data: { userId: me.id, provider: 'G', providerId: 'google-1', email: 'g@example.com' },
-    });
     const res = await request(app).get('/api/v1/users/me').set('Authorization', bearer(me.id));
     expect(res.body.data).toMatchObject({
-      email: null,
-      loginMethods: ['GOOGLE'],
       profileImageSource: 'CUSTOM',
       profileImageUrl: 'https://images.test/profile/1/a.webp',
     });

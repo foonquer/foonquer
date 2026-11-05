@@ -11,11 +11,8 @@ const testEnv = {
   COOKIE_SECURE: 'true',
   FRONTEND_URL: 'http://localhost:5173',
   API_BASE_URL: 'http://localhost:3000',
-  MAIL_DRIVER: 'console',
   KAKAO_REST_API_KEY: 'test-kakao-rest-key',
   IMAGE_BASE_URL: 'https://images.test',
-  GOOGLE_CLIENT_ID: 'test-google-client-id',
-  GOOGLE_CLIENT_SECRET: 'test-google-client-secret',
 };
 
 // global-setup.ts(DB 준비)도 같은 값을 쓰도록 이 프로세스에도 넣는다. server/.env보다 우선한다.
