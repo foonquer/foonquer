@@ -11,6 +11,11 @@ export const ProfileError = defineErrors({
     code: 'PICK_NOT_CONQUERED',
     message: '내가 정복한 가게 중에서만 고를 수 있어요.',
   },
+  PICK_DUPLICATE: {
+    status: 400,
+    code: 'PICK_DUPLICATE',
+    message: '같은 가게를 두 번 고를 수 없어요.',
+  },
   PICK_COMMENT_TOO_LONG: {
     status: 400,
     code: 'PICK_COMMENT_TOO_LONG',

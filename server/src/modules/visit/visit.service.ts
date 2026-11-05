@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { Tx } from '../../common/db';
+import { type Db, lockMember, type Tx } from '../../common/db';
 import { AppError } from '../../common/errors/app-error';
 import { distanceBetween } from '../../common/geo';
 import { findCurrentSeason } from '../../common/season';
@@ -64,8 +64,9 @@ async function assertCanVerify(
   restaurantId: bigint,
   now: Date,
   exceptVisitId?: bigint,
+  db: Db = prisma,
 ) {
-  const pending = await prisma.visit.findFirst({
+  const pending = await db.visit.findFirst({
     where: {
       userId,
       restaurantId,
@@ -77,7 +78,7 @@ async function assertCanVerify(
   if (pending) {
     throw new AppError(VisitError.VISIT_PENDING_RATING, undefined, { verificationId: pending.id });
   }
-  const today = await prisma.visit.findFirst({
+  const today = await db.visit.findFirst({
     where: {
       userId,
       restaurantId,
@@ -209,6 +210,9 @@ export async function completeOnSite(
     const [locked] = await tx.$queryRaw<{ status: string }[]>`
       SELECT status FROM visit WHERE id = ${visit.id} FOR UPDATE`;
     if (locked?.status !== 'L') throw new AppError(VisitError.INVALID_VISIT_STATE);
+    // 같은 가게 인증이 동시에 두 건 통과하지 않게 회원을 잠그고 다시 본다 (잠금 순서: visit → member)
+    await lockMember(tx, userId);
+    await assertCanVerify(userId, restaurant.id, now, visit.id, tx);
     await tx.visit.update({
       where: { id: visit.id },
       data: {
@@ -239,7 +243,16 @@ const running = new Set<Promise<void>>();
 
 export function scheduleReceiptCheck(visitId: bigint) {
   const job = processReceipt(visitId)
-    .catch((err: unknown) => console.error(`영수증 확인 실패 visit=${visitId}`, err))
+    .catch(async (err: unknown) => {
+      console.error(`영수증 확인 실패 visit=${visitId}`, err);
+      // READING(P)으로 영원히 남지 않게 실패로 바꾼다 (이미 바뀐 상태는 그대로)
+      await prisma.visit
+        .updateMany({
+          where: { id: visitId, status: 'P' },
+          data: { status: 'F', failReason: 'UNREADABLE' },
+        })
+        .catch((e: unknown) => console.error(`영수증 실패 기록 실패 visit=${visitId}`, e));
+    })
     .finally(() => running.delete(job));
   running.add(job);
 }
@@ -299,7 +312,7 @@ export async function processReceipt(visitId: bigint, now = new Date()) {
 
   const url = await createReadUrl(visit.receiptImageKey, 600);
   const ext = visit.receiptImageKey.split('.').pop() ?? 'jpg';
-  const receipt = url ? await readReceipt(url, ext === 'jpg' ? 'jpg' : ext) : null;
+  const receipt = url ? await readReceipt(url, ext) : null;
   if (
     !receipt ||
     !receipt.paidAt ||
@@ -352,6 +365,18 @@ export async function processReceipt(visitId: bigint, now = new Date()) {
       const [locked] = await tx.$queryRaw<{ status: string }[]>`
         SELECT status FROM visit WHERE id = ${visit.id} FOR UPDATE`;
       if (locked?.status !== 'P') return;
+      // 같은 가게 영수증 두 장이 함께 읽히면 앞의 것만 인증한다
+      await lockMember(tx, visit.userId);
+      try {
+        await assertCanVerify(visit.userId, restaurant.id, now, visit.id, tx);
+      } catch (err) {
+        if (!(err instanceof AppError)) throw err;
+        await tx.visit.update({
+          where: { id: visit.id },
+          data: { ...ocrFields, status: 'F', failReason: 'ALREADY_VERIFIED' },
+        });
+        return;
+      }
       await tx.visit.update({
         where: { id: visit.id },
         data: { ...ocrFields, storeNameMatched, businessNoMatched, receiptHash },
@@ -361,8 +386,12 @@ export async function processReceipt(visitId: bigint, now = new Date()) {
           data: receipt.items.map((item) => ({ visitId: visit.id, ...item })),
         });
       }
-      // 처음 인증된 영수증의 사업자번호를 가게에 저장해 같은 이름 다른 지점을 구분한다
-      if (!restaurant.businessNo && receipt.businessNo) {
+      // 처음 인증된 영수증의 사업자번호를 가게에 저장해 같은 이름 다른 지점을 구분한다.
+      // 이름이 포함 관계로만 맞은 경우(다른 지점일 수 있음)는 저장하지 않는다
+      const sameName =
+        receipt.storeName !== null &&
+        normalizeStoreName(receipt.storeName) === normalizeStoreName(restaurant.name);
+      if (!restaurant.businessNo && receipt.businessNo && sameName) {
         await tx.restaurant.update({
           where: { id: restaurant.id },
           data: { businessNo: receipt.businessNo },

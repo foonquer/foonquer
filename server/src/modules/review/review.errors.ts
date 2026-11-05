@@ -27,6 +27,11 @@ export const ReviewError = defineErrors({
     code: 'TOO_MANY_IMAGES',
     message: '사진은 5장까지 올릴 수 있어요.',
   },
+  INVALID_IMAGE_KEY: {
+    status: 400,
+    code: 'INVALID_IMAGE_KEY',
+    message: '사진 정보가 올바르지 않아요. 같은 사진은 한 번만 올려 주세요.',
+  },
   REVIEW_DETAIL_EMPTY: {
     status: 400,
     code: 'REVIEW_DETAIL_EMPTY',

@@ -61,6 +61,8 @@ export async function applyConquest(
   let tierUp: ConquestResult['tierUp'] = null;
 
   if (seasonId !== null) {
+    // 같은 구의 정복·순위 계산을 한 줄로 세운다 (둘이 동시에 1위·먹짱으로 저장되지 않게)
+    await tx.$queryRaw`SELECT id FROM region WHERE id = ${restaurant.sigunguId} FOR UPDATE`;
     const existing = await tx.conquest.findUnique({
       where: {
         userId_restaurantId_seasonId: { userId, restaurantId: restaurant.id, seasonId },

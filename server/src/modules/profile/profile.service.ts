@@ -1,15 +1,21 @@
+import { lockMember } from '../../common/db';
 import { AppError } from '../../common/errors/app-error';
 import { toPageResult } from '../../common/pagination';
 import { findCurrentSeason } from '../../common/season';
 import { toKstIso } from '../../common/time';
-import type { Prisma } from '../../generated/prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 import { publicImageUrl } from '../../lib/image-url';
 import { prisma } from '../../lib/prisma';
 import { loadMukkaebi } from '../mukkaebi/mukkaebi-view';
 import { loadTitles, titleOf } from '../ranking/title';
 import { TIER_API, TIER_ORDER, type TierCode, tierTitle } from '../ranking/tier';
 import { UserError } from '../user/user.errors';
-import type { PickCandidateQuery, PicksBody, VisitedQuery } from './profile.schema';
+import {
+  MAX_PICKS,
+  type PickCandidateQuery,
+  type PicksBody,
+  type VisitedQuery,
+} from './profile.schema';
 import { ProfileError } from './profile.errors';
 
 async function findActiveMember(userId: number | bigint) {
@@ -67,6 +73,13 @@ async function loadPicks(userId: bigint) {
   }));
 }
 
+/** 모든 시즌에 정복한 서로 다른 가게 수 */
+async function distinctRestaurantCount(userId: bigint) {
+  const [row] = await prisma.$queryRaw<{ n: bigint }[]>`
+    SELECT COUNT(DISTINCT restaurant_id) AS n FROM conquest WHERE user_id = ${userId}`;
+  return Number(row?.n ?? 0);
+}
+
 /** PROFILE-01 탐방러 프로필 */
 export async function getMemberProfile(viewerId: bigint, userId: number) {
   const member = await findActiveMember(userId);
@@ -76,11 +89,12 @@ export async function getMemberProfile(viewerId: bigint, userId: number) {
     mukkaebi,
     home,
     seasonStats,
-    distinct,
+    visitedCount,
     helpful,
     reviewCount,
     results,
-    achieved,
+    achievedCount,
+    recentAchievements,
     totalAchievements,
     picks,
     block,
@@ -98,11 +112,7 @@ export async function getMemberProfile(viewerId: bigint, userId: number) {
           include: { sigungu: { select: { name: true } } },
         })
       : [],
-    prisma.conquest.findMany({
-      where: { userId: member.id },
-      distinct: ['restaurantId'],
-      select: { restaurantId: true },
-    }),
+    distinctRestaurantCount(member.id),
     prisma.review.aggregate({
       where: { userId: member.id, status: 'A' },
       _sum: { helpfulCount: true },
@@ -114,9 +124,11 @@ export async function getMemberProfile(viewerId: bigint, userId: number) {
       take: 5,
       include: { season: { select: { seasonNo: true } }, bestSigungu: { select: { name: true } } },
     }),
+    prisma.memberAchievement.count({ where: { userId: member.id } }),
     prisma.memberAchievement.findMany({
       where: { userId: member.id },
       orderBy: { achievedAt: 'desc' },
+      take: 3,
       include: {
         achievement: { select: { id: true, name: true, description: true, iconKey: true } },
       },
@@ -185,13 +197,13 @@ export async function getMemberProfile(viewerId: bigint, userId: number) {
             : null,
         }
       : null,
-    totalConquestCount: distinct.length,
+    totalConquestCount: visitedCount,
     helpfulReceived: helpful._sum.helpfulCount ?? 0,
     seasonTitles,
     achievements: {
-      achievedCount: achieved.length,
+      achievedCount,
       totalCount: totalAchievements,
-      recent: achieved.slice(0, 3).map((a) => ({
+      recent: recentAchievements.map((a) => ({
         achievementId: a.achievement.id,
         name: a.achievement.name,
         description: a.achievement.description,
@@ -199,7 +211,7 @@ export async function getMemberProfile(viewerId: bigint, userId: number) {
         achievedAt: toKstIso(a.achievedAt),
       })),
     },
-    counts: { visitedRestaurants: distinct.length, reviews: reviewCount, picks: picks.length },
+    counts: { visitedRestaurants: visitedCount, reviews: reviewCount, picks: picks.length },
     picks,
     isMe: member.id === viewerId,
     isBlocked: block !== null,
@@ -260,46 +272,55 @@ export async function listVisitedRestaurants(
   };
 }
 
-/** PICK-01 내 PICK과 고를 수 있는 정복한 가게 */
+/** PICK-01 내 PICK과 고를 수 있는 정복한 가게 (가게마다 마지막 정복 최근순, DB에서 페이지) */
 export async function getMyPicks(userId: bigint, query: PickCandidateQuery) {
-  const picks = await loadPicks(userId);
-  const conquered = await prisma.conquest.findMany({
-    where: {
-      userId,
-      restaurant: query.keyword ? { name: { contains: query.keyword } } : undefined,
-    },
-    distinct: ['restaurantId'],
-    orderBy: { conqueredAt: 'desc' },
-    select: {
-      restaurant: {
-        select: {
-          id: true,
-          name: true,
-          category: { select: { name: true } },
-          region: { select: { name: true } },
-        },
+  const keyword = query.keyword ? `%${query.keyword}%` : null;
+  const nameFilter = keyword ? Prisma.sql`AND r.name LIKE ${keyword}` : Prisma.empty;
+  const [picks, rows, [total]] = await Promise.all([
+    loadPicks(userId),
+    prisma.$queryRaw<{ restaurant_id: bigint }[]>`
+      SELECT c.restaurant_id FROM conquest c JOIN restaurant r ON r.id = c.restaurant_id
+      WHERE c.user_id = ${userId} ${nameFilter}
+      GROUP BY c.restaurant_id
+      ORDER BY MAX(c.conquered_at) DESC, c.restaurant_id DESC
+      LIMIT ${query.size} OFFSET ${(query.page - 1) * query.size}`,
+    prisma.$queryRaw<{ n: bigint }[]>`
+      SELECT COUNT(DISTINCT c.restaurant_id) AS n FROM conquest c JOIN restaurant r ON r.id = c.restaurant_id
+      WHERE c.user_id = ${userId} ${nameFilter}`,
+  ]);
+  const ids = rows.map((r) => r.restaurant_id);
+  const [restaurants, counts] = await Promise.all([
+    prisma.restaurant.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        name: true,
+        category: { select: { name: true } },
+        region: { select: { name: true } },
       },
-    },
-  });
-  const start = (query.page - 1) * query.size;
-  const page = conquered.slice(start, start + query.size);
-  const counts = await visitCounts(
-    userId,
-    page.map((c) => c.restaurant.id),
-  );
+    }),
+    visitCounts(userId, ids),
+  ]);
+  const byId = new Map(restaurants.map((r) => [r.id.toString(), r]));
   const picked = new Set(picks.map((p) => p.restaurantId.toString()));
-  const candidates = page.map((c) => ({
-    restaurantId: c.restaurant.id,
-    name: c.restaurant.name,
-    categoryName: c.restaurant.category?.name ?? null,
-    dongName: c.restaurant.region.name,
-    visitCount: counts.get(c.restaurant.id.toString()) ?? 0,
-    isPicked: picked.has(c.restaurant.id.toString()),
-  }));
+  const candidates = ids.flatMap((id) => {
+    const r = byId.get(id.toString());
+    if (!r) return [];
+    return [
+      {
+        restaurantId: r.id,
+        name: r.name,
+        categoryName: r.category?.name ?? null,
+        dongName: r.region.name,
+        visitCount: counts.get(r.id.toString()) ?? 0,
+        isPicked: picked.has(r.id.toString()),
+      },
+    ];
+  });
   return {
     picks,
-    maxPicks: 10,
-    candidates: toPageResult(candidates, { ...query, totalCount: conquered.length }),
+    maxPicks: MAX_PICKS,
+    candidates: toPageResult(candidates, { ...query, totalCount: Number(total?.n ?? 0) }),
   };
 }
 
@@ -315,6 +336,8 @@ export async function saveMyPicks(userId: bigint, body: PicksBody, now = new Dat
     if (conquered.length !== ids.length) throw new AppError(ProfileError.PICK_NOT_CONQUERED);
   }
   await prisma.$transaction(async (tx) => {
+    // 같은 회원의 저장이 겹쳐 (user_id, sort_order) 충돌로 500이 나지 않게
+    await lockMember(tx, userId);
     await tx.memberPick.deleteMany({ where: { userId } });
     if (ids.length > 0) {
       await tx.memberPick.createMany({

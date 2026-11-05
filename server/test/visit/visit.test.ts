@@ -138,6 +138,82 @@ describe('VISIT-01·02 현장 인증', () => {
     expect(expired.body.code).toBe('LOCATION_CHECK_EXPIRED');
   });
 
+  it('사진 좌표·시각·키 검사, 같은 위치 확인 두 번, 오늘 이미 인증한 가게', async () => {
+    const { me, restaurant, lat, lng } = await setup();
+    const other = await createMember();
+    const check = async () =>
+      (
+        await request(app)
+          .post('/api/v1/visit-verifications/location-checks')
+          .set('Authorization', bearer(me.id))
+          .send({ restaurantId: Number(restaurant.id), lat, lng })
+      ).body.data.verificationId as number;
+    const onSite = (id: number, body: object) =>
+      request(app)
+        .post(`/api/v1/visit-verifications/${id}/on-site`)
+        .set('Authorization', bearer(me.id))
+        .send({ sitePhotoKey: `site/${me.id}/${randomUUID()}.jpg`, ...body });
+    const id = await check();
+
+    const halfCoord = await onSite(id, { photoLat: lat });
+    expect(halfCoord.status).toBe(400);
+    expect(halfCoord.body.code).toBe('INVALID_COORDINATE');
+    // 한국 밖 좌표는 요청 오류가 아니라 사진 위치가 다른 것
+    const abroad = await onSite(id, { photoLat: 48.85, photoLng: 2.35 });
+    expect(abroad.status).toBe(422);
+    expect(abroad.body.code).toBe('PHOTO_MISMATCH');
+    const oldPhoto = await onSite(id, {
+      photoTakenAt: new Date(Date.now() - 25 * 3600_000).toISOString(),
+    });
+    expect(oldPhoto.body.code).toBe('PHOTO_MISMATCH');
+    const othersKey = await request(app)
+      .post(`/api/v1/visit-verifications/${id}/on-site`)
+      .set('Authorization', bearer(me.id))
+      .send({ sitePhotoKey: `site/${other.id}/${randomUUID()}.jpg` });
+    expect(othersKey.status).toBe(403);
+    expect(othersKey.body.code).toBe('IMAGE_KEY_FORBIDDEN');
+    expect(await prisma.pointHistory.count({ where: { userId: me.id } })).toBe(0);
+
+    expect((await onSite(id, {})).status).toBe(200);
+    const twice = await onSite(id, {});
+    expect(twice.status).toBe(409);
+    expect(twice.body.code).toBe('INVALID_VISIT_STATE');
+
+    // 별점까지 남긴(C) 오늘은 같은 가게를 다시 인증할 수 없다
+    await prisma.visit.update({ where: { id: BigInt(id) }, data: { status: 'C' } });
+    const today = await request(app)
+      .post('/api/v1/visit-verifications/location-checks')
+      .set('Authorization', bearer(me.id))
+      .send({ restaurantId: Number(restaurant.id), lat, lng });
+    expect(today.status).toBe(409);
+    expect(today.body.code).toBe('ALREADY_VERIFIED_TODAY');
+  });
+
+  it('같은 가게 위치 확인 두 건을 동시에 사진 인증해도 하나만 통과한다', async () => {
+    const { me, restaurant, lat, lng } = await setup();
+    const ids: number[] = [];
+    for (let i = 0; i < 2; i += 1) {
+      // 두 번째 위치 확인을 만들 수 있게 앞의 것은 아직 L 상태다
+      const res = await request(app)
+        .post('/api/v1/visit-verifications/location-checks')
+        .set('Authorization', bearer(me.id))
+        .send({ restaurantId: Number(restaurant.id), lat, lng });
+      ids.push(res.body.data.verificationId as number);
+    }
+    const results = await Promise.all(
+      ids.map((id) =>
+        request(app)
+          .post(`/api/v1/visit-verifications/${id}/on-site`)
+          .set('Authorization', bearer(me.id))
+          .send({ sitePhotoKey: `site/${me.id}/${randomUUID()}.jpg` }),
+      ),
+    );
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    expect(
+      await prisma.pointHistory.count({ where: { userId: me.id, reason: 'VISIT_VERIFIED' } }),
+    ).toBe(1);
+  });
+
   it('다른 회원의 인증은 404', async () => {
     const { me, restaurant, lat, lng } = await setup();
     const other = await createMember();
@@ -176,6 +252,9 @@ describe('VISIT-03·04 영수증 인증', () => {
     await flushReceiptChecks();
     return res;
   }
+
+  const visitOf = (res: { body: { data: { verificationId: number } } }) =>
+    prisma.visit.findUniqueOrThrow({ where: { id: BigInt(res.body.data.verificationId) } });
 
   it('접수 202 → OCR 결과가 맞으면 인증 완료, 메뉴 줄을 남긴다', async () => {
     const { me, restaurant } = await setup();
@@ -246,15 +325,66 @@ describe('VISIT-03·04 영수증 인증', () => {
     ).toBe('UNREADABLE');
   });
 
-  it('가게에 사업자번호가 없으면 가게명으로 맞추고, 맞으면 사업자번호를 저장한다', async () => {
+  it('가게에 사업자번호가 없으면 가게명으로 맞추고, 이름이 똑같을 때만 사업자번호를 저장한다', async () => {
     const { me } = await setup();
     const shop = await createRestaurant({ name: '스이루 중앙대점' });
     vi.mocked(readReceipt).mockResolvedValue(
-      receipt({ storeName: '스이루', businessNo: '9876543210', approvalNo: '3' }),
+      receipt({ storeName: '(주)스이루 중앙대점', businessNo: '9876543210', approvalNo: '3' }),
     );
-    await submit(me.id, shop.id);
+    const res = await submit(me.id, shop.id);
+    expect(await visitOf(res)).toMatchObject({ status: 'V' });
     expect((await prisma.restaurant.findUniqueOrThrow({ where: { id: shop.id } })).businessNo).toBe(
       '9876543210',
     );
+  });
+
+  it('이름이 포함 관계로만 맞으면(다른 지점일 수 있음) 인증은 되지만 사업자번호는 저장하지 않는다', async () => {
+    const { me } = await setup();
+    const shop = await createRestaurant({ name: '스이루 중앙대점' });
+    vi.mocked(readReceipt).mockResolvedValue(
+      receipt({ storeName: '스이루', businessNo: '1111111111', approvalNo: '4' }),
+    );
+    const res = await submit(me.id, shop.id);
+    expect(await visitOf(res)).toMatchObject({ status: 'V' });
+    expect(
+      (await prisma.restaurant.findUniqueOrThrow({ where: { id: shop.id } })).businessNo,
+    ).toBeNull();
+  });
+
+  it('같은 가게 영수증 두 장을 함께 내면 하나만 인증(+50P), 다른 하나는 ALREADY_VERIFIED', async () => {
+    const { me, restaurant } = await setup();
+    vi.mocked(readReceipt)
+      .mockResolvedValueOnce(receipt({ approvalNo: '11' }))
+      .mockResolvedValueOnce(receipt({ approvalNo: '22' }));
+    const send = () =>
+      request(app)
+        .post('/api/v1/visit-verifications/receipt')
+        .set('Authorization', bearer(me.id))
+        .send({
+          restaurantId: Number(restaurant.id),
+          receiptImageKey: `receipt/${me.id}/${randomUUID()}.jpg`,
+        });
+    const [a, b] = await Promise.all([send(), send()]);
+    expect([a.status, b.status]).toEqual([202, 202]);
+    await flushReceiptChecks();
+    const visits = await prisma.visit.findMany({
+      where: { userId: me.id },
+      orderBy: { id: 'asc' },
+    });
+    expect(visits.map((v) => v.status).sort()).toEqual(['F', 'V']);
+    expect(visits.find((v) => v.status === 'F')?.failReason).toBe('ALREADY_VERIFIED');
+    expect(
+      await prisma.pointHistory.count({ where: { userId: me.id, reason: 'VISIT_VERIFIED' } }),
+    ).toBe(1);
+  });
+
+  it('OCR 처리 중 예외가 나도 READING으로 남지 않고 UNREADABLE 실패가 되며 포인트는 없다', async () => {
+    const { me, restaurant } = await setup();
+    vi.mocked(readReceipt).mockRejectedValueOnce(new Error('OCR 서버 오류'));
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const res = await submit(me.id, restaurant.id);
+    errorLog.mockRestore();
+    expect(await visitOf(res)).toMatchObject({ status: 'F', failReason: 'UNREADABLE' });
+    expect(await prisma.pointHistory.count({ where: { userId: me.id } })).toBe(0);
   });
 });

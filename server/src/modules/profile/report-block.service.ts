@@ -56,10 +56,13 @@ export async function blockMember(userId: bigint, targetUserId: number, now = ne
   });
   if (!target || target.status === 'D' || target.status === 'P')
     throw new AppError(UserError.MEMBER_NOT_FOUND);
-  const row = await prisma.memberBlock.upsert({
+  // upsert는 MySQL에서 조회 후 생성이라 동시 요청이면 P2002(500)가 날 수 있다 → 중복은 건너뛰고 넣은 뒤 읽는다
+  await prisma.memberBlock.createMany({
+    data: [{ blockerId: userId, blockedId, regDate: now }],
+    skipDuplicates: true,
+  });
+  const row = await prisma.memberBlock.findUniqueOrThrow({
     where: { blockerId_blockedId: { blockerId: userId, blockedId } },
-    update: {},
-    create: { blockerId: userId, blockedId, regDate: now },
   });
   return { userId: blockedId, isBlocked: true, blockedAt: toKstIso(row.regDate) };
 }

@@ -47,6 +47,13 @@ describe('LIST-01~03 저장한 맛집', () => {
     await save(c.id);
     await createConquest(me.id, c, season.id);
     expect((await save(b.id, { memo: '주말엔 웨이팅' })).body.data.memo).toBe('주말엔 웨이팅');
+    expect(
+      (
+        await prisma.savedRestaurant.findUniqueOrThrow({
+          where: { userId_restaurantId: { userId: me.id, restaurantId: b.id } },
+        })
+      ).memo,
+    ).toBe('주말엔 웨이팅');
 
     const want = await request(app)
       .get('/api/v1/users/me/saved-restaurants')
@@ -61,6 +68,13 @@ describe('LIST-01~03 저장한 맛집', () => {
       regionLabel: '서울특별시 강서구',
     });
     expect(want.body.data.pins).toHaveLength(3);
+    const page2 = await request(app)
+      .get('/api/v1/users/me/saved-restaurants?size=1&page=2')
+      .set('Authorization', bearer(me.id));
+    expect(page2.body.data).toMatchObject({ totalCount: 2, hasNext: false });
+    expect(page2.body.data.items.map((i: { restaurantId: number }) => i.restaurantId)).toEqual([
+      Number(b.id),
+    ]);
 
     const done = await request(app)
       .get('/api/v1/users/me/saved-restaurants?tab=CONQUERED')
@@ -75,6 +89,17 @@ describe('LIST-01~03 저장한 맛집', () => {
     expect(
       (await prisma.restaurantStat.findUniqueOrThrow({ where: { restaurantId: a.id } })).saveCount,
     ).toBe(0);
-    expect((await save(a.id, { memo: 'a'.repeat(51) })).body.code).toBe('MEMO_TOO_LONG');
+    const tooLong = await save(a.id, { memo: 'a'.repeat(51) });
+    expect(tooLong.status).toBe(400);
+    expect(tooLong.body.code).toBe('MEMO_TOO_LONG');
+    // 거절된 요청은 다시 저장하지 않는다
+    expect(
+      await prisma.savedRestaurant.findUnique({
+        where: { userId_restaurantId: { userId: me.id, restaurantId: a.id } },
+      }),
+    ).toBeNull();
+    expect(
+      (await prisma.restaurantStat.findUniqueOrThrow({ where: { restaurantId: a.id } })).saveCount,
+    ).toBe(0);
   });
 });
