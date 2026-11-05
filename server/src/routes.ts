@@ -5,7 +5,14 @@ import { mapRouter } from './modules/map/map.router';
 import { regionRouter } from './modules/region/region.router';
 import { restaurantRouter } from './modules/restaurant/restaurant.router';
 import { recommendationRouter, searchRouter } from './modules/search/search.router';
+import {
+  celebrationRouter,
+  characterRouter,
+  pointRouter,
+  shopRouter,
+} from './modules/mukkaebi/mukkaebi.router';
 import { profileRouter, reportRouter } from './modules/profile/profile.router';
+import { myRankingRouter, rankingRouter, seasonRouter } from './modules/ranking/ranking.router';
 import {
   restaurantReviewRouter,
   reviewAspectRouter,
@@ -27,8 +34,10 @@ export const router = Router();
 router.use('/health', healthRouter);
 router.use('/auth', authRouter);
 router.use('/users/me/saved-restaurants', savedRouter);
+router.use('/users/me/celebrations', celebrationRouter);
 router.use('/users', userRouter);
 router.use('/users', userReviewRouter);
+router.use('/users', myRankingRouter);
 router.use('/users', profileRouter);
 router.use('/regions', regionRouter);
 router.use('/map', mapRouter);
@@ -42,3 +51,8 @@ router.use('/visits', visitReviewRouter);
 router.use('/reviews', reviewRouter);
 router.use('/review-aspects', reviewAspectRouter);
 router.use('/reports', reportRouter);
+router.use('/seasons', seasonRouter);
+router.use('/rankings', rankingRouter);
+router.use('/characters', characterRouter);
+router.use('/shop', shopRouter);
+router.use('/points', pointRouter);
