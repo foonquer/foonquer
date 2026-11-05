@@ -83,6 +83,14 @@ describe('UPLOAD-01 POST /uploads/signed-url', () => {
     expect(noBucket.status).toBe(500);
     expect(noBucket.body.code).toBe('UPLOAD_URL_FAILED');
   });
+
+  it('로그인하지 않으면 401이고 URL을 만들지 않는다', async () => {
+    const res = await request(app)
+      .post('/api/v1/uploads/signed-url')
+      .send({ purpose: 'REVIEW', contentType: 'image/jpeg', fileSize: 1 });
+    expect(res.status).toBe(401);
+    expect(createUploadUrl).not.toHaveBeenCalled();
+  });
 });
 
 describe('assertUploadedImage (올린 사진 key 확인)', () => {

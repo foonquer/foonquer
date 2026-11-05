@@ -58,6 +58,38 @@ describe('POINT-03 grantReward / addPoint / spendPoint', () => {
     ).toBe(10);
   });
 
+  it('동시에 받아도 경험치·포인트를 덮어쓰지 않고, 하루 한도도 지킨다', async () => {
+    const me = await createMember();
+    await prisma.mukkaebi.create({ data: { userId: me.id } });
+    // 경험치 20씩 4번 동시에 (레벨 업이 없도록 합 80)
+    await Promise.all(
+      [1, 2, 3, 4].map((id) =>
+        prisma.$transaction((tx) =>
+          grantReward(tx, me.id, 'VISIT_VERIFIED', '방문 인증', { type: 'VISIT', id }),
+        ),
+      ),
+    );
+    const mukkaebi = await prisma.mukkaebi.findUniqueOrThrow({ where: { userId: me.id } });
+    expect(mukkaebi.exp).toBe(80);
+    expect((await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).pointBalance).toBe(
+      200,
+    );
+
+    await Promise.all(
+      Array.from({ length: 12 }, (_, i) =>
+        prisma.$transaction((tx) =>
+          grantReward(tx, me.id, 'REVIEW_VOTE', '리뷰 평가 참여', {
+            type: 'REVIEW_REACTION',
+            id: 100 + i,
+          }),
+        ),
+      ),
+    );
+    expect(
+      await prisma.pointHistory.count({ where: { userId: me.id, reason: 'REVIEW_VOTE' } }),
+    ).toBe(10);
+  });
+
   it('잔액이 모자라면 409 POINT_NOT_ENOUGH, 충분하면 빼고 내역을 남긴다', async () => {
     const me = await createMember();
     await prisma.$transaction((tx) =>

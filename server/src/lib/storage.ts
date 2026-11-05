@@ -51,10 +51,17 @@ export interface UploadUrl {
   headers: Record<string, string>;
 }
 
+/** 업로드 URL에 서명으로 묶는 헤더: 크기 제한 + 처음 만들 때만 (덮어쓰기 금지) */
+const CREATE_ONLY_HEADERS = (lengthRange: string) => ({
+  'x-goog-content-length-range': lengthRange,
+  'x-goog-if-generation-match': '0',
+});
+
 /**
  * 브라우저가 파일을 직접 올릴 signed URL(V4, PUT)을 만든다.
  * 서명은 VM 서비스 계정이 IAM signBlob으로 한다(roles/iam.serviceAccountTokenCreator).
  * 크기는 x-goog-content-length-range 헤더로 서명에 묶어 maxBytes보다 큰 파일을 막는다.
+ * x-goog-if-generation-match: 0으로 처음 만들 때만 올라가게 해서, 서버가 확인한 뒤 같은 URL로 바꿔치기하지 못하게 한다.
  * 버킷이 없으면(로컬 등) null.
  */
 export async function createUploadUrl(
@@ -75,12 +82,9 @@ export async function createUploadUrl(
       action: 'write',
       expires: Date.now() + expiresInSec * 1000,
       contentType,
-      extensionHeaders: { 'x-goog-content-length-range': lengthRange },
+      extensionHeaders: CREATE_ONLY_HEADERS(lengthRange),
     });
-  return {
-    url,
-    headers: { 'Content-Type': contentType, 'x-goog-content-length-range': lengthRange },
-  };
+  return { url, headers: { 'Content-Type': contentType, ...CREATE_ONLY_HEADERS(lengthRange) } };
 }
 
 /**
