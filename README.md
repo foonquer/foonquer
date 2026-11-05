@@ -64,7 +64,7 @@ foonquer/
 │   │   │   ├── geo.ts       # 두 좌표 사이 거리(m)
 │   │   │   └── ttl-cache.ts # 정해진 시간 동안만 기억하는 메모리 캐시 (카카오 응답 캐시)
 │   │   ├── modules/         # 도메인별 router · service · schema · errors
-│   │   │   ├── auth/        # 이메일·소셜 로그인, 토큰, 비밀번호
+│   │   │   ├── auth/        # 카카오 로그인, 약관 동의, 토큰
 │   │   │   ├── user/        # 프로필, 내 동네
 │   │   │   ├── region/      # 동 검색 (data/seoul-regions.json = 서울 구·법정동 원본)
 │   │   │   ├── map/         # 지도 영역 음식점
@@ -87,7 +87,7 @@ foonquer/
 │   ├── src/
 │   │   ├── main.tsx         # 앱 시작
 │   │   ├── router.tsx       # 화면 경로 목록 (로그인 단계별 가드, 하단 탭, 준비 중 화면 자리)
-│   │   ├── pages/           # 화면 (auth/: 로그인·회원가입·비밀번호, profile-setup/: 프로필 설정 …)
+│   │   ├── pages/           # 화면 (auth/: 카카오 로그인·약관 동의, profile-setup/: 프로필 설정 …)
 │   │   ├── api/             # 도메인별 서버 호출 함수와 응답 타입 (auth.ts, users.ts, regions.ts …)
 │   │   ├── components/      # 공통 컴포넌트 (헤더, 버튼, 입력창, 시트, 확인창, 토스트, 하단 탭 …)
 │   │   ├── data/            # 화면에서 쓰는 고정 데이터 (서울 구·동 목록)
@@ -130,7 +130,7 @@ router.use('/reviews', reviewRouter);
 - **로그인 상태**: accessToken은 메모리에만 두고 refreshToken은 서버의 httpOnly 쿠키다. 앱을 열면 `POST /auth/refresh`로 로그인을 복구한다. 로그인 API가 성공하면 `signIn(accessToken, nextAction)`만 부르면 라우트 가드가 다음 화면(약관 동의·프로필 설정·홈)으로 보낸다.
 - **화면 데이터**: `useAsync(() => api.get(...), [deps])` → `{ data, error, loading, reload }`.
 - **보고 있는 동네·내 위치**: 홈·검색·추천은 `useViewRegion()`(처음엔 내 동네 첫 곳, 지역 선택 시트로 바꾼다)과 `useMyCoords()`(위치 권한이 없으면 `null`)를 같이 쓴다.
-- **공통 컴포넌트**: `Screen`(화면 틀·하단 버튼), `AppHeader`(‹ 제목), `PageTitle`(큰 제목·설명), `Button`, `TextField`, `ChoiceGroup`(성별·나이대 같은 버튼 고르기), `BottomSheet`, `Dialog`, `useToast()`, `FilterChips`, `ResultScreen`(메일 발송·완료 안내), `DongFinder`(동 검색·현재 위치·구/동 목록), `ConsentCard`(약관 동의), `MenuList`(내 정보·설정 메뉴 줄), `RestaurantCard`(음식점 목록 카드), `RegionSelectSheet`(지역 선택), `EmptyState`, `Loading`.
+- **공통 컴포넌트**: `Screen`(화면 틀·하단 버튼), `AppHeader`(‹ 제목), `PageTitle`(큰 제목·설명), `Button`, `TextField`, `ChoiceGroup`(성별·나이대 같은 버튼 고르기), `BottomSheet`, `Dialog`, `useToast()`, `FilterChips`, `DongFinder`(동 검색·현재 위치·구/동 목록), `ConsentCard`(약관 동의), `MenuList`(내 정보·설정 메뉴 줄), `RestaurantCard`(음식점 목록 카드), `RegionSelectSheet`(지역 선택), `EmptyState`, `Loading`.
 
 ```tsx
 export function MyReviewsPage() {
@@ -185,10 +185,9 @@ Copy-Item web\.env.example web\.env.local
 | 기능 | 넣을 값 | 비워 두면 |
 | --- | --- | --- |
 | 지도·맛집 검색에 카카오 가게 불러오기, 카카오 로그인 | `server/.env`의 `KAKAO_REST_API_KEY` | DB에 있는 가게만 보이고(처음엔 없음) 카카오 로그인이 안 된다 |
-| 구글 로그인 | `server/.env`의 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 구글 로그인이 안 된다 |
 | 홈 카카오 지도 | `web/.env.local`의 `VITE_KAKAO_MAP_KEY` | 가게 위치만 점으로 보여 주는 간단한 지도 |
 
-이메일 회원가입·로그인은 키 없이 된다 (인증 코드는 서버 터미널에 찍힌다).
+로그인은 카카오 하나만 있으므로, 로컬에서 로그인해 보려면 `KAKAO_REST_API_KEY`가 있어야 한다.
 
 ### 4. 테이블 만들기와 기본 데이터
 
@@ -302,23 +301,17 @@ pnpm -C server db:migrate                                       # 적용
 | `TRUST_PROXY` | 서버 앞 프록시(nginx·로드밸런서·Cloudflare) 단계 수. 요청 횟수 제한이 실제 사용자 IP를 보게 한다 | `0` |
 | `COOKIE_SECURE` | 쿠키 Secure 속성 (`true`/`false`) | `true` |
 | `TEST_DATABASE_URL` | 테스트 DB 주소. 이름이 `_test`로 끝나야 한다 | 비워 두면 `mysql://root:password@localhost:3307/foonquer_test` |
-| `FRONTEND_URL` | 웹 주소. 비밀번호 재설정 메일 링크(`{FRONTEND_URL}/password/reset?token=`)·소셜 로그인 콜백에 쓴다 | `http://localhost:5173` |
-| `MAIL_DRIVER` | `console`(메일 대신 서버 로그에 출력) / `ses`(AWS SES로 발송). 운영(`NODE_ENV=production`)에서는 `ses`가 아니면 서버가 시작하지 않는다 | `console` |
-| `MAIL_FROM` | 보내는 사람 주소. SES에서 인증한 도메인·주소여야 한다 (`ses`일 때 필수) | 비워 둔다 |
-| `AWS_REGION` | SES·S3 리전 | `ap-northeast-2` |
+| `FRONTEND_URL` | 웹 주소. 카카오 로그인이 끝나면 `{FRONTEND_URL}/oauth/callback`으로 보낸다 | `http://localhost:5173` |
+| `AWS_REGION` | S3 리전 | `ap-northeast-2` |
 | `IMAGE_BASE_URL` | 프로필·리뷰 사진 공개 주소(CloudFront). 비우면 사진 URL을 `null`로 준다 | 비워 둔다 |
 | `AWS_S3_BUCKET` | 사진을 두는 S3 버킷. 올린 사진 key가 실제로 있는지 확인한다. 비우면 사진 key를 받지 않는다(`PROFILE_IMAGE_NOT_FOUND`) | 비워 둔다 |
-| `API_BASE_URL` | 이 API 서버의 바깥 주소. 소셜 로그인 redirect_uri를 만든다 | `http://localhost:3000` |
+| `API_BASE_URL` | 이 API 서버의 바깥 주소. 카카오 로그인 redirect_uri를 만든다 | `http://localhost:3000` |
 | `KAKAO_REST_API_KEY` | 카카오 REST API 키 (카카오 로그인 client_id, 카카오 로컬 API) | 카카오 개발자 콘솔 |
 | `KAKAO_CLIENT_SECRET` | 카카오 로그인 Client Secret (콘솔에서 켰을 때만) | 비워 둔다 |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 구글 OAuth 클라이언트 | Google Cloud 콘솔 |
 
 > **카카오 로컬 API**: 지도(MAP-01)·맛집 검색(SEARCH-02)은 카카오 장소 검색으로 우리 DB에 없는 가게를 저장한 뒤 DB 기준으로 응답한다. 같은 영역·같은 검색어는 24시간 동안 서버 메모리에 캐시해 카카오를 다시 부르지 않는다(하루 호출 한도). 카카오가 실패해도 에러 대신 DB 결과만 준다. 카카오는 한 번 검색에 분류(음식점·카페)마다 최대 45곳까지만 주므로, 가게가 아주 많은 동네에서 지도를 넓게 보면 일부 가게는 지도를 확대해 그 영역을 다시 볼 때 저장된다. 카카오 개발자 콘솔에서 이 앱의 **카카오맵 API(지도·로컬)를 활성화**해야 로컬 API가 응답한다.
 
-> **소셜 로그인 Redirect URI**: 카카오·구글 콘솔에 `{API_BASE_URL}/api/v1/auth/oauth/kakao/callback`, `{API_BASE_URL}/api/v1/auth/oauth/google/callback`을 글자 하나까지 똑같이 등록한다. 로그인이 끝나면 서버가 `{FRONTEND_URL}/oauth/callback?code=…`(실패 시 `?error=…`)로 보내므로 웹에 그 페이지가 있어야 한다. 웹은 받은 code로 `POST /api/v1/auth/oauth/exchange`를 부른다.
-
-> 로컬에서 회원가입을 해 보면 인증 코드 메일이 `pnpm -C server dev`를 띄운 터미널에 `[mail:console]`로 찍힌다.
-> 운영(SES)은 EC2 인스턴스 IAM 역할에 `ses:SendEmail` 권한을 주고, SES에서 보내는 도메인을 인증해야 한다. SES 샌드박스 상태에서는 인증한 주소로만 보낼 수 있다.
+> **카카오 로그인 Redirect URI**: 카카오 개발자 콘솔에 `{API_BASE_URL}/api/v1/auth/oauth/kakao/callback`을 글자 하나까지 똑같이 등록한다. 동의 항목(이메일·닉네임 등)은 켜지 않는다 — 카카오 회원번호만 쓴다. 로그인이 끝나면 서버가 `{FRONTEND_URL}/oauth/callback?code=…`(실패 시 `?error=…`)로 보내므로 웹에 그 페이지가 있어야 한다. 웹은 받은 code로 `POST /api/v1/auth/oauth/exchange`를 부른다.
 
 운영 서버의 환경변수는 AWS SSM Parameter Store(`/foonquer/prod/*`)에 두고, 배포할 때 EC2에서 `.env`로 만든다.
 
@@ -347,7 +340,7 @@ Vite는 `VITE_`로 시작하는 변수만 화면 코드에 넣는다. **비밀�
 
 // 실패 — data는 보통 null, 화면에 추가 정보가 필요한 에러만 객체
 { "success": false, "code": "TOKEN_EXPIRED", "message": "로그인이 만료되었어요. 다시 로그인해 주세요.", "data": null }
-{ "success": false, "code": "LOGIN_INVALID_CREDENTIALS", "message": "이메일 또는 비밀번호가 맞지 않아요.", "data": { "failCount": 1, "maxFailCount": 5 } }
+{ "success": false, "code": "LOCAL_REGION_CHANGE_LIMITED", "message": "내 동네는 한 시즌에 한 번만 바꿀 수 있어요. (1월 1일부터 가능)", "data": { "nextChangeAvailableAt": "2027-01-01" } }
 ```
 
 ```ts
@@ -386,7 +379,7 @@ throw new AppError(AuthError.LOGIN_LOCKED, undefined, { lockedUntil });   // dat
 
 ### 도메인 에러 코드
 
-- 코드 이름은 **명세서 Error 항목에 적힌 이름 그대로** 쓴다 (`EMAIL_REQUIRED`, `REGION_NOT_FOUND` …). 번호 코드(`USER_001`)는 쓰지 않는다.
+- 코드 이름은 **명세서 Error 항목에 적힌 이름 그대로** 쓴다 (`OAUTH_RESULT_CODE_REQUIRED`, `REGION_NOT_FOUND` …). 번호 코드(`USER_001`)는 쓰지 않는다.
 - 각자 `modules/<도메인>/<도메인>.errors.ts`에 `defineErrors()`로 만든다. 같은 코드를 다른 HTTP 상태로 두 번 정의하면 서버가 시작할 때 에러가 난다.
 
 ```ts
@@ -406,11 +399,11 @@ export const ReviewError = defineErrors({
 - 그 밖의 오류는 `VALIDATION_ERROR`로 응답하고 `data.field`에 어느 필드인지 넣는다. 명세서에 VALIDATION_ERROR 문구가 따로 있으면 `validate(schemas, { validationMessage })`로 바꾼다.
 
 ```ts
-const signupSchema = z.object({
-  email: z.string({ error: 'EMAIL_REQUIRED' }).trim().min(1, { error: 'EMAIL_REQUIRED' }).email({ error: 'INVALID_EMAIL_FORMAT' }),
+const reviewSchema = z.object({
+  content: z.string({ error: 'REVIEW_CONTENT_REQUIRED' }).trim().min(1, { error: 'REVIEW_CONTENT_REQUIRED' }),
   taste: z.number().int().min(1).max(5), // 실패하면 VALIDATION_ERROR (data.field = 'taste')
 });
-router.post('/', validate({ body: signupSchema }), async (req, res) => { ... });
+router.post('/', validate({ body: reviewSchema }), async (req, res) => { ... });
 ```
 
 ### 로그인이 필요한 API (`common/auth/require-auth.ts`)
@@ -419,7 +412,7 @@ router.post('/', validate({ body: signupSchema }), async (req, res) => { ... });
 
 | level | 들어올 수 있는 회원 | 막히면 |
 | --- | --- | --- |
-| `'terms'` | 약관 동의 전 소셜 신규 회원(status P)부터 | — |
+| `'terms'` | 약관 동의 전 카카오 신규 회원(status P)부터 | — |
 | `'profile'` | 약관 동의를 마친 프로필 설정 전 회원(status P)부터 | `TERMS_REQUIRED` |
 | `'active'` (기본값) | 활성 회원(status A)만 | `TERMS_REQUIRED` / `PROFILE_REQUIRED` |
 
@@ -438,7 +431,7 @@ router.post('/', requireAuth(), validate({ body: createReviewSchema }), async (r
 
 같은 IP의 요청 수를 제한할 때는 `rateLimit({ windowMs, limit })`(`common/middlewares/rate-limit.ts`)을 라우트에 붙인다. 넘으면 429 `TOO_MANY_REQUESTS`. 서버 1대의 메모리에 세므로 서버를 여러 대로 늘리면 Redis 같은 저장소로 바꿔야 한다.
 
-지금 붙어 있는 제한 (같은 IP, 1분): 이메일 중복 확인 30번, 인증 코드 메일 10번, 인증 코드 확인 30번, 로그인 20번, 비밀번호 재설정 메일 10번.
+지금은 붙어 있는 제한이 없다 (이메일 인증·로그인·비밀번호 재설정에 있던 제한은 카카오 로그인만 남기면서 API와 함께 없앴다).
 
 <br>
 
@@ -449,7 +442,7 @@ router.post('/', requireAuth(), validate({ body: createReviewSchema }), async (r
 - 로컬 Docker MySQL(3307)이 켜져 있으면 따로 할 것이 없다. 테스트를 시작할 때 `test/global-setup.ts`가 테스트 DB를 만들고, 마이그레이션을 적용하고(`prisma migrate deploy`), 카테고리 같은 기본 데이터를 넣는다.
 - 다른 DB를 쓰려면 `TEST_DATABASE_URL`을 지정한다. 실수로 개발 DB를 비우지 않도록 DB 이름이 `_test`로 끝나지 않으면 테스트가 시작하지 않는다.
 - 테스트는 매번 `resetDb()`로 테이블을 비운다(카테고리·지역 같은 기본 데이터는 남김). 같은 DB를 쓰므로 테스트 파일은 하나씩 차례로 돈다.
-- 외부 API(카카오, 메일 등)는 `vi.mock()`으로 바꿔서 실제로 호출하지 않는다. 카카오 로컬 API는 `test/helpers/kakao.ts`의 `stubKakao()`로 흉내 낸다.
+- 외부 API(카카오 등)는 `vi.mock()`으로 바꿔서 실제로 호출하지 않는다. 카카오 로컬 API는 `test/helpers/kakao.ts`의 `stubKakao()`로 흉내 낸다.
 - GitHub Actions CI도 MySQL 8.4 컨테이너를 띄워 같은 방식으로 돈다.
 
 ```ts
