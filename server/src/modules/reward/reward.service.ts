@@ -1,5 +1,6 @@
 import { type Tx, isUniqueViolation, lockMember } from '../../common/db';
 import { AppError } from '../../common/errors/app-error';
+import { truncateChars } from '../../common/text';
 import { kstStartOfToday } from '../../common/time';
 import { RewardError } from './reward.errors';
 
@@ -62,7 +63,7 @@ export async function addPoint(
       amount,
       balanceAfter: member.pointBalance,
       reason,
-      title: title.slice(0, 60),
+      title: truncateChars(title, 60),
       refType: ref.type,
       refId,
       regDate: now,
@@ -104,7 +105,7 @@ export async function spendPoint(
       amount: -amount,
       balanceAfter,
       reason,
-      title: title.slice(0, 60),
+      title: truncateChars(title, 60),
       refType: ref.type,
       refId: BigInt(ref.id),
       regDate: now,
@@ -136,6 +137,8 @@ export async function addExp(
   now = new Date(),
 ): Promise<{ exp: number; levelUp: LevelUp | null }> {
   if (amount <= 0) return { exp: 0, levelUp: null };
+  // 같은 회원의 경험치를 동시에 더할 때 앞 트랜잭션이 끝날 때까지 기다린 뒤 최신 exp를 읽는다
+  await lockMember(tx, userId);
   const refId = BigInt(ref.id);
   try {
     // unique(user_id, reason, ref_type, ref_id)로 한 번만. 먼저 넣고, 이미 있으면 건너뛴다
@@ -199,9 +202,12 @@ export async function grantReward(
 
   if (policy.dailyLimit !== null) {
     await lockMember(tx, userId);
-    const today = await tx.pointHistory.count({
-      where: { userId, reason, regDate: { gte: kstStartOfToday(now) } },
-    });
+    // 포인트 0 정책은 포인트 내역이 남지 않으므로 경험치 내역으로 센다
+    const where = { userId, reason, regDate: { gte: kstStartOfToday(now) } };
+    const today =
+      policy.point > 0
+        ? await tx.pointHistory.count({ where })
+        : await tx.expHistory.count({ where });
     if (today >= policy.dailyLimit) return NONE;
   }
 

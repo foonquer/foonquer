@@ -1,4 +1,5 @@
 import type { Db } from '../../common/db';
+import { truncateChars } from '../../common/text';
 
 /** 알림함 필터 (NOTI-01 category) */
 export type NotificationCategory = 'RANK' | 'REVIEW' | 'MUKKAEBI' | 'NOTICE';
@@ -40,8 +41,8 @@ export async function notify(db: Db, userId: bigint, input: NotificationInput, n
       userId,
       category: input.category,
       type: input.type,
-      title: input.title.slice(0, 60),
-      content: input.content.slice(0, 255),
+      title: truncateChars(input.title, 60),
+      content: truncateChars(input.content, 255),
       refType: input.refType ?? null,
       refId: input.refId === undefined ? null : BigInt(input.refId),
       regDate: now,

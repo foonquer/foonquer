@@ -9,7 +9,7 @@ ALTER TABLE `member`
 
 ALTER TABLE `member` ADD CONSTRAINT `member_rep_title_chk`
     CHECK ((rep_title_type IS NULL AND rep_title_ref IS NULL)
-        OR (rep_title_type IN ('A', 'T') AND rep_title_ref IS NOT NULL));
+        OR (rep_title_type IS NOT NULL AND rep_title_type IN ('A', 'T') AND rep_title_ref IS NOT NULL));
 
 -- AlterTable
 ALTER TABLE `saved_restaurant`
