@@ -76,7 +76,11 @@ export async function exchangeOAuthResult(oauthResultCode: string, now = new Dat
   if (!(await consumeTemporaryToken(prisma, row.id, now))) {
     throw new AppError(AccountError.OAUTH_RESULT_CODE_INVALID);
   }
-  const { kakaoId } = readPayload<OAuthResultPayload>(row);
+  // 카카오 전용으로 바꾸기 전(이메일 payload)에 발급된 결과 코드는 kakaoId가 없다 → 다시 로그인하게 한다
+  const { kakaoId } = readPayload<Partial<OAuthResultPayload>>(row);
+  if (typeof kakaoId !== 'string' || kakaoId.length === 0) {
+    throw new AppError(AccountError.OAUTH_RESULT_CODE_INVALID);
+  }
 
   // ① 이미 가입한 카카오 계정
   const existing = await prisma.member.findUnique({

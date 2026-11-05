@@ -352,7 +352,7 @@ created(res, review, '리뷰를 등록했어요.'); // 201
 ok(res, null, '로그아웃했어요.');           // 삭제·로그아웃도 200 + 바디 (204는 쓰지 않음)
 throw new AppError(AuthError.TOKEN_EXPIRED);                               // 401 TOKEN_EXPIRED
 throw new AppError(ReviewError.REVIEW_NOT_FOUND, '이미 지운 리뷰예요.');    // 메시지만 바꾸기
-throw new AppError(AuthError.LOGIN_LOCKED, undefined, { lockedUntil });   // data 넣기
+throw new AppError(UserError.LOCAL_REGION_CHANGE_LIMITED, undefined, { nextChangeAvailableAt });   // data 넣기
 ```
 
 - 응답은 `res.json()`으로 직접 만들지 않고 항상 `ok()` / `created()` / `AppError`를 쓴다.

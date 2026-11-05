@@ -48,9 +48,37 @@ ALTER TABLE `review`
 CREATE INDEX `review_ad_suspected_idx` ON `review`(`ad_suspected`, `ai_checked_at`);
 
 ALTER TABLE `review` ADD CONSTRAINT `review_overall_score_chk` CHECK (overall_score between 0.5 and 5.0 and overall_score * 2 = floor(overall_score * 2));
-ALTER TABLE `review` ADD CONSTRAINT `review_detail_score_chk` CHECK ((taste is null and cleanliness is null and portion is null and service is null and price is null) or (taste between 1 and 5 and cleanliness between 1 and 5 and portion between 1 and 5 and service between 1 and 5 and price between 1 and 5));
+ALTER TABLE `review` ADD CONSTRAINT `review_detail_score_chk` CHECK ((taste is null and cleanliness is null and portion is null and service is null and price is null) or (taste is not null and cleanliness is not null and portion is not null and service is not null and price is not null and taste between 1 and 5 and cleanliness between 1 and 5 and portion between 1 and 5 and service between 1 and 5 and price between 1 and 5));
 ALTER TABLE `review` ADD CONSTRAINT `review_weight_chk` CHECK (score_weight between 0.5 and 2.2);
 ALTER TABLE `review` ADD CONSTRAINT `review_status_chk` CHECK (status in ('A','H','F','D'));
+
+-- 가게 집계를 바뀐 리뷰 값으로 다시 계산한다 (공개 리뷰만): 단순 평균은 종합 별점 합, 세부 별점은 다섯 항목을 모두 남긴 리뷰만,
+-- 재방문 의사는 종합 별점 2.5 이상 리뷰 수 (ERD restaurant_stat)
+UPDATE `restaurant_stat` s
+LEFT JOIN (
+    SELECT
+        `restaurant_id`,
+        SUM(`overall_score`) AS score_sum,
+        SUM(COALESCE(`taste`, 0)) AS taste_sum,
+        SUM(COALESCE(`cleanliness`, 0)) AS cleanliness_sum,
+        SUM(COALESCE(`portion`, 0)) AS portion_sum,
+        SUM(COALESCE(`service`, 0)) AS service_sum,
+        SUM(COALESCE(`price`, 0)) AS price_sum,
+        SUM(`taste` IS NOT NULL) AS detail_review_count,
+        SUM(`overall_score` >= 2.5) AS revisit_intent_count
+    FROM `review`
+    WHERE `status` = 'A'
+    GROUP BY `restaurant_id`
+) r ON r.`restaurant_id` = s.`restaurant_id`
+SET
+    s.`score_sum` = COALESCE(r.score_sum, 0),
+    s.`taste_sum` = COALESCE(r.taste_sum, 0),
+    s.`cleanliness_sum` = COALESCE(r.cleanliness_sum, 0),
+    s.`portion_sum` = COALESCE(r.portion_sum, 0),
+    s.`service_sum` = COALESCE(r.service_sum, 0),
+    s.`price_sum` = COALESCE(r.price_sum, 0),
+    s.`detail_review_count` = COALESCE(r.detail_review_count, 0),
+    s.`revisit_intent_count` = COALESCE(r.revisit_intent_count, 0);
 
 -- 4. 도움돼요·별로예요: 방문자 여부와 계산 반영 여부
 ALTER TABLE `review_reaction`

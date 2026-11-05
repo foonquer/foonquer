@@ -350,11 +350,11 @@ model RestaurantStat {
   reviewCount        Int        @default(0) @map("review_count")
   textReviewCount    Int        @default(0) @map("text_review_count")
   photoReviewCount   Int        @default(0) @map("photo_review_count")
-  /// 리뷰 score_avg의 합 — 단순 평균 = score_sum / review_count
+  /// 리뷰 overall_score(종합 별점)의 합 — 단순 평균 = score_sum / review_count
   scoreSum           Decimal    @default(0) @map("score_sum") @db.Decimal(12, 1)
   /// Σw — 계산에 넣는 공개 리뷰의 최종 가중치 w = score_weight × 시간 감쇠 d 의 합 (ERD v1.0)
   weightSum          Decimal    @default(0) @map("weight_sum") @db.Decimal(10, 3)
-  /// Σ(w × r) — 같은 리뷰들의 최종 가중치 × 별점 합
+  /// Σ(w × r) — 같은 리뷰들의 최종 가중치 × 종합 별점(overall_score) 합
   weightedScoreSum   Decimal    @default(0) @map("weighted_score_sum") @db.Decimal(12, 3)
   /// 화면의 대표 별점 R = (C × m + Σ(w × r)) / (C + Σw), 소수 첫째 자리. C·m은 rating_param(PRIOR_WEIGHT, GLOBAL_MEAN). 리뷰가 0개면 null → "아직 별점이 없어요"
   displayScore       Decimal?   @map("display_score") @db.Decimal(2, 1)
@@ -365,9 +365,9 @@ model RestaurantStat {
   portionSum         Int        @default(0) @map("portion_sum")
   serviceSum         Int        @default(0) @map("service_sum")
   priceSum           Int        @default(0) @map("price_sum")
-  /// 세부평가(청결·양·서비스·가격·재방문 의사)를 남긴 리뷰 수 — 맛 외 항목 평균과 재방문 의사 %의 분모. 맛 평균의 분모는 review_count
+  /// 세부 별점(맛·청결·양·서비스·가격)을 남긴 리뷰 수 — 항목별 평균의 분모
   detailReviewCount  Int        @default(0) @map("detail_review_count")
-  /// 재방문 의사 있음 수 → 재방문 의사 % = revisit_intent_count ÷ detail_review_count
+  /// 종합 별점 2.5 이상(다시 갈 의향) 리뷰 수 → 재방문 의사 % = revisit_intent_count ÷ review_count
   revisitIntentCount Int        @default(0) @map("revisit_intent_count")
   /// 성공한 방문 인증 수 (영수증 + 현장)
   visitCount         Int        @default(0) @map("visit_count")
