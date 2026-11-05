@@ -1,4 +1,5 @@
 import type { Tx } from '../../common/db';
+import { withSubjectParticle } from '../../common/josa';
 import { addDays, kstTodayAsDbDate } from '../../common/time';
 import { prisma } from '../../lib/prisma';
 import { grantSeasonRankAchievements } from '../achievement/achievement.service';
@@ -19,9 +20,14 @@ function addMonthsDb(date: Date, months: number) {
   return d;
 }
 
+type RewardRules = Awaited<ReturnType<typeof loadRewardRules>>;
+
+function loadRewardRules() {
+  return prisma.seasonRewardRule.findMany({ include: { item: true } });
+}
+
 /** 시즌 보상표: 방망이는 걸린 것 중 가장 좋은 1개, 명예 아이템(왕관·밤하늘)은 모두 */
-async function rewardItemsFor(tx: Tx, rank: number, topPercent: number) {
-  const rules = await tx.seasonRewardRule.findMany({ include: { item: true } });
+function rewardItemsFor(rules: RewardRules, rank: number, topPercent: number) {
   const matched = rules.filter((r) =>
     r.ruleType === 'R' ? rank <= r.threshold.toNumber() : topPercent <= r.threshold.toNumber(),
   );
@@ -55,7 +61,10 @@ export async function finalizeSeason(seasonId: number, now = new Date()) {
   }
   await prisma.seasonRegionStat.updateMany({ where: { seasonId }, data: { isFinalized: true } });
 
-  const policy = await prisma.rewardPolicy.findUnique({ where: { reason: 'SEASON_REWARD' } });
+  const [policy, rules] = await Promise.all([
+    prisma.rewardPolicy.findUnique({ where: { reason: 'SEASON_REWARD' } }),
+    loadRewardRules(),
+  ]);
   const members = await prisma.seasonRegionStat.groupBy({
     by: ['userId'],
     where: { seasonId, conquestCount: { gt: 0 } },
@@ -80,7 +89,7 @@ export async function finalizeSeason(seasonId: number, now = new Date()) {
         const bestRank = Math.min(...stats.map((s) => s.rankNo ?? Infinity));
         // 1위(먹짱)는 참여자가 적어도 상위 10% 보상(황금 방망이·밤하늘)까지 모두 받는다 (2026-10-06 확정)
         const topPercent = bestRank === 1 ? 0 : (best.topPercent?.toNumber() ?? 100);
-        const { club, honors } = await rewardItemsFor(tx, bestRank, topPercent);
+        const { club, honors } = rewardItemsFor(rules, bestRank, topPercent);
         const rewardPoint = policy?.point ?? 0;
 
         const result = await tx.seasonResult.create({
@@ -118,7 +127,7 @@ export async function finalizeSeason(seasonId: number, now = new Date()) {
           {
             category: 'RANK',
             type: 'SEASON_END',
-            title: `시즌 ${season.seasonNo}이 끝났어요`,
+            title: `${withSubjectParticle(`시즌 ${season.seasonNo}`)} 끝났어요`,
             content: `${tierTitle(best.sigungu.name, best.tier as TierCode)} · ${best.rankNo}위 · 최종 결과를 확인해 보세요`,
             refType: 'SEASON',
             refId: seasonId,

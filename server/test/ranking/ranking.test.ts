@@ -107,6 +107,24 @@ describe('RANK-03~07 현황·랭킹', () => {
       unlocked: false,
     });
   });
+
+  it('탈퇴한 사람은 TOP 50·TOP 3 PICK 모두에서 "탈퇴한 탐험가", userId null', async () => {
+    const season = await createActiveSeason(3);
+    const gu = await gangseo();
+    const me = await createMember();
+    const gone = await createMember({ nickname: '떠난깨비' });
+    const [shop] = await conquerMany(gone.id, season.id, 3);
+    await conquerMany(me.id, season.id, 1);
+    await prisma.memberPick.create({
+      data: { userId: gone.id, restaurantId: shop.id, sortOrder: 0 },
+    });
+    await prisma.member.update({ where: { id: gone.id }, data: { status: 'D', nickname: null } });
+
+    const res = await get(me.id, `/rankings/sigungus/${gu.id}`);
+    const withdrawn = { userId: null, nickname: '탈퇴한 탐험가' };
+    expect(res.body.data.items[0]).toMatchObject({ rank: 1, ...withdrawn });
+    expect(res.body.data.topPicks[0]).toMatchObject({ rank: 1, ...withdrawn, pickCount: 1 });
+  });
 });
 
 describe('RANK-08·09·11 업적·칭호', () => {
@@ -136,18 +154,64 @@ describe('RANK-08·09·11 업적·칭호', () => {
       .set('Authorization', bearer(me.id))
       .send({ type: 'ACHIEVEMENT', refId: first?.refId });
     expect(set.body.data).toMatchObject({ representativeTitle: '첫 정복', isAuto: false });
+    expect(await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).toMatchObject({
+      repTitleType: 'A',
+      repTitleRef: BigInt(first?.refId ?? 0),
+    });
 
-    const notOwned = await request(app)
-      .patch('/api/v1/users/me/representative-title')
-      .set('Authorization', bearer(me.id))
-      .send({ type: 'ACHIEVEMENT', refId: 9999 });
+    const patch = (body: object) =>
+      request(app)
+        .patch('/api/v1/users/me/representative-title')
+        .set('Authorization', bearer(me.id))
+        .send(body);
+    const notOwned = await patch({ type: 'ACHIEVEMENT', refId: 9999 });
+    expect(notOwned.status).toBe(403);
     expect(notOwned.body.code).toBe('TITLE_NOT_OWNED');
+    const invalid = await patch({ type: null, refId: 1 });
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.code).toBe('INVALID_TITLE');
 
-    const reset = await request(app)
-      .patch('/api/v1/users/me/representative-title')
-      .set('Authorization', bearer(me.id))
-      .send({ type: null });
-    expect(reset.body.data).toMatchObject({ representativeTitle: '강서구의 먹짱', isAuto: true });
+    // 남의 시즌 티어 기록은 고를 수 없다
+    const other = await createMember();
+    await conquerMany(other.id, season.id, 5);
+    const otherStat = await prisma.seasonRegionStat.findFirstOrThrow({
+      where: { userId: other.id },
+    });
+    const othersTier = await patch({ type: 'TIER', refId: Number(otherStat.id) });
+    expect(othersTier.status).toBe(403);
+    expect(othersTier.body.code).toBe('TITLE_NOT_OWNED');
+
+    const reset = await patch({ type: null });
+    expect(reset.body.data).toMatchObject({ isAuto: true });
+    expect(await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).toMatchObject({
+      repTitleType: null,
+      repTitleRef: null,
+    });
+  });
+
+  it('시즌·구가 없으면 404 (진행 중 시즌 없음, 없는·예정 시즌, 구가 아닌 지역)', async () => {
+    const me = await createMember();
+    const none = await get(me.id, '/seasons/current');
+    expect(none.status).toBe(404);
+    expect(none.body.code).toBe('NO_ACTIVE_SEASON');
+
+    await createActiveSeason(3);
+    const upcoming = await prisma.season.create({
+      data: {
+        seasonNo: 4,
+        startDate: addDays(kstTodayAsDbDate(), 41),
+        endDate: addDays(kstTodayAsDbDate(), 200),
+      },
+    });
+    for (const id of [999999, upcoming.id]) {
+      const res = await get(me.id, `/users/me/conquests/sigungus?seasonId=${id}`);
+      expect(res.status).toBe(404);
+      expect(res.body.code).toBe('SEASON_NOT_FOUND');
+    }
+    const dong = await prisma.region.findFirstOrThrow({ where: { level: 3 } });
+    const notSigungu = await get(me.id, `/rankings/sigungus/${dong.id}`);
+    expect(notSigungu.status).toBe(404);
+    expect(notSigungu.body.code).toBe('SIGUNGU_NOT_FOUND');
   });
 });
 

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { z } from 'zod';
 import { getAuthUser, requireAuth } from '../../common/auth/require-auth';
+import { withObjectParticle } from '../../common/josa';
 import { validate } from '../../common/middlewares/validate';
 import { ok } from '../../common/response';
 import {
@@ -81,7 +82,7 @@ characterRouter.post(
     const { userId } = getAuthUser(req);
     const { itemId } = req.params as unknown as ItemParams;
     const data = await craftItem(userId, itemId);
-    ok(res, data, `${data.item.name}을 만들었어요!`);
+    ok(res, data, `${withObjectParticle(data.item.name)} 만들었어요!`);
   },
 );
 
@@ -130,7 +131,7 @@ shopRouter.get(
 shopRouter.post('/purchases', requireAuth(), validate({ body: purchaseBody }), async (req, res) => {
   const { userId } = getAuthUser(req);
   const data = await purchaseItem(userId, req.body as PurchaseBody);
-  ok(res, data, `${data.name}을 샀어요!`);
+  ok(res, data, `${withObjectParticle(data.name)} 샀어요!`);
 });
 
 /** /api/v1/points — POINT-01·02 */
