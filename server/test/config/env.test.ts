@@ -4,9 +4,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 async function loadEnv(values: Record<string, string>) {
   vi.resetModules();
   for (const [key, value] of Object.entries(values)) vi.stubEnv(key, value);
-  const exit = vi.spyOn(process, 'exit').mockImplementation((() => {
+  const exit = vi.spyOn(process, 'exit').mockImplementation(() => {
     throw new Error('process.exit');
-  }) as never);
+  });
   vi.spyOn(console, 'error').mockImplementation(() => {});
   try {
     const { env } = await import('../../src/config/env.js');
@@ -22,11 +22,11 @@ afterEach(() => {
 });
 
 describe('환경변수 (config/env.ts)', () => {
-  it('.env에 비워 둔 선택 값(IMAGE_BASE_URL, MAIL_FROM)은 없는 값으로 본다', async () => {
-    const { env } = await loadEnv({ IMAGE_BASE_URL: '', MAIL_FROM: '' });
+  it('.env에 비워 둔 선택 값(IMAGE_BASE_URL, KAKAO_CLIENT_SECRET)은 없는 값으로 본다', async () => {
+    const { env } = await loadEnv({ IMAGE_BASE_URL: '', KAKAO_CLIENT_SECRET: '' });
 
     expect(env?.IMAGE_BASE_URL).toBeUndefined();
-    expect(env?.MAIL_FROM).toBeUndefined();
+    expect(env?.KAKAO_CLIENT_SECRET).toBeUndefined();
   });
 
   it('IMAGE_BASE_URL 끝의 /는 뗀다', async () => {
@@ -35,8 +35,8 @@ describe('환경변수 (config/env.ts)', () => {
     expect(env?.IMAGE_BASE_URL).toBe('https://img.example.com');
   });
 
-  it('운영(NODE_ENV=production)에서 MAIL_DRIVER가 console이면 서버를 시작하지 않는다', async () => {
-    const result = await loadEnv({ NODE_ENV: 'production', MAIL_DRIVER: 'console' });
+  it('필수 값(JWT_ACCESS_SECRET)이 짧으면 서버를 시작하지 않는다', async () => {
+    const result = await loadEnv({ JWT_ACCESS_SECRET: 'short' });
 
     expect(result.exited).toBe(true);
   });

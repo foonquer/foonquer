@@ -4,15 +4,10 @@ import type { Prisma } from '../../generated/prisma/client';
 import { prisma } from '../../lib/prisma';
 
 /**
- * auth_temporary_token.token_type (ERD v0.7)
- * - EMAIL_VERIFY   이메일 인증 코드 (5분)        payload { email, codeHash, attempts }
- * - EMAIL_VERIFIED 인증 완료 토큰, 가입에 사용 (30분) payload { email }
- * - PASSWORD_RESET 비밀번호 재설정 링크 (30분)    payload { userId }
- * - OAUTH_RESULT   소셜 콜백 결과 교환 코드 (1분)  payload { provider, providerId, email, emailVerified }
- * - ACCOUNT_LINK   같은 이메일 계정 연동 (5분)     payload { targetUserId, provider, providerId, email }
+ * auth_temporary_token.token_type (ERD v0.9 — 로그인은 카카오 하나만)
+ * - OAUTH_RESULT   카카오 로그인 콜백 결과 교환 코드 (1분)  payload { kakaoId }
  */
-export type TemporaryTokenType =
-  'EMAIL_VERIFY' | 'EMAIL_VERIFIED' | 'PASSWORD_RESET' | 'OAUTH_RESULT' | 'ACCOUNT_LINK';
+export type TemporaryTokenType = 'OAUTH_RESULT';
 
 type Db = Prisma.TransactionClient | typeof prisma;
 

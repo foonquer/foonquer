@@ -3,10 +3,8 @@ import type { z } from 'zod';
 import { getAuthUser, requireAuth } from '../../common/auth/require-auth';
 import { validate } from '../../common/middlewares/validate';
 import { created, ok } from '../../common/response';
-import { consentsBody, passwordChangeBody } from '../auth/auth.schema';
+import { consentsBody } from '../auth/auth.schema';
 import { saveMemberConsents } from '../auth/consent.service';
-import { changePassword } from '../auth/password.service';
-import { setRefreshCookie } from '../auth/refresh-token';
 import { addLocalRegion, getLocalRegions, removeLocalRegion } from './local-region.service';
 import {
   localRegionAddBody,
@@ -103,19 +101,5 @@ userRouter.delete(
     const { userId } = getAuthUser(req);
     const { localRegionId } = req.params as unknown as z.infer<typeof localRegionParams>;
     ok(res, await removeLocalRegion(userId, localRegionId), '내 동네에서 뺐어요.');
-  },
-);
-
-// SET-05 비밀번호 변경
-userRouter.patch(
-  '/me/password',
-  requireAuth(),
-  validate({ body: passwordChangeBody }),
-  async (req, res) => {
-    const { userId } = getAuthUser(req);
-    const { currentPassword, newPassword } = req.body as z.infer<typeof passwordChangeBody>;
-    const { refreshToken, data } = await changePassword(userId, { currentPassword, newPassword });
-    setRefreshCookie(res, refreshToken);
-    ok(res, data, '비밀번호를 바꿨어요. 다른 기기에서는 다시 로그인해 주세요.');
   },
 );
