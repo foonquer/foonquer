@@ -15,9 +15,9 @@ import { LOCAL_REGION_ALREADY_ADDED, UserError } from './user.errors';
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
-/** 내 동네는 최소 1곳, 최대 3곳 */
+/** 내 동네는 최소 1곳, 최대 2곳 (사는 동네 + 1곳, 2026-11-04) */
 export const LOCAL_REGION_MIN = 1;
-export const LOCAL_REGION_MAX = 3;
+export const LOCAL_REGION_MAX = 2;
 
 /** LOCAL-01 items[] 한 줄 (USER-03·04, SET-01에서도 같은 형태) */
 export async function listLocalRegions(userId: bigint, db: Db = prisma) {

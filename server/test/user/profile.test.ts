@@ -242,8 +242,8 @@ describe('USER-03 POST /users/me/profile', () => {
     [{ gender: undefined }, 'INVALID_GENDER', undefined],
     [{ ageGroup: 25 }, 'INVALID_AGE_GROUP', '성별과 나이대를 골라 주세요.'],
     [{ ageGroup: '20' }, 'INVALID_AGE_GROUP', undefined],
-    [{ localRegionIds: [] }, 'LOCAL_REGION_COUNT_INVALID', '내 동네는 1~3곳 골라 주세요.'],
-    [{ localRegionIds: [1, 2, 3, 4] }, 'LOCAL_REGION_COUNT_INVALID', undefined],
+    [{ localRegionIds: [] }, 'LOCAL_REGION_COUNT_INVALID', '내 동네는 1~2곳 골라 주세요.'],
+    [{ localRegionIds: [1, 2, 3] }, 'LOCAL_REGION_COUNT_INVALID', undefined],
     [{ localRegionIds: undefined }, 'LOCAL_REGION_COUNT_INVALID', undefined],
     [{ localRegionIds: [5, 5] }, 'LOCAL_REGION_DUPLICATE', '같은 동네를 두 번 고를 수 없어요.'],
   ])('입력이 잘못되면 400 (%j → %s)', async (overrides, code, message) => {
