@@ -255,6 +255,19 @@ describe('AUTH-08 POST /auth/oauth/exchange', () => {
     expect(missing.status).toBe(400);
     expect(missing.body.code).toBe('OAUTH_RESULT_CODE_REQUIRED');
   });
+
+  it('카카오 전용 전에 발급된 결과 코드(kakaoId 없는 payload)는 400 OAUTH_RESULT_CODE_INVALID', async () => {
+    const code = await resultCode('k-1');
+    await prisma.authTemporaryToken.updateMany({
+      where: { usedAt: null },
+      data: { payload: { provider: 'KAKAO', providerId: 'k-1', email: null } },
+    });
+
+    const res = await exchange(code);
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('OAUTH_RESULT_CODE_INVALID');
+    expect(await prisma.member.count()).toBe(0);
+  });
 });
 
 describe('AUTH-15 POST /users/me/consents', () => {
