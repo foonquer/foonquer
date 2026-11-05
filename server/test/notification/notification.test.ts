@@ -71,24 +71,56 @@ describe('NOTI 알림함·푸시 구독', () => {
       .patch(`/api/v1/notifications/${id}/read`)
       .set('Authorization', bearer(me.id));
     expect(read.body.data).toMatchObject({ isRead: true, deepLink: '/reviews/7' });
+    expect(
+      (await prisma.notification.findUniqueOrThrow({ where: { id: BigInt(id) } })).isRead,
+    ).toBe(true);
+
+    const rankRead = await request(app)
+      .patch('/api/v1/notifications/read-all')
+      .set('Authorization', bearer(me.id))
+      .send({ category: 'RANK' });
+    expect(rankRead.body.data.updatedCount).toBe(1);
     const all = await request(app)
       .patch('/api/v1/notifications/read-all')
       .set('Authorization', bearer(me.id))
       .send({});
-    expect(all.body.data.updatedCount).toBe(2); // 31일 지난 알림도 안 읽은 것은 읽음 처리
+    expect(all.body.data.updatedCount).toBe(1); // 31일 지난 알림도 안 읽은 것은 읽음 처리
+    expect(await prisma.notification.count({ where: { userId: other.id, isRead: false } })).toBe(1);
+
     const otherId = (await prisma.notification.findFirstOrThrow({ where: { userId: other.id } }))
       .id;
-    expect(
-      (
-        await request(app)
-          .delete(`/api/v1/notifications/${otherId}`)
-          .set('Authorization', bearer(me.id))
-      ).body.code,
-    ).toBe('NOTIFICATION_NOT_FOUND');
-    expect(
-      (await request(app).delete(`/api/v1/notifications/${id}`).set('Authorization', bearer(me.id)))
-        .status,
-    ).toBe(200);
+    for (const req of [
+      request(app).patch(`/api/v1/notifications/${otherId}/read`),
+      request(app).delete(`/api/v1/notifications/${otherId}`),
+    ]) {
+      const res = await req.set('Authorization', bearer(me.id));
+      expect(res.status).toBe(404);
+      expect(res.body.code).toBe('NOTIFICATION_NOT_FOUND');
+    }
+    expect(await prisma.notification.findUniqueOrThrow({ where: { id: otherId } })).toMatchObject({
+      isRead: false,
+    });
+
+    const del = () =>
+      request(app).delete(`/api/v1/notifications/${id}`).set('Authorization', bearer(me.id));
+    expect((await del()).status).toBe(200);
+    expect(await prisma.notification.findUnique({ where: { id: BigInt(id) } })).toBeNull();
+    expect((await del()).status).toBe(404);
+  });
+
+  it('잘못된 종류는 400, 로그인하지 않으면 401', async () => {
+    const me = await createMember();
+    const bad = await request(app)
+      .get('/api/v1/notifications?category=SHOP')
+      .set('Authorization', bearer(me.id));
+    expect(bad.status).toBe(400);
+    expect(bad.body.code).toBe('INVALID_NOTIFICATION_CATEGORY');
+    const badBody = await request(app)
+      .patch('/api/v1/notifications/read-all')
+      .set('Authorization', bearer(me.id))
+      .send({ category: 'SHOP' });
+    expect(badBody.body.code).toBe('INVALID_NOTIFICATION_CATEGORY');
+    expect((await request(app).get('/api/v1/notifications')).status).toBe(401);
   });
 
   it('Web Push 구독 등록(같은 endpoint는 한 행)·해제', async () => {
@@ -116,5 +148,29 @@ describe('NOTI 알림함·푸시 구독', () => {
       .set('Authorization', bearer(me.id))
       .send({ endpoint: 'nope' });
     expect(bad.body.code).toBe('INVALID_PUSH_SUBSCRIPTION');
+    const emptyKey = await request(app)
+      .put('/api/v1/notifications/push-subscription')
+      .set('Authorization', bearer(me.id))
+      .send({ ...body, keys: { p256dh: '', auth: 'auth' } });
+    expect(emptyKey.status).toBe(400);
+    expect(emptyKey.body.code).toBe('INVALID_PUSH_SUBSCRIPTION');
+  });
+
+  it('다른 회원이 쓰던 브라우저 endpoint를 등록하면 나에게 옮긴다', async () => {
+    const before = await createMember();
+    const me = await createMember();
+    const body = {
+      endpoint: 'https://fcm.googleapis.com/fcm/send/shared',
+      keys: { p256dh: 'key', auth: 'auth' },
+    };
+    for (const user of [before, me]) {
+      await request(app)
+        .put('/api/v1/notifications/push-subscription')
+        .set('Authorization', bearer(user.id))
+        .send(body);
+    }
+    const rows = await prisma.pushSubscription.findMany();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].userId).toBe(me.id);
   });
 });

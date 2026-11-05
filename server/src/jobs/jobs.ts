@@ -35,17 +35,27 @@ export async function runRatingJob(now = new Date()) {
     distinct: ['restaurantId'],
     select: { restaurantId: true },
   });
+  // 가게 하나가 실패해도 나머지는 계속 갱신하고, 실패 수를 돌려준다(run.ts가 종료 코드 1로)
+  let failed = 0;
   for (const { restaurantId } of restaurants) {
-    await prisma.$transaction(async (tx) => {
-      const reviews = await tx.review.findMany({
-        where: { restaurantId, status: 'A' },
-        select: { id: true },
-      });
-      for (const r of reviews) await refreshReviewWeight(tx, r.id, params);
-      await refreshRestaurantStat(tx, restaurantId, now, params);
-    });
+    try {
+      await prisma.$transaction(
+        async (tx) => {
+          const reviews = await tx.review.findMany({
+            where: { restaurantId, status: 'A' },
+            select: { id: true },
+          });
+          for (const r of reviews) await refreshReviewWeight(tx, r.id, params);
+          await refreshRestaurantStat(tx, restaurantId, now, params);
+        },
+        { timeout: 15_000 },
+      );
+    } catch (err) {
+      failed += 1;
+      console.error(`[job] rating 가게 ${restaurantId.toString()} 실패`, err);
+    }
   }
-  return { restaurants: restaurants.length, reviewCount: agg._count };
+  return { restaurants: restaurants.length, reviewCount: agg._count, failed };
 }
 
 /** cleanup: 30일 지난 알림, 만료된 로그인 토큰·카카오 결과 교환 코드 삭제 */
@@ -85,6 +95,12 @@ export async function runSavedReminderJob(now = new Date()) {
       where: { userId: s.userId, restaurantId: s.restaurantId },
     });
     await prisma.$transaction(async (tx) => {
+      // 먼저 선점한다: 작업이 겹쳐 돌아도 두 번째는 count 0이라 알림을 또 보내지 않는다
+      const { count } = await tx.savedRestaurant.updateMany({
+        where: { userId: s.userId, restaurantId: s.restaurantId, remindedAt: null },
+        data: { remindedAt: now },
+      });
+      if (count === 0) return;
       if (!conquered && s.restaurant.status === 'A') {
         await notify(
           tx,
@@ -101,10 +117,6 @@ export async function runSavedReminderJob(now = new Date()) {
         );
         sent += 1;
       }
-      await tx.savedRestaurant.update({
-        where: { userId_restaurantId: { userId: s.userId, restaurantId: s.restaurantId } },
-        data: { remindedAt: now },
-      });
     });
   }
   return { checked: due.length, sent };

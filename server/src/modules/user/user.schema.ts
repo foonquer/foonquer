@@ -48,7 +48,13 @@ export const profileUpdateBody = z.object({
   gender: genderField.optional(),
   ageGroup: ageGroupField.optional(),
   /** 탐방러 프로필 소개글 (60자, null이면 지움) — ERD v1.2 */
-  bio: z.string().trim().max(60, { error: 'BIO_TOO_LONG' }).nullable().optional(),
+  bio: z
+    .string()
+    .trim()
+    // DB varchar(60)과 같이 글자 수로 센다 (이모지도 1자)
+    .refine((v) => [...v].length <= 60, { error: 'BIO_TOO_LONG' })
+    .nullable()
+    .optional(),
 });
 export type ProfileUpdateBody = z.infer<typeof profileUpdateBody>;
 

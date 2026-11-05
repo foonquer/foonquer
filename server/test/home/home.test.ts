@@ -74,7 +74,55 @@ describe('HOME-01·USER-08·MAP-02 순위 미리보기·USER-05 소개글', () =
       (await request(app).get('/api/v1/users/me').set('Authorization', bearer(me.id))).body.data
         .bio,
     ).toBe('국밥·칼국수 위주로 다녀요');
-    expect((await patch('a'.repeat(61))).body.code).toBe('BIO_TOO_LONG');
+    const tooLong = await patch('a'.repeat(61));
+    expect(tooLong.status).toBe(400);
+    expect(tooLong.body.code).toBe('BIO_TOO_LONG');
+    // 60자까지는 된다 (이모지도 1자로 센다)
+    const emoji = '🍜'.repeat(60);
+    expect((await patch(emoji)).status).toBe(200);
+    expect((await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).bio).toBe(emoji);
     expect((await patch(null)).body.data.bio).toBeNull();
+    expect((await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).bio).toBeNull();
+  });
+
+  it('내 정보 요약의 받은 도움돼요는 이번 시즌 리뷰만 센다', async () => {
+    const season = await createActiveSeason(3);
+    const me = await createMember();
+    const shops = await conquerMany(me.id, season.id, 1);
+    const visit = await prisma.visit.findFirstOrThrow({ where: { userId: me.id } });
+    await prisma.review.create({
+      data: {
+        visitId: visit.id,
+        userId: me.id,
+        restaurantId: shops[0].id,
+        overallScore: 4,
+        helpfulCount: 3,
+      },
+    });
+    const pastSeason = await prisma.season.create({
+      data: {
+        seasonNo: 2,
+        startDate: new Date('2026-03-01'),
+        endDate: new Date('2026-08-31'),
+        status: 'F',
+      },
+    });
+    const [old] = await conquerMany(me.id, pastSeason.id, 1);
+    const oldVisit = await prisma.visit.findFirstOrThrow({
+      where: { userId: me.id, seasonId: pastSeason.id },
+    });
+    await prisma.review.create({
+      data: {
+        visitId: oldVisit.id,
+        userId: me.id,
+        restaurantId: old.id,
+        overallScore: 4,
+        helpfulCount: 10,
+      },
+    });
+    const mine = await request(app)
+      .get('/api/v1/users/me/summary')
+      .set('Authorization', bearer(me.id));
+    expect(mine.body.data.seasonRecord).toMatchObject({ reviewCount: 1, helpfulReceived: 3 });
   });
 });

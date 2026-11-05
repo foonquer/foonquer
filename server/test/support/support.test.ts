@@ -49,6 +49,21 @@ describe('CS 공지·FAQ·문의·약관', () => {
       .get('/api/v1/faqs?category=VISIT')
       .set('Authorization', bearer(me.id));
     expect(faqs.body.data.items).toHaveLength(1);
+
+    const badFaq = await request(app)
+      .get('/api/v1/faqs?category=SHOP')
+      .set('Authorization', bearer(me.id));
+    expect(badFaq.status).toBe(400);
+    expect(badFaq.body.code).toBe('INVALID_FAQ_CATEGORY');
+    const hidden = await prisma.notice.create({
+      data: { title: '내린 공지', content: '', status: 'H' },
+    });
+    const hiddenRes = await request(app)
+      .get(`/api/v1/notices/${hidden.id}`)
+      .set('Authorization', bearer(me.id));
+    expect(hiddenRes.status).toBe(404);
+    expect(hiddenRes.body.code).toBe('NOTICE_NOT_FOUND');
+    expect((await request(app).get('/api/v1/notices')).status).toBe(401);
   });
 
   it('1:1 문의 등록(내 방문 인증·사진 1장)·목록·상세(signed URL)', async () => {
@@ -69,12 +84,32 @@ describe('CS 공지·FAQ·문의·약관', () => {
       });
     expect(created.status).toBe(201);
     const id = created.body.data.inquiryId as number;
+    expect(await prisma.inquiry.findUniqueOrThrow({ where: { id: BigInt(id) } })).toMatchObject({
+      userId: me.id,
+      refVisitId: visit.id,
+      imageKey: key,
+      status: 'W',
+    });
 
-    const others = await request(app)
-      .post('/api/v1/inquiries')
-      .set('Authorization', bearer(other.id))
-      .send({ category: 'VISIT', content: '남의 인증', refVisitId: Number(visit.id) });
+    const send = (userId: bigint, body: object) =>
+      request(app).post('/api/v1/inquiries').set('Authorization', bearer(userId)).send(body);
+    const others = await send(other.id, {
+      category: 'VISIT',
+      content: '남의 인증',
+      refVisitId: Number(visit.id),
+    });
+    expect(others.status).toBe(400);
     expect(others.body.code).toBe('INVALID_REF_VISIT');
+    const cases: [object, string][] = [
+      [{ category: 'SHOP', content: '내용' }, 'INVALID_INQUIRY_CATEGORY'],
+      [{ category: 'ETC', content: '   ' }, 'INQUIRY_CONTENT_REQUIRED'],
+      [{ category: 'ETC', content: '남의 사진', imageKey: key }, 'IMAGE_KEY_FORBIDDEN'],
+    ];
+    for (const [body, code] of cases) expect((await send(other.id, body)).body.code).toBe(code);
+    // 실패한 요청은 문의를 남기지 않는다
+    expect(await prisma.inquiry.count({ where: { userId: other.id } })).toBe(0);
+    // 1분에 5번까지 (위에서 5번 보냄)
+    expect((await send(other.id, { category: 'ETC', content: '여섯 번째' })).status).toBe(429);
 
     const list = await request(app).get('/api/v1/inquiries/me').set('Authorization', bearer(me.id));
     expect(list.body.data.items[0]).toMatchObject({ inquiryId: id, status: 'WAITING' });

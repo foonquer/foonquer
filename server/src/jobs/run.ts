@@ -12,10 +12,17 @@ async function main() {
     process.exitCode = 1;
     return;
   }
+  // 하나가 실패해도 나머지 작업(특히 season)은 돌리고, 끝에 종료 코드로 실패를 알린다
   for (const n of names) {
     const started = Date.now();
-    const result = await JOBS[n]();
-    console.log(`[job] ${n} ${Date.now() - started}ms`, JSON.stringify(result));
+    try {
+      const result: object = await JOBS[n]();
+      console.log(`[job] ${n} ${Date.now() - started}ms`, JSON.stringify(result));
+      if ('failed' in result && Number(result.failed) > 0) process.exitCode = 1;
+    } catch (err) {
+      console.error(`[job] ${n} 실패`, err);
+      process.exitCode = 1;
+    }
   }
 }
 

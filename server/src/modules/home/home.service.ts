@@ -116,7 +116,13 @@ export async function getMySummary(userId: bigint, now = new Date()) {
     season
       ? prisma.review.count({ where: { userId, status: 'A', visit: { seasonId: season.id } } })
       : 0,
-    prisma.review.aggregate({ where: { userId, status: 'A' }, _sum: { helpfulCount: true } }),
+    // 이번 시즌 방문으로 쓴 리뷰가 받은 도움돼요 (seasonRecord라서 시즌 기준)
+    season
+      ? prisma.review.aggregate({
+          where: { userId, status: 'A', visit: { seasonId: season.id } },
+          _sum: { helpfulCount: true },
+        })
+      : { _sum: { helpfulCount: 0 } },
     prisma.memberItem.count({ where: { userId, seenAt: null, quantity: { gt: 0 } } }),
     Promise.all([
       prisma.memberAchievement.count({ where: { userId } }),

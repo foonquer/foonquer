@@ -1,32 +1,14 @@
 import { z } from 'zod';
 import { AppError } from '../../common/errors/app-error';
-import { defineErrors } from '../../common/errors/error-codes';
 import { sha256Hex } from '../../common/crypto';
 import { pageQuery, toPageResult } from '../../common/pagination';
 import { addDays, toKstIso } from '../../common/time';
 import type { Prisma } from '../../generated/prisma/client';
 import { prisma } from '../../lib/prisma';
+import { NotificationError } from './notification.errors';
 
 // NOTI-01~06·09 알림함·Web Push 구독 (ERD notification, push_subscription). 알림은 30일 동안 보관한다.
 // NOTI-07·08(알림 설정)은 SET-01·02로 대신한다 (ERD 기준: member 알림 컬럼 + member_consent)
-
-export const NotificationError = defineErrors({
-  NOTIFICATION_NOT_FOUND: {
-    status: 404,
-    code: 'NOTIFICATION_NOT_FOUND',
-    message: '알림을 찾을 수 없어요.',
-  },
-  INVALID_NOTIFICATION_CATEGORY: {
-    status: 400,
-    code: 'INVALID_NOTIFICATION_CATEGORY',
-    message: '알림 종류가 올바르지 않아요.',
-  },
-  INVALID_PUSH_SUBSCRIPTION: {
-    status: 400,
-    code: 'INVALID_PUSH_SUBSCRIPTION',
-    message: '푸시 구독 정보가 올바르지 않아요.',
-  },
-});
 
 export const KEEP_DAYS = 30;
 const category = z.enum(['RANK', 'REVIEW', 'MUKKAEBI', 'NOTICE'], {
@@ -37,21 +19,24 @@ export const notificationListQuery = z.object({ ...pageQuery, category: category
 export type NotificationListQuery = z.infer<typeof notificationListQuery>;
 export const notificationParams = z.object({ notificationId: z.coerce.number().int().positive() });
 export const readAllBody = z.object({ category: category.optional() });
+const PUSH_ERROR = { error: 'INVALID_PUSH_SUBSCRIPTION' } as const;
+const pushKey = z.string(PUSH_ERROR).min(1, PUSH_ERROR).max(255, PUSH_ERROR);
+
 export const pushSubscriptionBody = z.object({
   endpoint: z
     .url({ error: 'INVALID_PUSH_SUBSCRIPTION' })
     .max(1024, { error: 'INVALID_PUSH_SUBSCRIPTION' }),
   keys: z.object(
     {
-      p256dh: z.string({ error: 'INVALID_PUSH_SUBSCRIPTION' }).min(1).max(255),
-      auth: z.string({ error: 'INVALID_PUSH_SUBSCRIPTION' }).min(1).max(255),
+      p256dh: pushKey,
+      auth: pushKey,
     },
     { error: 'INVALID_PUSH_SUBSCRIPTION' },
   ),
 });
 export type PushSubscriptionBody = z.infer<typeof pushSubscriptionBody>;
 export const pushUnsubscribeBody = z.object({
-  endpoint: z.string({ error: 'INVALID_PUSH_SUBSCRIPTION' }).min(1).max(1024),
+  endpoint: z.string(PUSH_ERROR).min(1, PUSH_ERROR).max(1024, PUSH_ERROR),
 });
 
 /** 알림을 눌렀을 때 갈 화면 (프론트 경로) */
@@ -127,16 +112,16 @@ export async function countUnread(userId: bigint, now = new Date()) {
   return { unreadCount: rows.reduce((s, r) => s + r._count._all, 0), byCategory };
 }
 
-async function findMine(userId: bigint, notificationId: number) {
-  const n = await prisma.notification.findUnique({ where: { id: BigInt(notificationId) } });
-  if (!n || n.userId !== userId) throw new AppError(NotificationError.NOTIFICATION_NOT_FOUND);
-  return n;
-}
-
-/** NOTI-03 읽음 처리 */
+/** NOTI-03 읽음 처리 (이미 읽었어도 성공) */
 export async function readNotification(userId: bigint, notificationId: number) {
-  const n = await findMine(userId, notificationId);
-  if (!n.isRead) await prisma.notification.update({ where: { id: n.id }, data: { isRead: true } });
+  const id = BigInt(notificationId);
+  // 내 알림 조건을 쿼리에 넣어 동시에 지워져도 500이 아니라 404가 되게 한다
+  const { count } = await prisma.notification.updateMany({
+    where: { id, userId },
+    data: { isRead: true },
+  });
+  const n = count ? await prisma.notification.findUnique({ where: { id } }) : null;
+  if (!n) throw new AppError(NotificationError.NOTIFICATION_NOT_FOUND);
   return { notificationId: n.id, isRead: true, deepLink: deepLinkOf(n.refType, n.refId) };
 }
 
@@ -151,9 +136,10 @@ export async function readAll(userId: bigint, category?: string) {
 
 /** NOTI-05 알림 삭제 */
 export async function deleteNotification(userId: bigint, notificationId: number) {
-  const n = await findMine(userId, notificationId);
-  await prisma.notification.delete({ where: { id: n.id } });
-  return { notificationId: n.id, deleted: true };
+  const id = BigInt(notificationId);
+  const { count } = await prisma.notification.deleteMany({ where: { id, userId } });
+  if (count === 0) throw new AppError(NotificationError.NOTIFICATION_NOT_FOUND);
+  return { notificationId: id, deleted: true };
 }
 
 /** NOTI-06 Web Push 구독 등록·갱신 (같은 브라우저 endpoint는 한 행, 다른 회원이 쓰던 것이면 나에게 옮긴다) */
