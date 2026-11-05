@@ -15,6 +15,9 @@ const adapter = new PrismaMariaDb({
   connectionLimit: 10,
   // MySQL 8 기본 인증(caching_sha2_password)을 SSL 없이 쓸 때 필요하다.
   allowPublicKeyRetrieval: true,
+  // 기본 REPEATABLE READ는 트랜잭션 첫 조회 때 찍은 스냅샷을 계속 읽어서, 회원 행을 잠근 뒤에도
+  // 먼저 끝난 트랜잭션의 포인트·경험치 내역을 못 본다(하루 한도 초과, 경험치 덮어쓰기). 잠근 뒤 최신 값을 읽도록 READ COMMITTED로 연다.
+  initSql: 'SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED',
 });
 
 export const prisma = new PrismaClient({ adapter });
