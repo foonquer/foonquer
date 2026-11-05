@@ -44,6 +44,12 @@ const envSchema = z.object({
   KAKAO_CLIENT_SECRET: blankAsUndefined(z.string().optional()),
   /** 사진·영수증을 두는 Cloud Storage 버킷 이름. 비우면 올린 사진을 확인할 수 없어 사진 key를 받지 않는다 */
   GCS_BUCKET: blankAsUndefined(z.string().optional()),
+  /** 영수증·현장·문의 사진을 두는 비공개 Cloud Storage 버킷 (UPLOAD-01). 비우면 그 사진들의 업로드 URL을 만들 수 없다 */
+  GCS_PRIVATE_BUCKET: blankAsUndefined(z.string().optional()),
+  /** 네이버 CLOVA OCR 영수증 특화 모델 APIGW Invoke URL (VISIT-03). 비우면 영수증을 읽지 못해 인증이 UNREADABLE로 실패한다 */
+  CLOVA_OCR_URL: blankAsUndefined(z.url().optional()),
+  /** CLOVA OCR Secret Key (X-OCR-SECRET 헤더) */
+  CLOVA_OCR_SECRET: blankAsUndefined(z.string().optional()),
   /** 프로필·리뷰 사진 공개 주소. 예) https://storage.googleapis.com/버킷 또는 Cloud CDN 도메인 — 비우면 사진 URL을 null로 준다 */
   IMAGE_BASE_URL: blankAsUndefined(
     z

@@ -98,6 +98,11 @@ async function seedRegions(prisma: PrismaClient) {
       gu,
     );
     sigunguIds.set(gu.code, { id: row.id, name: gu.name });
+    // 구 특색 배경 에셋 이름 (프론트 에셋과 맞춘다). 이미 다른 값이 들어 있으면 그대로 둔다
+    await prisma.region.updateMany({
+      where: { id: row.id, bgKey: null },
+      data: { bgKey: `BG_${gu.code}` },
+    });
   }
   for (const dong of SEOUL_DONG) {
     const gu = sigunguIds.get(dong.sigunguCode);
@@ -144,11 +149,497 @@ async function seedRatingParams(prisma: PrismaClient) {
   return ratingParams.length;
 }
 
+// ── ERD v1.2 게임 기본 데이터 (2026-11-05 API 명세서 전체 점검) ─────────────────────────────
+// 수치는 초안이다. 운영하면서 DB에서 바로 조정하므로 이미 있는 행은 덮어쓰지 않는다(create만).
+
+/** 레벨 n이 되는 누적 경험치 = Σ(k=1..n-1) (100 + 20 × (k − 1)) — LV.2 100, LV.3 220, LV.10 1,620, LV.20 5,320 */
+export function requiredExpOf(level: number) {
+  let sum = 0;
+  for (let k = 1; k < level; k += 1) sum += 100 + 20 * (k - 1);
+  return sum;
+}
+export const MAX_LEVEL = 30;
+
+/** 성장 단계: E 알(LV.1~2) / B 아기(LV.3~9, 60%) / K 어린이(LV.10~19, 80%) / A 다 큼(LV.20~, 100%) */
+function stageOf(level: number) {
+  if (level <= 2) return { stage: 'E', sizePercent: 100 };
+  if (level <= 9) return { stage: 'B', sizePercent: 60 };
+  if (level <= 19) return { stage: 'K', sizePercent: 80 };
+  return { stage: 'A', sizePercent: 100 };
+}
+
+async function seedLevelPolicies(prisma: PrismaClient) {
+  for (let level = 1; level <= MAX_LEVEL; level += 1) {
+    await prisma.levelPolicy.upsert({
+      where: { level },
+      update: {},
+      create: { level, requiredExp: requiredExpOf(level), ...stageOf(level), rewardPoint: 200 },
+    });
+  }
+  return MAX_LEVEL;
+}
+
+// 피그마 "먹포인트 모으는 법"과 디자인 결정사항의 적립 초안
+const rewardPolicies = [
+  { reason: 'VISIT_VERIFIED', point: 50, exp: 20, dailyLimit: null, description: '방문 인증' },
+  {
+    reason: 'FIRST_CONQUEST',
+    point: 100,
+    exp: 30,
+    dailyLimit: null,
+    description: '새 가게 첫 정복',
+  },
+  {
+    reason: 'REVIEW_DETAIL',
+    point: 20,
+    exp: 10,
+    dailyLimit: null,
+    description: '세부평가(세부 별점 5항목)',
+  },
+  { reason: 'REVIEW_TEXT', point: 30, exp: 20, dailyLimit: null, description: '글 리뷰' },
+  { reason: 'REVIEW_PHOTO', point: 20, exp: 10, dailyLimit: null, description: '사진 리뷰' },
+  {
+    reason: 'HELPFUL_RECEIVED',
+    point: 5,
+    exp: 2,
+    dailyLimit: 20,
+    description: '내 리뷰에 도움돼요',
+  },
+  { reason: 'REVIEW_VOTE', point: 5, exp: 0, dailyLimit: 10, description: '리뷰 평가 참여' },
+  { reason: 'LEVEL_UP', point: 200, exp: 0, dailyLimit: null, description: '레벨업' },
+  { reason: 'TIER_UP', point: 100, exp: 0, dailyLimit: null, description: '티어 상승' },
+  { reason: 'SEASON_REWARD', point: 300, exp: 0, dailyLimit: null, description: '시즌 보상' },
+];
+
+async function seedRewardPolicies(prisma: PrismaClient) {
+  for (const policy of rewardPolicies) {
+    await prisma.rewardPolicy.upsert({
+      where: { reason: policy.reason },
+      update: {},
+      create: policy,
+    });
+  }
+  return rewardPolicies.length;
+}
+
+// 아이템 (2026-10-06 회의: 모자 6 + 왕관, 얼굴 6, 소품 6, 밤하늘, 방망이 4단계 + 전설). 이름·가격은 피그마 에셋 보드·상점
+type ItemSeed = {
+  code: string;
+  category: 'HAT' | 'FACE' | 'PROP' | 'SKIN' | 'CLUB';
+  name: string;
+  price?: number;
+  unlockType?: 'P' | 'S' | 'M';
+  clubTier?: number;
+  description: string;
+};
+const items: ItemSeed[] = [
+  {
+    code: 'HAT_SPROUT',
+    category: 'HAT',
+    name: '새싹 모자',
+    price: 200,
+    description: '머리 위에 새싹이 쏙 올라와요.',
+  },
+  {
+    code: 'HAT_STRAWBERRY',
+    category: 'HAT',
+    name: '딸기 모자',
+    price: 300,
+    description: '새콤달콤한 딸기 모자예요.',
+  },
+  {
+    code: 'HAT_SNAPBACK',
+    category: 'HAT',
+    name: '스냅백',
+    price: 400,
+    description: '동네 탐방엔 역시 스냅백.',
+  },
+  {
+    code: 'HAT_BEAR',
+    category: 'HAT',
+    name: '곰돌이 모자',
+    price: 400,
+    description: '복슬복슬 곰돌이 귀가 달렸어요.',
+  },
+  {
+    code: 'HAT_CHICK',
+    category: 'HAT',
+    name: '병아리 모자',
+    price: 450,
+    description: '삐약삐약 병아리 모자예요.',
+  },
+  {
+    code: 'HAT_ACORN',
+    category: 'HAT',
+    name: '도토리 모자',
+    price: 600,
+    description: '가을 숲에서 주운 도토리 모자예요.',
+  },
+  {
+    code: 'HAT_CROWN',
+    category: 'HAT',
+    name: '왕관',
+    unlockType: 'S',
+    description: '구의 먹짱(시즌 1위)만 쓸 수 있어요.',
+  },
+  {
+    code: 'FACE_STAR_STICKER',
+    category: 'FACE',
+    name: '반짝 별 스티커',
+    price: 150,
+    description: '볼에 반짝이는 별을 붙여요.',
+  },
+  {
+    code: 'FACE_MUSTACHE',
+    category: 'FACE',
+    name: '콧수염',
+    price: 250,
+    description: '맛집 감별사의 콧수염.',
+  },
+  {
+    code: 'FACE_ROUND_GLASSES',
+    category: 'FACE',
+    name: '동글 안경',
+    price: 300,
+    description: '동글동글 귀여운 안경이에요.',
+  },
+  {
+    code: 'FACE_HEART_SUNGLASSES',
+    category: 'FACE',
+    name: '하트 선글라스',
+    price: 500,
+    description: '하트 모양 선글라스예요.',
+  },
+  {
+    code: 'FACE_MONOCLE',
+    category: 'FACE',
+    name: '외알 안경',
+    price: 600,
+    description: '미식가의 품격, 외알 안경.',
+  },
+  {
+    code: 'FACE_STAR_SUNGLASSES',
+    category: 'FACE',
+    name: '별 선글라스',
+    price: 700,
+    description: '별 모양 선글라스예요.',
+  },
+  {
+    code: 'PROP_ICE_CREAM',
+    category: 'PROP',
+    name: '아이스크림',
+    price: 250,
+    description: '시원한 아이스크림을 들어요.',
+  },
+  {
+    code: 'PROP_HEART_BALLOON',
+    category: 'PROP',
+    name: '하트 풍선',
+    price: 250,
+    description: '둥실둥실 하트 풍선이에요.',
+  },
+  {
+    code: 'PROP_TTEOKKKOCHI',
+    category: 'PROP',
+    name: '떡꼬치',
+    price: 300,
+    description: '달콤매콤 떡꼬치예요.',
+  },
+  {
+    code: 'PROP_COTTON_CANDY',
+    category: 'PROP',
+    name: '솜사탕',
+    price: 350,
+    description: '폭신한 솜사탕이에요.',
+  },
+  {
+    code: 'PROP_FLAG',
+    category: 'PROP',
+    name: '정복 깃발',
+    price: 400,
+    description: '정복한 곳에 꽂는 깃발이에요.',
+  },
+  {
+    code: 'PROP_MIC',
+    category: 'PROP',
+    name: '마이크',
+    price: 450,
+    description: '맛집 리뷰는 마이크를 들고.',
+  },
+  {
+    code: 'SKIN_NIGHTSKY',
+    category: 'SKIN',
+    name: '밤하늘 먹깨비',
+    unlockType: 'S',
+    description: '시즌 상위 10% 명예 먹깨비예요.',
+  },
+  {
+    code: 'CLUB_WOOD',
+    category: 'CLUB',
+    name: '나무 방망이',
+    unlockType: 'S',
+    clubTier: 1,
+    description: '시즌에 정복 기록을 남기면 받아요.',
+  },
+  {
+    code: 'CLUB_BRONZE',
+    category: 'CLUB',
+    name: '청동 방망이',
+    unlockType: 'S',
+    clubTier: 2,
+    description: '시즌 상위 50% 보상이에요.',
+  },
+  {
+    code: 'CLUB_SILVER',
+    category: 'CLUB',
+    name: '은 방망이',
+    unlockType: 'S',
+    clubTier: 3,
+    description: '시즌 상위 30% 보상이에요.',
+  },
+  {
+    code: 'CLUB_GOLD',
+    category: 'CLUB',
+    name: '황금 방망이',
+    unlockType: 'S',
+    clubTier: 4,
+    description: '시즌 상위 10% 보상이에요. 3개를 모으면 전설의 방망이로 합칠 수 있어요.',
+  },
+  {
+    code: 'CLUB_LEGEND',
+    category: 'CLUB',
+    name: '전설의 방망이',
+    unlockType: 'M',
+    clubTier: 5,
+    description: '황금 방망이 3개를 합쳐 만들어요.',
+  },
+];
+
+async function seedItems(prisma: PrismaClient) {
+  for (const [index, item] of items.entries()) {
+    await prisma.item.upsert({
+      where: { code: item.code },
+      update: {},
+      create: {
+        code: item.code,
+        category: item.category,
+        name: item.name,
+        description: item.description,
+        price: item.price ?? null,
+        unlockType: item.unlockType ?? 'P',
+        clubTier: item.clubTier ?? null,
+        sortOrder: index + 1,
+      },
+    });
+  }
+  const id = async (code: string) =>
+    (await prisma.item.findUniqueOrThrow({ where: { code }, select: { id: true } })).id;
+
+  const legend = await id('CLUB_LEGEND');
+  const gold = await id('CLUB_GOLD');
+  await prisma.itemRecipe.upsert({
+    where: { resultItemId: legend },
+    update: {},
+    create: { resultItemId: legend, materialItemId: gold, materialCount: 3 },
+  });
+
+  // 시즌 보상표 (ERD season_reward_rule 초안): 방망이는 걸린 것 중 가장 좋은 1개, 명예 아이템은 모두
+  const rules = [
+    { ruleType: 'P', threshold: 10, code: 'CLUB_GOLD' },
+    { ruleType: 'P', threshold: 10, code: 'SKIN_NIGHTSKY' },
+    { ruleType: 'P', threshold: 30, code: 'CLUB_SILVER' },
+    { ruleType: 'P', threshold: 50, code: 'CLUB_BRONZE' },
+    { ruleType: 'P', threshold: 100, code: 'CLUB_WOOD' },
+    { ruleType: 'R', threshold: 1, code: 'HAT_CROWN' },
+  ];
+  for (const rule of rules) {
+    const itemId = await id(rule.code);
+    await prisma.seasonRewardRule.upsert({
+      where: {
+        ruleType_threshold_itemId: { ruleType: rule.ruleType, threshold: rule.threshold, itemId },
+      },
+      update: {},
+      create: { ruleType: rule.ruleType, threshold: rule.threshold, itemId },
+    });
+  }
+  return items.length;
+}
+
+// 업적 12개 (피그마 탐방러 프로필 / 업적 전체). 업적 이름이 칭호로도 쓰인다(RANK-11)
+const achievements = [
+  {
+    code: 'FIRST_CONQUEST',
+    name: '첫 정복',
+    description: '처음으로 맛집을 정복했어요',
+    conditionType: 'CONQUEST_TOTAL',
+    conditionValue: 1,
+    rewardPoint: 50,
+  },
+  {
+    code: 'REGULAR_START',
+    name: '단골의 시작',
+    description: '한 구에서 5곳 정복',
+    conditionType: 'SIGUNGU_CONQUEST',
+    conditionValue: 5,
+    rewardPoint: 100,
+  },
+  {
+    code: 'REVIEW_10',
+    name: '리뷰 10개',
+    description: '글 리뷰 10개 쓰기',
+    conditionType: 'REVIEW_TEXT_COUNT',
+    conditionValue: 10,
+    rewardPoint: 100,
+  },
+  {
+    code: 'PHOTO_REVIEW_5',
+    name: '사진 리뷰 5개',
+    description: '사진 리뷰 5개 쓰기',
+    conditionType: 'REVIEW_PHOTO_COUNT',
+    conditionValue: 5,
+    rewardPoint: 100,
+  },
+  {
+    code: 'DISTRICT_3',
+    name: '3개 구 탐험',
+    description: '서로 다른 3개 구에서 정복',
+    conditionType: 'DISTRICT_COUNT',
+    conditionValue: 3,
+    rewardPoint: 100,
+  },
+  {
+    code: 'REVIEW_50',
+    name: '리뷰 50개',
+    description: '글 리뷰 50개 쓰기',
+    conditionType: 'REVIEW_TEXT_COUNT',
+    conditionValue: 50,
+    rewardPoint: 300,
+  },
+  {
+    code: 'DISTRICT_5',
+    name: '5개 구 탐험',
+    description: '서로 다른 5개 구에서 정복',
+    conditionType: 'DISTRICT_COUNT',
+    conditionValue: 5,
+    rewardPoint: 200,
+  },
+  {
+    code: 'WEEKLY_STREAK_4',
+    name: '4주 연속 정복',
+    description: '4주 동안 매주 1곳 이상 정복',
+    conditionType: 'WEEKLY_STREAK',
+    conditionValue: 4,
+    rewardPoint: 200,
+  },
+  {
+    code: 'HELPFUL_300',
+    name: '도움왕',
+    description: '도움돼요 300개 받기',
+    conditionType: 'HELPFUL_RECEIVED',
+    conditionValue: 300,
+    rewardPoint: 300,
+  },
+  {
+    code: 'SEASON_CONQUEST_30',
+    name: '한 시즌 30곳 정복',
+    description: '한 시즌에 30곳 정복',
+    conditionType: 'SEASON_CONQUEST',
+    conditionValue: 30,
+    rewardPoint: 300,
+  },
+  {
+    code: 'SEASON_TOP10',
+    name: '시즌 TOP 10',
+    description: '시즌이 끝났을 때 한 구에서 10위 안',
+    conditionType: 'SEASON_RANK',
+    conditionValue: 10,
+    rewardPoint: 300,
+  },
+  {
+    code: 'MUKJJANG',
+    name: '구의 먹짱',
+    description: '시즌이 끝났을 때 한 구에서 1위',
+    conditionType: 'SEASON_RANK',
+    conditionValue: 1,
+    rewardPoint: 500,
+  },
+];
+
+async function seedAchievements(prisma: PrismaClient) {
+  for (const [index, a] of achievements.entries()) {
+    await prisma.achievement.upsert({
+      where: { code: a.code },
+      update: {},
+      create: { ...a, iconKey: `ACH_${a.code}`, sortOrder: index + 1 },
+    });
+  }
+  return achievements.length;
+}
+
+// 좋았던 점·아쉬웠던 점 칩 (2026-11-04 초안, 문구는 팀 확정 전)
+const reviewAspects = [
+  { code: 'TASTE', name: '맛' },
+  { code: 'PORTION', name: '양' },
+  { code: 'PRICE', name: '가격' },
+  { code: 'SERVICE', name: '서비스' },
+  { code: 'CLEAN', name: '청결' },
+  { code: 'WAIT', name: '대기시간' },
+  { code: 'MOOD', name: '분위기' },
+];
+
+async function seedReviewAspects(prisma: PrismaClient) {
+  for (const [index, aspect] of reviewAspects.entries()) {
+    await prisma.reviewAspect.upsert({
+      where: { code: aspect.code },
+      update: {},
+      create: { ...aspect, sortOrder: index + 1 },
+    });
+  }
+  return reviewAspects.length;
+}
+
+/** 시즌 1~3 (디자인 결정사항: 시즌 1 2025.9~2026.2, 시즌 2 2026.3~8, 시즌 3 2026.9~2027.2). 배포·로컬 seed에서만 쓴다(테스트는 시즌을 직접 만든다) */
+export async function seedSeasons(prisma: PrismaClient) {
+  const seasons = [
+    { seasonNo: 1, startDate: '2025-09-01', endDate: '2026-02-28', status: 'F' },
+    { seasonNo: 2, startDate: '2026-03-01', endDate: '2026-08-31', status: 'F' },
+    { seasonNo: 3, startDate: '2026-09-01', endDate: '2027-02-28', status: 'A' },
+  ];
+  for (const season of seasons) {
+    await prisma.season.upsert({
+      where: { seasonNo: season.seasonNo },
+      update: {},
+      create: {
+        ...season,
+        startDate: new Date(`${season.startDate}T00:00:00Z`),
+        endDate: new Date(`${season.endDate}T00:00:00Z`),
+        finalizedAt: season.status === 'F' ? new Date(`${season.endDate}T15:00:00Z`) : null,
+      },
+    });
+  }
+  return seasons.length;
+}
+
 /** 기본 데이터를 모두 넣고 넣은 개수를 돌려준다 */
 export async function seedBaseData(prisma: PrismaClient) {
   const categoryCount = await seedCategories(prisma);
   const policyDocumentCreated = await seedPolicyDocuments(prisma);
   const regions = await seedRegions(prisma);
   const ratingParamCount = await seedRatingParams(prisma);
-  return { categoryCount, policyDocumentCreated, ...regions, ratingParamCount };
+  const levelCount = await seedLevelPolicies(prisma);
+  const rewardPolicyCount = await seedRewardPolicies(prisma);
+  const itemCount = await seedItems(prisma);
+  const achievementCount = await seedAchievements(prisma);
+  const reviewAspectCount = await seedReviewAspects(prisma);
+  return {
+    categoryCount,
+    policyDocumentCreated,
+    ...regions,
+    ratingParamCount,
+    levelCount,
+    rewardPolicyCount,
+    itemCount,
+    achievementCount,
+    reviewAspectCount,
+  };
 }

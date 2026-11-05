@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../../common/errors/app-error';
+import { type ImageExt, isImageOf, MAGIC_BYTES } from '../../lib/image-file';
 import { publicImageUrl } from '../../lib/image-url';
 import { prisma } from '../../lib/prisma';
 import { createUploadUrl, deleteObjectQuietly, readObjectHead } from '../../lib/storage';
@@ -16,17 +17,6 @@ const UPLOAD_URL_EXPIRES_IN = 300;
 /** 프로필 사진 key 형식: profile/{회원 id}/{uuid}.{jpg|png|webp} */
 const PROFILE_KEY = /^profile\/(\d+)\/[0-9a-fA-F-]{36}\.(jpg|png|webp)$/;
 
-/** 확장자별 파일 앞부분(매직 바이트). Content-Type만 믿지 않고 실제 이미지인지 본다 */
-const MAGIC: Record<string, (head: Buffer) => boolean> = {
-  jpg: (h) => h.length >= 3 && h[0] === 0xff && h[1] === 0xd8 && h[2] === 0xff,
-  png: (h) =>
-    h.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
-  webp: (h) =>
-    h.subarray(0, 4).toString('latin1') === 'RIFF' &&
-    h.subarray(8, 12).toString('latin1') === 'WEBP',
-};
-const MAGIC_BYTES = 12;
-
 /**
  * 올린 프로필 사진 key를 확인한다 (USER-03·06 공통).
  * 다른 회원 폴더면 403 IMAGE_KEY_FORBIDDEN(forbidOthers일 때), 형식이 틀리거나 파일이 없으면 400 PROFILE_IMAGE_NOT_FOUND,
@@ -42,7 +32,7 @@ export async function assertProfileImage(userId: bigint, key: string, forbidOthe
   if (!match) throw new AppError(UserError.PROFILE_IMAGE_NOT_FOUND);
   const head = await readObjectHead(key, MAGIC_BYTES);
   if (!head) throw new AppError(UserError.PROFILE_IMAGE_NOT_FOUND);
-  if (!MAGIC[match[2]](head)) {
+  if (!isImageOf(match[2] as ImageExt, head)) {
     await deleteObjectQuietly(key);
     throw new AppError(UserError.UNSUPPORTED_IMAGE_TYPE);
   }

@@ -28,3 +28,5 @@ ALTER TABLE `member_item` ADD CONSTRAINT `member_item_quantity_chk` CHECK (quant
 ALTER TABLE `restaurant_mapae` ADD CONSTRAINT `restaurant_mapae_reason_chk` CHECK (reason in ('A','E'));
 ALTER TABLE `restaurant_mapae` ADD CONSTRAINT `restaurant_mapae_status_chk` CHECK (status in ('A','R'));
 ALTER TABLE `review_aspect_mark` ADD CONSTRAINT `review_aspect_mark_polarity_chk` CHECK (polarity in ('G','B'));
+ALTER TABLE `member` ADD CONSTRAINT `member_rep_title_chk` CHECK ((rep_title_type is null and rep_title_ref is null) or (rep_title_type in ('A','T') and rep_title_ref is not null));
+ALTER TABLE `member_pick` ADD CONSTRAINT `member_pick_order_chk` CHECK (sort_order between 0 and 9);

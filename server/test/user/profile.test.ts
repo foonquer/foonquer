@@ -186,7 +186,7 @@ describe('USER-03 POST /users/me/profile', () => {
     expect(preferred.map((p) => p.categoryId)).toEqual([1, 6]);
   });
 
-  it('진행 중 시즌이 있으면 시즌 번호를, 레벨 정책이 있으면 그 단계를 준다', async () => {
+  it('진행 중 시즌이 있으면 시즌 번호를, 레벨 정책(기본 데이터)의 단계를 준다', async () => {
     const today = kstTodayAsDbDate();
     await prisma.season.create({
       data: {
@@ -196,7 +196,6 @@ describe('USER-03 POST /users/me/profile', () => {
         status: 'A',
       },
     });
-    await prisma.levelPolicy.create({ data: { level: 1, requiredExp: 0, stage: 'E' } });
     const me = await pendingMember();
 
     const res = await setup(me.id, await setupBody({ localRegionIds: [await regionId(SINDANG)] }));
@@ -217,10 +216,18 @@ describe('USER-03 POST /users/me/profile', () => {
     });
     const me = await pendingMember();
 
-    await setup(me.id, await setupBody());
-    const items = await prisma.memberItem.findMany({ where: { userId: me.id } });
-    expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ itemId: item.id, acquiredType: 'D', quantity: 1 });
+    try {
+      await setup(me.id, await setupBody());
+      const items = await prisma.memberItem.findMany({ where: { userId: me.id } });
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({ itemId: item.id, acquiredType: 'D', quantity: 1 });
+    } finally {
+      // item은 기본 데이터 표라 테스트마다 비우지 않으므로 직접 지운다
+      await prisma.memberItem.deleteMany({
+        where: { item: { code: { in: ['HAT_BASIC', 'HAT_SHOP'] } } },
+      });
+      await prisma.item.deleteMany({ where: { code: { in: ['HAT_BASIC', 'HAT_SHOP'] } } });
+    }
   });
 
   it('스토리지에 올린 프로필 사진 key를 저장하고 URL로 준다', async () => {

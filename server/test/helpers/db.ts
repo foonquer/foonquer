@@ -8,6 +8,13 @@ const KEEP_TABLES = new Set([
   'region',
   'policy_document',
   'rating_param',
+  'level_policy',
+  'reward_policy',
+  'item',
+  'item_recipe',
+  'season_reward_rule',
+  'achievement',
+  'review_aspect',
 ]);
 
 let tableNames: string[] | null = null;
