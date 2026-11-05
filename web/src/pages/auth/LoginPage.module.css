@@ -1,4 +1,4 @@
-/* Figma S-03: 소개 카드 358×450 (top 52) / 버튼 3개 (top 540, 사이 10) / 로그인 링크 (top 736) */
+/* Figma S-03: 소개 카드 358×640 (top 52) / 카드 아래 28에 카카오로 시작하기 버튼 (top 720) — 로그인은 카카오 하나만 */
 .page {
   display: flex;
   flex-direction: column;
@@ -8,7 +8,9 @@
 
 .card {
   position: relative;
-  height: 450px;
+  /* 남는 높이를 카드가 채워 버튼이 늘 카드 아래 28에 온다 (최소 450) */
+  flex: 1;
+  min-height: 450px;
   overflow: hidden;
   border-radius: 32px;
   background: var(--mk-forest);
@@ -21,7 +23,7 @@
 }
 
 .logo {
-  margin-top: 92px;
+  margin-top: 150px;
   font-size: 38px;
   font-weight: 900;
   letter-spacing: -1.52px;
@@ -35,21 +37,22 @@
   color: var(--mk-green-soft);
 }
 
-/* 먹깨비 그림 250×269가 카드 아래로 걸쳐 잘린다 */
+/* 먹깨비 그림 250×269가 카드 아래로 걸쳐 잘린다 (카드 높이와 상관없이 아래에 붙인다) */
 .mukkaebi {
   position: absolute;
-  top: 227px;
+  bottom: -46px;
   left: 50%;
   width: 251px;
   max-width: none;
   transform: translateX(-50%);
 }
 
+/* 카드 아래 28. Figma 844 화면에서 버튼 아래 여백 72 = 48 + .page 24 */
 .buttons {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin: 38px 6px 0;
+  margin: auto 6px 0;
+  padding: 28px 0 48px;
 }
 
 .buttons button {
@@ -63,35 +66,8 @@
   font-weight: 700;
 }
 
-/* 카카오·구글 로그인 버튼 색은 각 회사 디자인 가이드 */
+/* 카카오 로그인 버튼 색은 카카오 디자인 가이드 */
 .kakao {
   background: #fee500;
   color: #191919;
-}
-
-.google {
-  border: 1px solid #dadce0;
-  background: var(--mk-white);
-  color: #1f1f1f;
-}
-
-.email {
-  border: 1px solid var(--mk-line-strong);
-  background: var(--mk-white);
-  color: var(--mk-forest);
-}
-
-.loginLink {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 20px;
-  font-size: 13px;
-  color: var(--mk-subtle);
-}
-
-.loginLink a {
-  font-weight: 700;
-  color: var(--mk-forest);
-  text-decoration: underline;
 }

@@ -25,7 +25,7 @@ const localRegion = {
   sortOrder: 0,
   regDate: '2026-10-01',
 };
-const me = { id: 1, nickname: '아기깨비', loginMethods: ['EMAIL'], localRegions: [localRegion] };
+const me = { id: 1, nickname: '아기깨비', localRegions: [localRegion] };
 const GAYANG = { regionId: 11, dongName: '가양동', sigunguName: '강서구', lat: 37.56, lng: 126.85 };
 const MANGWON = { regionId: 12, dongName: '망원동', sigunguName: '마포구', lat: 37.55, lng: 126.9 };
 

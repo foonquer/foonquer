@@ -20,8 +20,3 @@
   color: var(--mk-muted);
   white-space: pre-line;
 }
-
-.description[data-compact='true'] {
-  font-size: 13px;
-  font-weight: 500;
-}

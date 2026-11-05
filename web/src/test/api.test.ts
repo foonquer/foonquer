@@ -30,24 +30,21 @@ describe('API 호출', () => {
 
   it('실패하면 서버의 code·message·data를 담은 ApiError를 던진다', async () => {
     mockApi({
-      'POST /auth/login': fail(
-        401,
-        'LOGIN_INVALID_CREDENTIALS',
-        '이메일 또는 비밀번호가 맞지 않아요.',
-        {
-          failCount: 1,
-          maxFailCount: 5,
-        },
+      'POST /users/me/local-regions': fail(
+        409,
+        'LOCAL_REGION_CHANGE_LIMITED',
+        '내 동네는 한 시즌에 한 번만 바꿀 수 있어요.',
+        { nextChangeAvailableAt: '2027-01-01' },
       ),
     });
 
-    const err = await api.post('/auth/login', {}).catch((e: unknown) => e);
+    const err = await api.post('/users/me/local-regions', {}).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect(err).toMatchObject({
-      status: 401,
-      code: 'LOGIN_INVALID_CREDENTIALS',
-      message: '이메일 또는 비밀번호가 맞지 않아요.',
-      data: { failCount: 1, maxFailCount: 5 },
+      status: 409,
+      code: 'LOCAL_REGION_CHANGE_LIMITED',
+      message: '내 동네는 한 시즌에 한 번만 바꿀 수 있어요.',
+      data: { nextChangeAvailableAt: '2027-01-01' },
     });
   });
 

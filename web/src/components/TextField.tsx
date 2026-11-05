@@ -1,4 +1,4 @@
-import { useId, useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { useId, type InputHTMLAttributes, type ReactNode } from 'react';
 import styles from './TextField.module.css';
 
 export type FieldStatus = 'default' | 'ok' | 'error' | 'alert';
@@ -7,7 +7,7 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> &
   label?: ReactNode;
   value: string;
   onChange: (value: string) => void;
-  /** ok: 초록 테두리 / error: 빨간 바탕(회원가입) / alert: 산호색 테두리(로그인) */
+  /** ok: 초록 테두리 / error: 빨간 바탕 / alert: 산호색 테두리 */
   status?: FieldStatus;
   /** 입력창 아래 문구. ok면 앞에 ✓가 붙는다 */
   message?: ReactNode;
@@ -19,8 +19,6 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> &
   hint?: ReactNode;
   /** 입력창 오른쪽 끝 (글자 수, 남은 시간, 버튼) */
   right?: ReactNode;
-  /** 비밀번호 입력창: 오른쪽에 보기/숨기기 */
-  password?: boolean;
 };
 
 export function TextField({
@@ -33,7 +31,6 @@ export function TextField({
   messageAction,
   hint,
   right,
-  password,
   id,
   type = 'text',
   className,
@@ -43,7 +40,6 @@ export function TextField({
   const inputId = id ?? autoId;
   const messageId = `${inputId}-message`;
   const hintId = `${inputId}-hint`;
-  const [visible, setVisible] = useState(false);
   const tone = messageStatus ?? status;
 
   return (
@@ -60,7 +56,7 @@ export function TextField({
           className={styles.input}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          type={password ? (visible ? 'text' : 'password') : type}
+          type={type}
           aria-invalid={status === 'error' || status === 'alert' ? true : undefined}
           aria-describedby={
             [inputProps['aria-describedby'], message ? messageId : null, hint ? hintId : null]
@@ -69,16 +65,6 @@ export function TextField({
           }
         />
         {right}
-        {password && (
-          <button
-            type="button"
-            className={styles.toggle}
-            onClick={() => setVisible((v) => !v)}
-            aria-pressed={visible}
-          >
-            {visible ? '숨기기' : '보기'}
-          </button>
-        )}
       </div>
       {message && (
         <p className={styles.message} data-status={tone}>
