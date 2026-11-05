@@ -48,6 +48,7 @@ model Member {
   /// 탈퇴 시각 — 탈퇴하면 kakao_id·nickname을 비워 같은 카카오 계정으로 다시 가입하거나 다른 사람이 닉네임을 쓸 수 있게 한다
   deleteDate              DateTime?                @map("delete_date")
   memberLocalRegions      MemberLocalRegion[]
+  preferredCategories     MemberPreferredCategory[]
   memberWithdrawals       MemberWithdrawal[]
   refreshTokens           RefreshToken[]
   memberConsents          MemberConsent[]
@@ -78,6 +79,19 @@ model Member {
 /// 내 동네(로컬). 회원가입 S-06에서 처음 고르고, 내 정보 → 내 동네 추가로 늘린다. 한 사람 최대 2곳 — 사는 동네 + 1곳 (앱에서 확인).
 /// 집뿐 아니라 직장 근처처럼 자주 가는 동네도 고를 수 있다.
 /// 방문 인증 때 이 표의 구 중에 가게의 구가 있으면 visit.is_local = true → 리뷰 카드에 "로컬", 아니면 "외부 방문"
+/// 좋아하는 음식 종류 (2026-11-04, 3차 멘토링 개인화). 회원가입 S-05-1에서 여러 개 고른다. 첫 추천 맛집(RECO-01)에서 고른 카테고리를 먼저 보여 준다
+model MemberPreferredCategory {
+  userId     BigInt   @map("user_id")
+  categoryId Int      @map("category_id")
+  regDate    DateTime @default(now()) @map("reg_date")
+  user       Member   @relation(fields: [userId], references: [id])
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  @@id([userId, categoryId])
+  @@index([categoryId], map: "member_preferred_category_category_idx")
+  @@map("member_preferred_category")
+}
+
 model MemberLocalRegion {
   id        BigInt   @id @default(autoincrement())
   userId    BigInt   @map("user_id")
@@ -244,6 +258,7 @@ model Category {
   name        String       @unique @db.VarChar(20)
   sortOrder   Int          @default(0) @map("sort_order") @db.TinyInt
   restaurants Restaurant[]
+  preferredBy MemberPreferredCategory[]
 
   @@map("category")
 }
@@ -271,6 +286,8 @@ model Restaurant {
   businessNo        String?           @map("business_no") @db.VarChar(12)
   /// 영업시간 — 카카오 API가 주지 않으므로 직접 입력한 경우만 (없으면 화면에서 숨김). 형식: 요일(mon~sun)별 open/close 배열, 한국 시간 24시간제. 예) {"mon":[{"open":"11:00","close":"21:00"}],"sun":[]} · 쉬는 요일은 빈 배열, 점심·저녁 따로 영업하면 배열에 2개
   businessHours     Json?             @map("business_hours")
+  /// 마패가 붙어 있는지 — 표시 중인 restaurant_mapae(status = A)가 있으면 true. 검색 목록·음식점 상세에서 "리뷰 이벤트를 하는 가게입니다"를 보여 줄 때 바로 읽으려고 둔다
+  hasMapae          Boolean           @default(false) @map("has_mapae")
   /// A 영업 / C 폐업 / H 숨김
   status            String            @default("A") @db.Char(1)
   regDate           DateTime          @default(now()) @map("reg_date")
@@ -284,6 +301,7 @@ model Restaurant {
   conquests         Conquest[]
   reviews           Review[]
   mukkaebis         Mukkaebi[]
+  mapaes            RestaurantMapae[]
 
   @@index([sigunguId, categoryId], map: "restaurant_sigungu_category_idx")
   @@index([regionId, categoryId], map: "restaurant_region_category_idx")
@@ -293,6 +311,35 @@ model Restaurant {
 }
 
 /// 음식점 상세·추천맛집용 집계. 비율 대신 개수를 저장해서 리뷰가 추가·삭제될 때 +1/-1로 정확히 갱신한다. review.score_weight가 바뀌면 그 차이만큼 weight_sum·weighted_score_sum을 고친다
+/// 마패 (2026-11-04). 뒷광고 또는 리뷰 이벤트가 확인된 가게에 "리뷰 이벤트를 하는 가게입니다"를 붙인다. 운영자가 확인한 뒤 붙이고, 붙이거나 해제할 때 restaurant.has_mapae를 함께 바꾼다(한 트랜잭션). 해제해도 행은 지우지 않는다(이력)
+model RestaurantMapae {
+  id            BigInt     @id @default(autoincrement())
+  restaurantId  BigInt     @map("restaurant_id")
+  /// A 뒷광고(협찬을 숨긴 리뷰) / E 리뷰 이벤트(리뷰를 쓰면 혜택을 주는 이벤트)
+  reason        String     @db.Char(1)
+  /// 운영자가 확인한 근거 — 신고 내용, 리뷰 id, 매장 안내문 사진 등 요약
+  evidence      String?    @db.VarChar(500)
+  /// 계기가 된 신고 (있을 때)
+  reportId      BigInt?    @map("report_id")
+  /// 계기가 된 리뷰 — Gemini가 협찬·이벤트 문구를 찾은 리뷰 등 (있을 때)
+  reviewId      BigInt?    @map("review_id")
+  /// A 표시 중 / R 해제
+  status        String     @default("A") @db.Char(1)
+  /// 붙인 운영자 (관리자 화면이 없으면 이름이나 메일)
+  grantedBy     String     @map("granted_by") @db.VarChar(50)
+  grantedAt     DateTime   @map("granted_at")
+  /// 해제 시각 — 이벤트가 끝났거나 잘못 붙인 경우
+  releasedAt    DateTime?  @map("released_at")
+  releaseReason String?    @map("release_reason") @db.VarChar(255)
+  regDate       DateTime   @default(now()) @map("reg_date")
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
+  report        Report?    @relation(fields: [reportId], references: [id])
+  review        Review?    @relation(fields: [reviewId], references: [id])
+
+  @@index([restaurantId, status], map: "restaurant_mapae_restaurant_idx")
+  @@map("restaurant_mapae")
+}
+
 model RestaurantStat {
   restaurantId       BigInt     @id @map("restaurant_id")
   /// 인증 평가 수 (공개 리뷰)
@@ -301,10 +348,14 @@ model RestaurantStat {
   photoReviewCount   Int        @default(0) @map("photo_review_count")
   /// 리뷰 score_avg의 합 — 단순 평균 = score_sum / review_count
   scoreSum           Decimal    @default(0) @map("score_sum") @db.Decimal(12, 1)
-  /// 공개 리뷰 score_weight 합계
-  weightSum          Decimal    @default(0) @map("weight_sum") @db.Decimal(10, 2)
-  /// 리뷰마다 score_avg × score_weight를 더한 값 — 화면의 대표 별점 = weighted_score_sum / weight_sum (신뢰 온도가 낮은 리뷰는 덜 반영)
-  weightedScoreSum   Decimal    @default(0) @map("weighted_score_sum") @db.Decimal(12, 2)
+  /// Σw — 계산에 넣는 공개 리뷰의 최종 가중치 w = score_weight × 시간 감쇠 d 의 합 (ERD v1.0)
+  weightSum          Decimal    @default(0) @map("weight_sum") @db.Decimal(10, 3)
+  /// Σ(w × r) — 같은 리뷰들의 최종 가중치 × 별점 합
+  weightedScoreSum   Decimal    @default(0) @map("weighted_score_sum") @db.Decimal(12, 3)
+  /// 화면의 대표 별점 R = (C × m + Σ(w × r)) / (C + Σw), 소수 첫째 자리. C·m은 rating_param(PRIOR_WEIGHT, GLOBAL_MEAN). 리뷰가 0개면 null → "아직 별점이 없어요"
+  displayScore       Decimal?   @map("display_score") @db.Decimal(2, 1)
+  /// display_score를 계산한 시각
+  displayScoreAt     DateTime?  @map("display_score_at")
   tasteSum           Int        @default(0) @map("taste_sum")
   cleanlinessSum     Int        @default(0) @map("cleanliness_sum")
   portionSum         Int        @default(0) @map("portion_sum")
@@ -511,6 +562,7 @@ model Review {
   restaurant      Restaurant       @relation(fields: [restaurantId], references: [id])
   reviewImages    ReviewImage[]
   reviewReactions ReviewReaction[]
+  mapaes          RestaurantMapae[]
 
   @@index([restaurantId, status, regDate], map: "review_restaurant_latest_idx")
   @@index([restaurantId, status, helpfulCount], map: "review_restaurant_helpful_idx")
@@ -965,7 +1017,7 @@ model Report {
   /// R 리뷰 / M 회원
   targetType  String    @map("target_type") @db.Char(1)
   targetId    BigInt    @map("target_id")
-  /// SPAM / ABUSE / FAKE / PRIVACY / ETC
+  /// SPAM 스팸·광고 / AD 뒷광고·리뷰 이벤트(협찬을 숨긴 리뷰) / ABUSE 욕설·비방 / FAKE 가짜 리뷰 / PRIVACY 개인정보 노출 / ETC 기타
   reason      String    @db.VarChar(20)
   /// 자세한 내용 (선택, 200자)
   detail      String?   @db.VarChar(200)
@@ -974,6 +1026,7 @@ model Report {
   processedAt DateTime? @map("processed_at")
   regDate     DateTime  @default(now()) @map("reg_date")
   reporter    Member    @relation(fields: [reporterId], references: [id])
+  mapaes      RestaurantMapae[]
 
   @@unique([reporterId, targetType, targetId], map: "report_once_uk")
   @@index([targetType, targetId], map: "report_target_idx")
@@ -990,4 +1043,15 @@ model MemberBlock {
 
   @@id([blockerId, blockedId])
   @@map("member_block")
+}
+
+/// 신뢰도 가중 별점 계산식의 계수와 전체 평균 m (2026-11-05, ERD v1.0). 계수는 베타 운영·검증 실험 후 조정할 예정이라 코드가 아니라 표에 둔다. GLOBAL_MEAN은 하루 1번 배치가 공개 리뷰 별점 평균으로 바꾼다
+model RatingParam {
+  /// GLOBAL_MEAN 전체 평균 별점 m / PRIOR_WEIGHT 보정 강도 C / TEMP_BASE / HELP_POS / HELP_NEG / HELP_FULL_COUNT / REVISIT_WEIGHT / DECAY_RATE / DECAY_MIN / DECAY_MONTHS / TRUST_MIN / TRUST_MAX
+  code        String    @id @db.VarChar(30)
+  value       Decimal   @db.Decimal(8, 4)
+  description String?   @db.VarChar(100)
+  updateDate  DateTime? @updatedAt @map("update_date")
+
+  @@map("rating_param")
 }
