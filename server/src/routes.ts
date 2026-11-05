@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authRouter } from './modules/auth/auth.router';
 import { healthRouter } from './modules/health/health.router';
+import { homeRouter, mySummaryRouter } from './modules/home/home.router';
 import { mapRouter } from './modules/map/map.router';
 import { regionRouter } from './modules/region/region.router';
 import { restaurantRouter } from './modules/restaurant/restaurant.router';
@@ -11,6 +12,7 @@ import {
   pointRouter,
   shopRouter,
 } from './modules/mukkaebi/mukkaebi.router';
+import { notificationRouter } from './modules/notification/notification.router';
 import { profileRouter, reportRouter } from './modules/profile/profile.router';
 import { myRankingRouter, rankingRouter, seasonRouter } from './modules/ranking/ranking.router';
 import {
@@ -21,6 +23,12 @@ import {
   visitReviewRouter,
 } from './modules/review/review.router';
 import { savedRouter } from './modules/saved/saved.router';
+import {
+  faqRouter,
+  inquiryRouter,
+  noticeRouter,
+  termsRouter,
+} from './modules/support/support.router';
 import { uploadRouter } from './modules/upload/upload.router';
 import { visitRouter } from './modules/visit/visit.router';
 import { userRouter } from './modules/user/user.router';
@@ -35,6 +43,7 @@ router.use('/health', healthRouter);
 router.use('/auth', authRouter);
 router.use('/users/me/saved-restaurants', savedRouter);
 router.use('/users/me/celebrations', celebrationRouter);
+router.use('/users/me/summary', mySummaryRouter);
 router.use('/users', userRouter);
 router.use('/users', userReviewRouter);
 router.use('/users', myRankingRouter);
@@ -56,3 +65,9 @@ router.use('/rankings', rankingRouter);
 router.use('/characters', characterRouter);
 router.use('/shop', shopRouter);
 router.use('/points', pointRouter);
+router.use('/notifications', notificationRouter);
+router.use('/notices', noticeRouter);
+router.use('/faqs', faqRouter);
+router.use('/inquiries', inquiryRouter);
+router.use('/terms', termsRouter);
+router.use('/home', homeRouter);

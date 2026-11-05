@@ -119,6 +119,13 @@ describe('MAP-02 GET /restaurants/{restaurantId}/preview', () => {
       isSaved: false,
       myConquest: null,
       moving: null,
+      rankPreview: expect.objectContaining({
+        sigunguName: '강서구',
+        conquestCount: 0,
+        conquestCountAfter: 1,
+        currentRank: null,
+        rankAfterConquest: 1,
+      }),
     });
     // 37.5664,126.8447 ↔ 37.5613,126.8545 ≈ 1.04km
     expect(res.body.data.distanceM).toBeGreaterThan(1000);

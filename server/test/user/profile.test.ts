@@ -358,6 +358,7 @@ describe('USER-04 GET /users/me', () => {
       profileImageSource: 'DEFAULT',
       gender: 'M',
       ageGroup: 30,
+      bio: null,
       status: 'A',
       localRegions: [expect.objectContaining({ dongName: '가양동', sigunguName: '강서구' })],
       regDate: toKstIso(me.regDate),
@@ -414,6 +415,7 @@ describe('USER-05 PATCH /users/me', () => {
       nicknameChangeableAt: null,
       gender: 'F',
       ageGroup: 30,
+      bio: null,
     });
   });
 

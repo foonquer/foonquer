@@ -15,7 +15,9 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "job": "tsx src/jobs/run.ts",
+    "job:prod": "node dist/src/jobs/run.js"
   },
   "dependencies": {
     "@google-cloud/storage": "8.4.0",

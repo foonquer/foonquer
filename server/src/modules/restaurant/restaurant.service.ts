@@ -57,7 +57,42 @@ async function loadContext(userId: bigint, restaurantId: bigint) {
     state.conquestState === 'CONQUERED' && state.currentConquest
       ? await conquestReview(state.currentConquest.visitId)
       : null;
-  return { restaurant, state, conquerorCount, review };
+  return { restaurant, state, conquerorCount, review, season };
+}
+
+/**
+ * MAP-02 "정복하면 8위 → 7위": 이번 시즌 그 가게를 아직 정복하지 않았을 때만.
+ * 정복하면 내 정복 수 +1, 순위는 정복 수가 그 이상인 다른 탐험가 수 + 1 (동점이면 먼저 도달한 사람이 위)
+ */
+async function rankPreviewOf(
+  userId: bigint,
+  restaurant: { sigunguId: number; sigungu: { name: string } },
+  season: CurrentSeason | null,
+) {
+  if (!season) return null;
+  const mine = await prisma.seasonRegionStat.findUnique({
+    where: {
+      seasonId_sigunguId_userId: { seasonId: season.id, sigunguId: restaurant.sigunguId, userId },
+    },
+    select: { conquestCount: true, rankNo: true },
+  });
+  const after = (mine?.conquestCount ?? 0) + 1;
+  const ahead = await prisma.seasonRegionStat.count({
+    where: {
+      seasonId: season.id,
+      sigunguId: restaurant.sigunguId,
+      userId: { not: userId },
+      conquestCount: { gte: after },
+    },
+  });
+  return {
+    sigunguId: restaurant.sigunguId,
+    sigunguName: restaurant.sigungu.name,
+    conquestCount: mine?.conquestCount ?? 0,
+    conquestCountAfter: after,
+    currentRank: mine?.rankNo ?? null,
+    rankAfterConquest: ahead + 1,
+  };
 }
 
 /** MAP-02 가게 미리보기 */
@@ -67,9 +102,16 @@ export async function getRestaurantPreview(
   from: RestaurantLocationQuery,
   now = new Date(),
 ) {
-  const { restaurant: r, state, conquerorCount, review } = await loadContext(userId, restaurantId);
+  const {
+    restaurant: r,
+    state,
+    conquerorCount,
+    review,
+    season,
+  } = await loadContext(userId, restaurantId);
   const conquest = state.conquestState === 'CONQUERED' ? state.currentConquest : null;
   const moving = state.conquestState === 'MOVING' ? state.movingVisit : null;
+  const rankPreview = state.currentConquest ? null : await rankPreviewOf(userId, r, season);
 
   return {
     restaurantId: r.id,
@@ -97,6 +139,7 @@ export async function getRestaurantPreview(
         }
       : null,
     moving: moving ? { visitId: moving.id, verifiedAt: toKstIsoOrNull(moving.verifiedAt) } : null,
+    rankPreview,
   };
 }
 

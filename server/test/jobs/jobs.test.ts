@@ -1,0 +1,84 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { addDays } from '../../src/common/time';
+import { runCleanupJob, runRatingJob, runSavedReminderJob } from '../../src/jobs/jobs';
+import { prisma } from '../../src/lib/prisma';
+import { notify } from '../../src/modules/notification/notify';
+import { resetDb } from '../helpers/db';
+import {
+  createActiveSeason,
+  createConquest,
+  createMember,
+  createRestaurant,
+  createVisit,
+} from '../helpers/fixtures';
+
+beforeEach(async () => {
+  await resetDb();
+});
+
+describe('주기 작업', () => {
+  it('saved-reminder: 12일 지난 저장(알림 켬, 미정복)만 한 번 알린다', async () => {
+    const season = await createActiveSeason(3);
+    const me = await createMember();
+    const [due, off, conquered, fresh] = await Promise.all(
+      [1, 2, 3, 4].map(() => createRestaurant()),
+    );
+    const old = addDays(new Date(), -13);
+    await prisma.savedRestaurant.createMany({
+      data: [
+        { userId: me.id, restaurantId: due.id, regDate: old },
+        { userId: me.id, restaurantId: off.id, regDate: old, remind: false },
+        { userId: me.id, restaurantId: conquered.id, regDate: old },
+        { userId: me.id, restaurantId: fresh.id },
+      ],
+    });
+    await createConquest(me.id, conquered, season.id);
+    expect(await runSavedReminderJob()).toEqual({ checked: 2, sent: 1 });
+    expect(await runSavedReminderJob()).toEqual({ checked: 0, sent: 0 });
+    const note = await prisma.notification.findFirstOrThrow({
+      where: { userId: me.id, type: 'SAVED_REMINDER' },
+    });
+    expect(note.refId).toBe(due.id);
+  });
+
+  it('cleanup: 30일 지난 알림을 지운다', async () => {
+    const me = await createMember();
+    await notify(
+      prisma,
+      me.id,
+      { category: 'NOTICE', type: 'NOTICE', title: '옛', content: '' },
+      addDays(new Date(), -31),
+    );
+    await notify(prisma, me.id, { category: 'NOTICE', type: 'NOTICE', title: '새', content: '' });
+    expect((await runCleanupJob()).notifications).toBe(1);
+  });
+
+  it('rating: 6개월 지난 리뷰는 시간 감쇠로 덜 반영한다', async () => {
+    const season = await createActiveSeason(3);
+    const shop = await createRestaurant();
+    const a = await createMember();
+    const b = await createMember();
+    const v1 = await createVisit(a.id, shop.id, { seasonId: season.id });
+    const v2 = await createVisit(b.id, shop.id, { seasonId: season.id });
+    await prisma.review.create({
+      data: {
+        visitId: v1.id,
+        userId: a.id,
+        restaurantId: shop.id,
+        overallScore: 1,
+        regDate: addDays(new Date(), -400),
+      },
+    });
+    await prisma.review.create({
+      data: { visitId: v2.id, userId: b.id, restaurantId: shop.id, overallScore: 5 },
+    });
+    await runRatingJob();
+    const stat = await prisma.restaurantStat.findUniqueOrThrow({
+      where: { restaurantId: shop.id },
+    });
+    // w1 = 1 × 0.49(13개월 → 0.7²), w2 = 1 → R = (5×3.8 + 0.49×1 + 5) / (5 + 1.49) ≈ 3.8
+    expect(stat.weightSum.toNumber()).toBeCloseTo(1.49, 2);
+    expect(stat.displayScore?.toNumber()).toBe(3.8);
+    expect(stat.scoreSum.toNumber()).toBe(6);
+  });
+});
