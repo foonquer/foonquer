@@ -26,7 +26,7 @@ export function AddLocalRegionPage() {
 
   const items = list.data?.items ?? [];
   const first = items[0];
-  const max = list.data?.maxCount ?? 3;
+  const max = list.data?.maxCount ?? 2;
   // 주소로 바로 들어와도 목록 화면과 같은 조건으로 막는다 (목록을 못 받으면 서버가 판단)
   const blockedReason = !list.data
     ? null

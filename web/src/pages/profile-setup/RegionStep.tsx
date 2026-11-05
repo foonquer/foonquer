@@ -10,8 +10,8 @@ import { errorMessage } from '../../lib/api';
 import { StepHeader } from './StepHeader';
 import styles from './ProfileSetup.module.css';
 
-/** 내 동네는 최대 3곳 (서버 LOCAL_REGION_COUNT_INVALID와 같다) */
-const MAX_REGIONS = 3;
+/** 내 동네는 사는 동네 + 1곳, 최대 2곳 (서버 LOCAL_REGION_COUNT_INVALID와 같다) */
+const MAX_REGIONS = 2;
 
 type Props = {
   regions: Dong[];
@@ -96,7 +96,7 @@ export function RegionStep({ regions, onChange, onSubmit, saving }: Props) {
         step={3}
         name="내 동네"
         title={'자주 가는 동네를\n골라주세요'}
-        description={`집·직장 근처 등 최대 ${MAX_REGIONS}곳까지 고를 수 있어요`}
+        description={`사는 동네 외에 1곳 더, 최대 ${MAX_REGIONS}곳까지 고를 수 있어요`}
       />
       <div className={styles.regionContent}>
         <DongFinder

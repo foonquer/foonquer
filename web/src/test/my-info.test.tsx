@@ -30,7 +30,7 @@ const me = {
 const regions = (canChange = true) => ({
   items: me.localRegions,
   minCount: 1,
-  maxCount: 3,
+  maxCount: 2,
   canChange,
   nextChangeAvailableAt: canChange ? null : '2027-01-01',
 });
@@ -130,7 +130,8 @@ describe('내 동네 관리 (LOCAL-01·02·03)', () => {
 
   it('동을 찾아 고르고 확인하면 내 동네에 추가한다', async () => {
     const server = mockApi({
-      'GET /users/me/local-regions': ok(regions()),
+      // 최대 2곳이라 1곳만 있을 때 추가할 수 있다
+      'GET /users/me/local-regions': ok({ ...regions(), items: [me.localRegions[0]] }),
       'GET /regions/search': ok({
         keyword: '성수',
         items: [

@@ -213,7 +213,7 @@ function ProfileForm({ me }: { me: MyProfile }) {
             <span className={styles.regionChange}>변경</span>
           </Link>
           <p className={styles.info}>
-            {'내 동네는 최대 3곳까지 고를 수 있고,\n고른 동네에서 쓴 리뷰에는 ‘로컬’이 표시돼요'}
+            {'내 동네는 최대 2곳까지 고를 수 있고,\n고른 동네에서 쓴 리뷰에는 ‘로컬’이 표시돼요'}
           </p>
         </div>
       </div>
