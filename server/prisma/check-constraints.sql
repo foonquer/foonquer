@@ -1,7 +1,7 @@
 -- CHECK 제약 (ERD checks) — Prisma 스키마로 표현할 수 없어 직접 추가한다
 ALTER TABLE `member` ADD CONSTRAINT `member_point_balance_chk` CHECK (point_balance >= 0);
-ALTER TABLE `member` ADD CONSTRAINT `member_trust_temp_chk` CHECK (trust_temp between 0 and 99.9);
-ALTER TABLE `member_local_region` ADD CONSTRAINT `member_local_region_order_chk` CHECK (sort_order between 0 and 2);
+ALTER TABLE `member` ADD CONSTRAINT `member_trust_temp_chk` CHECK (trust_temp between 1 and 99);
+ALTER TABLE `member_local_region` ADD CONSTRAINT `member_local_region_order_chk` CHECK (sort_order between 0 and 1);
 ALTER TABLE `season` ADD CONSTRAINT `season_period_chk` CHECK (start_date < end_date);
 ALTER TABLE `visit` ADD CONSTRAINT `visit_restaurant_required_chk` CHECK (status in ('P','R','F') or restaurant_id is not null);
 ALTER TABLE `visit` ADD CONSTRAINT `visit_amount_chk` CHECK (total_amount is null or total_amount >= 0);
@@ -9,10 +9,11 @@ ALTER TABLE `visit` ADD CONSTRAINT `visit_method_chk` CHECK (method in ('R','S')
 ALTER TABLE `visit` ADD CONSTRAINT `visit_receipt_image_chk` CHECK (method <> 'R' or receipt_image_key is not null);
 ALTER TABLE `visit` ADD CONSTRAINT `visit_checkin_chk` CHECK (method <> 'S' or (checkin_lat is not null and checkin_lng is not null));
 ALTER TABLE `visit` ADD CONSTRAINT `visit_site_photo_chk` CHECK (method <> 'S' or status not in ('V','C') or site_photo_key is not null);
-ALTER TABLE `review` ADD CONSTRAINT `review_taste_chk` CHECK (taste between 1 and 5);
-ALTER TABLE `review` ADD CONSTRAINT `review_detail_score_chk` CHECK ((cleanliness is null or cleanliness between 1 and 5) and (portion is null or portion between 1 and 5) and (service is null or service between 1 and 5) and (price is null or price between 1 and 5));
+ALTER TABLE `review` ADD CONSTRAINT `review_overall_score_chk` CHECK (overall_score between 0.5 and 5.0 and overall_score * 2 = floor(overall_score * 2));
+ALTER TABLE `review` ADD CONSTRAINT `review_detail_score_chk` CHECK ((taste is null and cleanliness is null and portion is null and service is null and price is null) or (taste between 1 and 5 and cleanliness between 1 and 5 and portion between 1 and 5 and service between 1 and 5 and price between 1 and 5));
 ALTER TABLE `review` ADD CONSTRAINT `review_image_count_chk` CHECK (image_count between 0 and 5);
-ALTER TABLE `review` ADD CONSTRAINT `review_weight_chk` CHECK (score_weight between 0 and 1);
+ALTER TABLE `review` ADD CONSTRAINT `review_weight_chk` CHECK (score_weight between 0.5 and 2.2);
+ALTER TABLE `review` ADD CONSTRAINT `review_status_chk` CHECK (status in ('A','H','F','D'));
 ALTER TABLE `season_reward_rule` ADD CONSTRAINT `season_reward_rule_type_chk` CHECK (rule_type in ('R','P'));
 ALTER TABLE `level_policy` ADD CONSTRAINT `level_policy_stage_chk` CHECK (stage in ('E','B','K','A'));
 ALTER TABLE `level_policy` ADD CONSTRAINT `level_policy_size_chk` CHECK (size_percent between 1 and 100);
@@ -26,3 +27,4 @@ ALTER TABLE `item_recipe` ADD CONSTRAINT `item_recipe_count_chk` CHECK (material
 ALTER TABLE `member_item` ADD CONSTRAINT `member_item_quantity_chk` CHECK (quantity >= 0);
 ALTER TABLE `restaurant_mapae` ADD CONSTRAINT `restaurant_mapae_reason_chk` CHECK (reason in ('A','E'));
 ALTER TABLE `restaurant_mapae` ADD CONSTRAINT `restaurant_mapae_status_chk` CHECK (status in ('A','R'));
+ALTER TABLE `review_aspect_mark` ADD CONSTRAINT `review_aspect_mark_polarity_chk` CHECK (polarity in ('G','B'));
