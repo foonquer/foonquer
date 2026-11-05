@@ -36,7 +36,7 @@ export const picksBody = z.object({
     )
     .max(MAX_PICKS, { error: 'TOO_MANY_PICKS' })
     .refine((list) => new Set(list.map((p) => p.restaurantId)).size === list.length, {
-      error: 'PICK_NOT_CONQUERED',
+      error: 'PICK_DUPLICATE',
     }),
 });
 export type PicksBody = z.infer<typeof picksBody>;

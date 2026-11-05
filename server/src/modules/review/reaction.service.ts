@@ -37,6 +37,10 @@ async function findReactable(reviewId: number) {
   return review;
 }
 
+async function lockReview(tx: Tx, reviewId: bigint) {
+  await tx.$queryRaw`SELECT id FROM review WHERE id = ${reviewId} FOR UPDATE`;
+}
+
 /** 리뷰의 반응 수를 review_reaction에서 다시 센다 */
 async function recountReactions(tx: Tx, reviewId: bigint) {
   const [helpful, visitorHelpful, unhelpful] = await Promise.all([
@@ -51,15 +55,30 @@ async function recountReactions(tx: Tx, reviewId: bigint) {
   });
 }
 
-/** 이번 달에 같은 사람이 같은 작성자의 다른 리뷰에 준 같은 반응 중 계산에 넣은 수 */
+/**
+ * 이번 달에 같은 사람이 같은 작성자의 다른 리뷰에 준 같은 반응 중 계산에 넣은 수.
+ * 도움돼요는 이미 준 효과(온도 기록)로 센다 — 취소하고 다른 리뷰에 다시 눌러 한도를 피하지 못하게
+ */
 async function countedThisMonth(
   tx: Tx,
   actorId: bigint,
   authorId: bigint,
   type: 'H' | 'U',
   exceptReviewId: bigint,
+  exceptReactionId: bigint | undefined,
   now: Date,
 ) {
+  if (type === 'H') {
+    return tx.trustTempLog.count({
+      where: {
+        userId: authorId,
+        actorId,
+        reason: { in: ['HELPFUL_VISITOR', 'HELPFUL_GUEST'] },
+        regDate: { gte: kstStartOfMonth(now) },
+        ...(exceptReactionId ? { NOT: { refId: exceptReactionId } } : {}),
+      },
+    });
+  }
   return tx.reviewReaction.count({
     where: {
       userId: actorId,
@@ -132,6 +151,8 @@ export async function reactToReview(
   if (type === 'U' && !isVisitor) throw new AppError(ReviewError.VISIT_REQUIRED);
 
   const counts = await prisma.$transaction(async (tx) => {
+    // 같은 리뷰의 반응을 한 줄로 세워 수가 어긋나거나 첫 반응이 겹쳐 500이 나지 않게 한다
+    await lockReview(tx, review.id);
     const existing = await tx.reviewReaction.findUnique({
       where: { reviewId_userId: { reviewId: review.id, userId } },
     });
@@ -142,7 +163,7 @@ export async function reactToReview(
       });
     }
     const isCounted =
-      (await countedThisMonth(tx, userId, review.userId, type, review.id, now)) <
+      (await countedThisMonth(tx, userId, review.userId, type, review.id, existing?.id, now)) <
       MONTHLY_LIMIT[type];
     const reaction = existing
       ? await tx.reviewReaction.update({
@@ -221,6 +242,7 @@ export async function reactToReview(
 export async function cancelReaction(userId: bigint, reviewId: number, now = new Date()) {
   const review = await findReactable(reviewId);
   const counts = await prisma.$transaction(async (tx) => {
+    await lockReview(tx, review.id);
     const existing = await tx.reviewReaction.findUnique({
       where: { reviewId_userId: { reviewId: review.id, userId } },
     });
