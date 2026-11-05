@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# GitHub Actions가 aws ssm send-command(AWS-RunShellScript)로 EC2에서 실행하는
-# 배포 스크립트. SSM Run Command는 기본적으로 root로 실행되므로, ec2-user
-# 홈 디렉터리 기준 경로(git 저장소, docker compose)를 그대로 쓰기 위해
-# ec2-user 로그인 셸로 재실행한다.
+# GitHub Actions가 gcloud compute ssh --tunnel-through-iap로 Compute Engine VM에서 실행하는
+# 배포 스크립트 (워크플로가 이 파일을 stdin으로 넘긴다: ... --command 'bash -s' < scripts/deploy-remote.sh).
+# 22번 포트는 IAP 대역(35.235.240.0/20)에만 열어 두고, 저장소와 docker compose는
+# 배포용 사용자(deploy) 홈 디렉터리 기준이라 그 사용자 로그인 셸로 재실행한다.
 #
 # __GHCR_ACTOR__ / __GHCR_TOKEN__ 는 워크플로에서 sed로 실제 값을 채워 넣는
 # 플레이스홀더다 (GitHub Actions ${{ }} 치환은 이 파일엔 안 먹히므로).
 #
 # 모노레포: 저장소 루트(~/foonquer)에 docker-compose.yml과 .env가 있고,
 # 서버 이미지는 GitHub Actions에서 server/Dockerfile로 빌드해 GHCR에 올린다.
-# EC2는 이미지를 pull만 한다.
+# VM은 이미지를 pull만 한다.
 
 set -e
 
-sudo -iu ec2-user bash -s <<'DEPLOY_SCRIPT'
+sudo -iu deploy bash -s <<'DEPLOY_SCRIPT'
 set -e
 cd ~/foonquer
 
@@ -21,12 +21,12 @@ git fetch origin
 git checkout develop
 git pull origin develop
 
-aws ssm get-parameters-by-path --path "/foonquer/prod" --with-decryption \
-  --region ap-northeast-2 --query "Parameters[*].[Name,Value]" --output text \
-  | awk -F'\t' '{ n=split($1,a,"/"); print a[n]"="$2 }' > .env.new
+# 운영 환경변수는 Secret Manager의 foonquer-prod-env 하나에 .env 파일 내용 그대로 둔다.
+# VM 서비스 계정에 roles/secretmanager.secretAccessor가 필요하다.
+gcloud secrets versions access latest --secret=foonquer-prod-env > .env.new
 
 if [ ! -s .env.new ]; then
-  echo "SSM Parameter Store fetch failed or empty, aborting" >&2
+  echo "Secret Manager fetch failed or empty, aborting" >&2
   rm -f .env.new
   exit 1
 fi
@@ -35,8 +35,7 @@ chmod 600 .env
 
 echo '__GHCR_TOKEN__' | docker login ghcr.io -u __GHCR_ACTOR__ --password-stdin
 
-# --quiet: SSM Run Command는 stdout을 약 24KB에서 잘라버려서, pull 진행률
-# 로그가 길면 뒤에 나오는 up -d/prune 결과가 잘려서 안 보이게 된다.
+# --quiet: pull 진행률 로그가 길면 Actions 로그에서 뒤의 up -d/prune 결과를 찾기 어렵다.
 docker compose pull --quiet
 
 # < /dev/null: docker compose run은 기본적으로 컨테이너 stdin을 호출한 셸의
