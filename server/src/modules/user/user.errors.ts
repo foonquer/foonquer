@@ -3,6 +3,7 @@ import { defineErrors, type ErrorCodeDef } from '../../common/errors/error-codes
 // 코드 이름·상태·문구는 API 명세서 USER-01~07, LOCAL-01~03, SET-02·04의 Error 항목을 그대로 옮겼다.
 
 export const UserError = defineErrors({
+  MEMBER_NOT_FOUND: { status: 404, code: 'MEMBER_NOT_FOUND', message: '탐험가를 찾을 수 없어요.' },
   NICKNAME_REQUIRED: { status: 400, code: 'NICKNAME_REQUIRED', message: '닉네임을 입력해 주세요.' },
   INVALID_NICKNAME: {
     status: 400,

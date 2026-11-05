@@ -5,7 +5,17 @@ import { mapRouter } from './modules/map/map.router';
 import { regionRouter } from './modules/region/region.router';
 import { restaurantRouter } from './modules/restaurant/restaurant.router';
 import { recommendationRouter, searchRouter } from './modules/search/search.router';
+import { profileRouter, reportRouter } from './modules/profile/profile.router';
+import {
+  restaurantReviewRouter,
+  reviewAspectRouter,
+  reviewRouter,
+  userReviewRouter,
+  visitReviewRouter,
+} from './modules/review/review.router';
+import { savedRouter } from './modules/saved/saved.router';
 import { uploadRouter } from './modules/upload/upload.router';
+import { visitRouter } from './modules/visit/visit.router';
 import { userRouter } from './modules/user/user.router';
 
 /**
@@ -16,10 +26,19 @@ export const router = Router();
 
 router.use('/health', healthRouter);
 router.use('/auth', authRouter);
+router.use('/users/me/saved-restaurants', savedRouter);
 router.use('/users', userRouter);
+router.use('/users', userReviewRouter);
+router.use('/users', profileRouter);
 router.use('/regions', regionRouter);
 router.use('/map', mapRouter);
 router.use('/restaurants', restaurantRouter);
+router.use('/restaurants', restaurantReviewRouter);
 router.use('/search', searchRouter);
 router.use('/recommendations', recommendationRouter);
 router.use('/uploads', uploadRouter);
+router.use('/visit-verifications', visitRouter);
+router.use('/visits', visitReviewRouter);
+router.use('/reviews', reviewRouter);
+router.use('/review-aspects', reviewAspectRouter);
+router.use('/reports', reportRouter);
