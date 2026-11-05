@@ -39,16 +39,19 @@ export function localVisitRateOf(stat: Stat) {
   return stat ? percent(stat.localVisitCount, stat.visitCount) : null;
 }
 
-/** REST-01 stats. 맛은 review_count, 나머지 항목과 재방문 의사는 detail_review_count가 분모 */
+/**
+ * REST-01 stats. 세부 별점 5항목은 detail_review_count가 분모(다섯 항목을 모두 남기거나 모두 비운다),
+ * 재방문 의사 %는 종합 별점 2.5 이상 리뷰 수(revisit_intent_count) ÷ review_count (ERD v1.0)
+ */
 export function detailStatsOf(stat: Stat) {
   const detail = stat?.detailReviewCount ?? 0;
   return {
-    taste: stat ? average(stat.tasteSum, stat.reviewCount) : null,
+    taste: stat ? average(stat.tasteSum, detail) : null,
     cleanliness: stat ? average(stat.cleanlinessSum, detail) : null,
     portion: stat ? average(stat.portionSum, detail) : null,
     service: stat ? average(stat.serviceSum, detail) : null,
     price: stat ? average(stat.priceSum, detail) : null,
-    revisitIntentRate: stat ? percent(stat.revisitIntentCount, detail) : null,
+    revisitIntentRate: stat ? percent(stat.revisitIntentCount, stat.reviewCount) : null,
     localVisitRate: localVisitRateOf(stat),
     revisitRate: revisitRateOf(stat),
     textReviewCount: stat?.textReviewCount ?? 0,
