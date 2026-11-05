@@ -10,13 +10,12 @@ import { signIn, signOut } from '../../lib/session';
 const ERROR_MESSAGES: Record<string, string> = {
   OAUTH_CANCELLED: '로그인을 취소했어요.',
   OAUTH_STATE_MISMATCH: '로그인 요청이 올바르지 않아요. 다시 시도해 주세요.',
-  UNSUPPORTED_PROVIDER: '지원하지 않는 로그인 방식이에요.',
-  SOCIAL_LOGIN_FAILED: '소셜 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.',
+  SOCIAL_LOGIN_FAILED: '카카오 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.',
 };
 
 /**
  * /oauth/callback?code= (또는 ?error=)
- * 서버가 준 일회용 코드를 로그인 결과로 바꾼다 (AUTH-08). 같은 이메일 계정이 있으면 연동 확인 화면으로.
+ * 서버가 준 일회용 코드를 카카오 로그인 결과로 바꾼다 (AUTH-08).
  */
 export function OAuthCallbackPage() {
   const navigate = useNavigate();
@@ -46,11 +45,6 @@ export function OAuthCallbackPage() {
 
     exchangeOAuthCode(code).then(
       (result) => {
-        if (result.nextAction === 'ACCOUNT_LINK_REQUIRED') {
-          signOut(); // 아직 로그인하지 않았다 (토큰 없음)
-          navigate('/oauth/link', { replace: true, state: result });
-          return;
-        }
         signIn(result.accessToken, result.nextAction);
         navigate(PATH_OF[result.nextAction], { replace: true });
       },

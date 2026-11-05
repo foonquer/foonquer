@@ -56,13 +56,6 @@
   color: var(--mk-subtle);
 }
 
-.toggle {
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--mk-subtle);
-}
-
 .message {
   font-size: 12px;
   font-weight: 500;

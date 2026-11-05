@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { logout } from '../../api/auth';
-import { getMe, LOGIN_METHOD_LABEL } from '../../api/users';
+import { getMe } from '../../api/users';
 import { AppHeader } from '../../components/AppHeader';
 import { Dialog } from '../../components/Dialog';
 import { MenuList, MenuSection } from '../../components/MenuList';
@@ -48,7 +48,7 @@ function useLocationPermission() {
   return [state, setState] as const;
 }
 
-/** 설정 /me/settings: 위치 권한·내 동네·연결된 계정·비밀번호 변경·로그아웃(AUTH-11) */
+/** 설정 /me/settings: 위치 권한·내 동네·연결된 계정(카카오)·로그아웃(AUTH-11) */
 export function SettingsPage() {
   const toast = useToast();
   const me = useAsync(getMe, []);
@@ -60,8 +60,6 @@ export function SettingsPage() {
   const regionText = regions[0]
     ? `${regions[0].sigunguName} ${regions[0].dongName}${regions.length > 1 ? ` 외 ${regions.length - 1}곳` : ''}`
     : '';
-  const methods = me.data?.loginMethods ?? [];
-  const hasPassword = methods.includes('EMAIL');
 
   // 화면에 보이는 권한은 오래된 값일 수 있어(변경을 지켜보지 못하는 브라우저) 누를 때마다 다시 확인한다
   const askLocation = () => {
@@ -110,18 +108,8 @@ export function SettingsPage() {
         <MenuSection title="계정">
           <MenuList
             items={[
-              // 못 불러왔으면 비밀번호 변경 메뉴를 보여 줄지 모르니, 다시 불러오게 한다
-              me.error
-                ? {
-                    label: '연결된 계정',
-                    value: '불러오지 못했어요 · 다시 시도',
-                    onClick: me.reload,
-                  }
-                : {
-                    label: '연결된 계정',
-                    value: methods.map((m) => LOGIN_METHOD_LABEL[m]).join(' · '),
-                  },
-              ...(hasPassword ? [{ label: '비밀번호 변경', to: '/me/password' }] : []),
+              // 로그인은 카카오 하나만 쓴다
+              { label: '연결된 계정', value: '카카오' },
               { label: '로그아웃', onClick: () => setLogoutOpen(true) },
               { label: '회원 탈퇴', to: '/me/withdraw', muted: true },
             ]}

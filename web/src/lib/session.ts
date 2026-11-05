@@ -34,7 +34,7 @@ export function getSession() {
   return session;
 }
 
-/** 로그인·회원가입·소셜 로그인·토큰 재발급이 성공했을 때 */
+/** 카카오 로그인·토큰 재발급이 성공했을 때 */
 export function signIn(token: string, nextAction: NextAction) {
   generation += 1;
   accessToken = token;
@@ -46,11 +46,6 @@ export function setNextAction(nextAction: NextAction) {
   if (session.status === 'authed' && session.nextAction !== nextAction) {
     setSession({ status: 'authed', nextAction });
   }
-}
-
-/** accessToken만 바꾼다 (비밀번호 변경 SET-05가 새 토큰을 준다) */
-export function replaceAccessToken(token: string) {
-  accessToken = token;
 }
 
 /** 로그아웃·재발급 실패. 서버 쿠키는 POST /auth/logout이 지운다 */
