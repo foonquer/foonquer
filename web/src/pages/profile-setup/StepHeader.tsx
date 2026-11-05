@@ -5,7 +5,7 @@ import styles from './ProfileSetup.module.css';
 type Props = {
   /** 1 ~ 3 */
   step: number;
-  /** 단계 칩 이름 (닉네임 / 기본 정보 / 내 동네) */
+  /** 단계 칩 이름 (닉네임 / 기본 정보 · 좋아하는 음식 / 내 동네) */
   name: string;
   title: string;
   description: string;

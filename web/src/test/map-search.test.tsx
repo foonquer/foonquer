@@ -211,6 +211,7 @@ describe('음식점 상세 (REST-01)', () => {
         businessHours: null,
         businessStatus: null,
         rating: { score: 4.2, reviewCount: 86 },
+        hasMapae: true,
         stats: {
           taste: 4.6,
           cleanliness: 4.3,
@@ -240,6 +241,10 @@ describe('음식점 상세 (REST-01)', () => {
 
     expect(await screen.findByRole('heading', { name: '이가네떡볶이' })).toBeInTheDocument();
     expect(screen.getByText('강서구 가양동 · 서울 강서구 가양로 12')).toBeInTheDocument();
+    expect(screen.getByText('신뢰도 반영')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '마패' })).toHaveTextContent(
+      '리뷰 이벤트를 하는 가게입니다',
+    );
     expect(screen.getByText('영업시간 정보가 아직 없어요')).toBeInTheDocument();
     expect(screen.getByText('현지인 방문 72% · 재방문 38%')).toBeInTheDocument();
     expect(screen.getByText('내 평가 ★ 4.8')).toBeInTheDocument();
@@ -371,6 +376,7 @@ describe('추천맛집 (RECO-01)', () => {
       'GET /recommendations': ({ query }) =>
         ok({
           type: query.get('type'),
+          preferredCategories: [{ categoryId: 1, categoryName: '한식' }],
           region: {
             regionId: 11,
             level: 3,
@@ -388,6 +394,7 @@ describe('추천맛집 (RECO-01)', () => {
     renderRoute('/recommendations');
 
     expect(await screen.findByText('새맛집')).toBeInTheDocument();
+    expect(screen.getByText('좋아하는 한식 가게부터 보여 드려요.')).toBeInTheDocument();
     expect(screen.getAllByText('동네 주민이 자주 찾는 곳')).toHaveLength(2); // 카드마다
     expect(server.calls('GET /recommendations')[0].query.get('regionId')).toBe('11');
 

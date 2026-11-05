@@ -74,10 +74,12 @@ function Preview({ p }: { p: RestaurantPreview }) {
           <p className={styles.rating}>
             {score ? (
               <>
-                <span className={styles.star}>★</span> {score} · 인증 평가 {p.rating.reviewCount}
+                <span className={styles.star}>★</span> {score}{' '}
+                <span className={styles.trustNote}>신뢰도 반영</span> · 인증 평가{' '}
+                {p.rating.reviewCount}
               </>
             ) : (
-              '아직 인증 평가가 없어요'
+              '아직 별점이 없어요'
             )}
           </p>
           <p className={styles.meta}>

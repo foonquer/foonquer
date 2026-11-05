@@ -62,11 +62,14 @@ export const completeProfile = (body: {
   gender: Gender;
   ageGroup: AgeGroup;
   localRegionIds: number[];
+  /** S-05-1 좋아하는 음식 (카테고리 id 1개 이상) */
+  preferredCategoryIds: number[];
 }) =>
   api.post<{
     nextAction: 'HOME';
     user: { id: number; nickname: string; gender: Gender; ageGroup: AgeGroup };
     localRegions: LocalRegion[];
+    preferredCategories: { categoryId: number; categoryName: string }[];
     welcome: Welcome;
   }>('/users/me/profile', body);
 

@@ -115,12 +115,13 @@ function Detail({ r }: { r: RestaurantDetail }) {
           <p className={styles.rating}>
             {score ? (
               <>
-                <span className={styles.star}>★</span> {score}
+                <span className={styles.star}>★</span> {score}{' '}
+                <span className={styles.trustNote}>신뢰도 반영</span>
                 <span className={styles.gap} />
                 인증 평가 {r.rating.reviewCount}
               </>
             ) : (
-              '아직 인증 평가가 없어요'
+              '아직 별점이 없어요'
             )}
           </p>
           {r.my.conquestState === 'CONQUERED' && myScore && (
@@ -133,6 +134,18 @@ function Detail({ r }: { r: RestaurantDetail }) {
             r.distanceM !== null ? `현재 위치에서 ${formatDistance(r.distanceM)}` : null,
           ])}
         </p>
+
+        {r.hasMapae && (
+          <section className={styles.mapae} aria-label="마패">
+            <span className={styles.mapaeIcon} aria-hidden="true">
+              마패
+            </span>
+            <div>
+              <p className={styles.mapaeTitle}>리뷰 이벤트를 하는 가게입니다</p>
+              <p className={styles.mapaeSub}>뒷광고 또는 리뷰 이벤트가 확인된 가게예요</p>
+            </div>
+          </section>
+        )}
 
         <section className={styles.infoCard} aria-label="가게 정보">
           <p className={styles.address}>

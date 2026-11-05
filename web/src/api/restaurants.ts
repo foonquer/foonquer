@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 
 export type ConquestState = 'CONQUERED' | 'MOVING' | 'NOT_CONQUERED';
 
+/** score: 신뢰도 가중 별점 R (리뷰가 없거나 아직 계산 전이면 null → "아직 별점이 없어요") */
 export type Rating = { score: number | null; reviewCount: number };
 
 export type BusinessStatus = {
@@ -47,6 +48,8 @@ export type RestaurantPreview = {
   dongName: string | null;
   distanceM: number | null;
   rating: Rating;
+  /** 마패: 뒷광고·리뷰 이벤트가 확인된 가게 */
+  hasMapae: boolean;
   businessStatus: BusinessStatus | null;
   currentSeasonConquerorCount: number;
   conquestState: ConquestState;
@@ -87,6 +90,8 @@ export type RestaurantDetail = {
   businessHours: Record<string, { open: string; close: string }[]> | null;
   businessStatus: BusinessStatus | null;
   rating: Rating;
+  /** 마패: 뒷광고·리뷰 이벤트가 확인된 가게 → "리뷰 이벤트를 하는 가게입니다" */
+  hasMapae: boolean;
   stats: {
     taste: number | null;
     cleanliness: number | null;
@@ -132,6 +137,7 @@ export type RestaurantCardItem = {
   categoryName: string | null;
   distanceM: number | null;
   rating: Rating;
+  hasMapae: boolean;
   revisitRate: number | null;
   localVisitRate: number | null;
   conquestState: ConquestState;
@@ -181,6 +187,8 @@ export const getRecommendations = (query: {
 }) =>
   api.get<{
     type: RecommendationType;
+    /** 좋아하는 음식(S-05-1) 가게를 먼저 보여 줬으면 그 카테고리 (카테고리를 골랐으면 빈 배열) */
+    preferredCategories: { categoryId: number; categoryName: string }[];
     region: {
       regionId: number;
       level: number;
