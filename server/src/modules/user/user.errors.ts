@@ -1,6 +1,6 @@
 import { defineErrors, type ErrorCodeDef } from '../../common/errors/error-codes';
 
-// 코드 이름·상태·문구는 API 명세서 USER-01·03·05, LOCAL-01~03의 Error 항목을 그대로 옮겼다.
+// 코드 이름·상태·문구는 API 명세서 USER-01~07, LOCAL-01~03, SET-02·04의 Error 항목을 그대로 옮겼다.
 
 export const UserError = defineErrors({
   NICKNAME_REQUIRED: { status: 400, code: 'NICKNAME_REQUIRED', message: '닉네임을 입력해 주세요.' },
@@ -77,6 +77,51 @@ export const UserError = defineErrors({
     status: 409,
     code: 'LOCAL_REGION_MIN_REQUIRED',
     message: '내 동네는 최소 1곳 있어야 해요.',
+  },
+
+  // 프로필 사진 (USER-02·06·07)
+  UNSUPPORTED_IMAGE_TYPE: {
+    status: 400,
+    code: 'UNSUPPORTED_IMAGE_TYPE',
+    message: 'JPG, PNG, WEBP 사진만 올릴 수 있어요.',
+  },
+  IMAGE_TOO_LARGE: {
+    status: 400,
+    code: 'IMAGE_TOO_LARGE',
+    message: '5MB 이하 사진만 올릴 수 있어요.',
+  },
+  UPLOAD_URL_FAILED: {
+    status: 500,
+    code: 'UPLOAD_URL_FAILED',
+    message: '업로드를 준비하지 못했어요.',
+  },
+  IMAGE_KEY_REQUIRED: { status: 400, code: 'IMAGE_KEY_REQUIRED', message: '사진 정보가 필요해요.' },
+  IMAGE_KEY_FORBIDDEN: {
+    status: 403,
+    code: 'IMAGE_KEY_FORBIDDEN',
+    message: '내가 올린 사진이 아니에요.',
+  },
+
+  // 회원 탈퇴 (SET-04)
+  WITHDRAWAL_CONFIRM_REQUIRED: {
+    status: 400,
+    code: 'WITHDRAWAL_CONFIRM_REQUIRED',
+    message: '안내를 모두 확인해 주세요.',
+  },
+  INVALID_WITHDRAWAL_REASON: {
+    status: 400,
+    code: 'INVALID_WITHDRAWAL_REASON',
+    message: '떠나는 이유가 올바르지 않아요.',
+  },
+  REASON_DETAIL_TOO_LONG: {
+    status: 400,
+    code: 'REASON_DETAIL_TOO_LONG',
+    message: '255자 이내로 입력해 주세요.',
+  },
+  MEMBER_ALREADY_WITHDRAWN: {
+    status: 409,
+    code: 'MEMBER_ALREADY_WITHDRAWN',
+    message: '이미 탈퇴한 계정이에요.',
   },
 });
 

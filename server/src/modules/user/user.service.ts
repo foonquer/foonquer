@@ -5,9 +5,9 @@ import { toKoreanMonthDay, toKstIso, toKstIsoOrNull } from '../../common/time';
 import { Prisma } from '../../generated/prisma/client';
 import { publicImageUrl } from '../../lib/image-url';
 import { prisma } from '../../lib/prisma';
-import { objectExists } from '../../lib/storage';
 import { requireSeoulDong } from '../region/region.service';
 import { listLocalRegions } from './local-region.service';
+import { assertProfileImage } from './profile-image.service';
 import { nicknameChangeableAt, nicknameProblem } from './nickname';
 import { UserError } from './user.errors';
 import type { ProfileSetupBody, ProfileUpdateBody } from './user.schema';
@@ -51,14 +51,6 @@ export async function checkNicknameAvailability(userId: bigint, nickname: string
     data: { nickname, available: true, reason: null },
     message: '멋진 이름이에요! 사용할 수 있어요.',
   };
-}
-
-/** 프로필 사진 key는 profile/{내 id}/{uuid}.{jpg|png|webp} 형식이고 스토리지(Cloud Storage)에 실제로 있어야 한다 (USER-02 규칙) */
-async function assertProfileImage(userId: bigint, key: string) {
-  const pattern = new RegExp(`^profile/${userId.toString()}/[0-9a-fA-F-]{36}\\.(jpg|png|webp)$`);
-  if (!pattern.test(key) || !(await objectExists(key))) {
-    throw new AppError(UserError.PROFILE_IMAGE_NOT_FOUND);
-  }
 }
 
 function isUniqueViolation(err: unknown) {
