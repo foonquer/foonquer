@@ -33,6 +33,12 @@ export const profileSetupBody = z.object({
     .min(1, { error: 'LOCAL_REGION_COUNT_INVALID' })
     .max(2, { error: 'LOCAL_REGION_COUNT_INVALID' }) // LOCAL_REGION_MAX와 같다
     .refine((ids) => new Set(ids).size === ids.length, { error: 'LOCAL_REGION_DUPLICATE' }),
+  /** S-05-1 좋아하는 음식 (카테고리 id 1~12개, 첫 추천에 반영) */
+  preferredCategoryIds: z
+    .array(z.number().int().positive(), { error: 'PREFERRED_CATEGORY_INVALID' })
+    .min(1, { error: 'PREFERRED_CATEGORY_INVALID' })
+    .max(12, { error: 'PREFERRED_CATEGORY_INVALID' })
+    .refine((ids) => new Set(ids).size === ids.length, { error: 'PREFERRED_CATEGORY_INVALID' }),
 });
 export type ProfileSetupBody = z.infer<typeof profileSetupBody>;
 

@@ -47,7 +47,7 @@ async function visitWithMenus(
   });
 }
 
-function stat(restaurantId: bigint, data: Record<string, number>) {
+function stat(restaurantId: bigint, data: Record<string, number | null>) {
   return prisma.restaurantStat.create({ data: { restaurantId, ...data } });
 }
 
@@ -179,6 +179,7 @@ describe('SEARCH-02 GET /restaurants/search', () => {
         categoryName: '한식',
         distanceM: null,
         rating: { score: null, reviewCount: 0 },
+        hasMapae: false,
         revisitRate: null,
         localVisitRate: null,
         conquestState: 'NOT_CONQUERED',
@@ -446,6 +447,7 @@ describe('RECO-01 GET /recommendations', () => {
       categoryName: '한식',
       distanceM: null,
       rating: { score: null, reviewCount: 0 },
+      hasMapae: false,
       revisitRate: 0,
       localVisitRate: 100,
       visitorCount: 7,
@@ -467,17 +469,47 @@ describe('RECO-01 GET /recommendations', () => {
     expect(names(res)).toEqual(['C', 'B', 'A']);
   });
 
-  it('RATING: 인증 평가 5개 이상, 대표 별점 → 리뷰 수 → id 순', async () => {
+  it('RATING: 인증 평가 5개 이상, 신뢰도 가중 별점 R(display_score) → 리뷰 수 → id 순', async () => {
     const me = await memberInGayang();
     const a = await createRestaurant({ name: 'A' });
     const b = await createRestaurant({ name: 'B' });
     const few = await createRestaurant({ name: '리뷰적음' });
-    await stat(a.id, { reviewCount: 5, weightSum: 5, weightedScoreSum: 22.5 }); // 4.5
-    await stat(b.id, { reviewCount: 8, weightSum: 4, weightedScoreSum: 19.2 }); // 4.8
-    await stat(few.id, { reviewCount: 4, weightSum: 4, weightedScoreSum: 20 });
+    const notYet = await createRestaurant({ name: '계산전' });
+    await stat(a.id, { reviewCount: 5, displayScore: 4.5 });
+    await stat(b.id, { reviewCount: 8, displayScore: 4.8 });
+    await stat(few.id, { reviewCount: 4, displayScore: 5 });
+    await stat(notYet.id, { reviewCount: 9, displayScore: null });
     const res = await recommend(me.id, { type: 'RATING' });
     expect(names(res)).toEqual(['B', 'A']);
     expect(res.body.data.items[0].rating).toEqual({ score: 4.8, reviewCount: 8 });
+  });
+
+  it('카테고리를 고르지 않으면 좋아하는 음식(S-05-1) 가게를 먼저 보여 준다', async () => {
+    const me = await memberInGayang();
+    await prisma.memberPreferredCategory.createMany({
+      data: [
+        { userId: me.id, categoryId: 6 },
+        { userId: me.id, categoryId: 2 },
+      ],
+    });
+    const korean = await createRestaurant({ name: '한식집', categoryId: 1 });
+    const meat = await createRestaurant({ name: '고깃집', categoryId: 6 });
+    const chinese = await createRestaurant({ name: '중식집', categoryId: 2 });
+    await stat(korean.id, { localVisitCount: 9 });
+    await stat(meat.id, { localVisitCount: 1 });
+    await stat(chinese.id, { localVisitCount: 3 });
+
+    const res = await recommend(me.id);
+    expect(names(res)).toEqual(['중식집', '고깃집', '한식집']);
+    expect(res.body.data.preferredCategories).toEqual([
+      { categoryId: 2, categoryName: '중식' },
+      { categoryId: 6, categoryName: '고깃집' },
+    ]);
+
+    // 카테고리를 고르면 그 카테고리만 보여 주고 좋아하는 음식 안내는 없다
+    const picked = await recommend(me.id, { categoryId: 1 });
+    expect(names(picked)).toEqual(['한식집']);
+    expect(picked.body.data.preferredCategories).toEqual([]);
   });
 
   it('페이지가 넘어가도 rank가 이어진다', async () => {
