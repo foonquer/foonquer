@@ -556,10 +556,10 @@ GCP에서 준비할 것:
 
 | 항목 | 내용 |
 | --- | --- |
-| VM | Compute Engine(서울 `asia-northeast3`), Docker·git 설치, 배포용 사용자 `deploy` 홈에 저장소 clone |
+| VM | Compute Engine(서울 `asia-northeast3`), 액세스 범위(scope) `cloud-platform`으로 생성(기본 범위로는 Secret Manager를 부를 수 없다), Docker·git 설치, 배포용 사용자 `deploy` 홈에 저장소 clone. SSH 사용자가 암호 없이 `deploy`로 전환할 수 있어야 한다(`gcloud compute ssh` 사용자는 기본으로 된다) |
 | VM 서비스 계정 | `roles/secretmanager.secretAccessor`, 사진 버킷의 `roles/storage.objectViewer` (사진 업로드 URL을 서버가 만들게 되면 `roles/storage.objectAdmin`과 서명 권한 `roles/iam.serviceAccountTokenCreator`) |
 | Secret Manager | `foonquer-prod-env` — 운영 `.env` 내용 |
-| Cloud Storage | 사진 버킷. `public/`(프로필·리뷰)만 공개 읽기, `private/`(영수증·현장·문의)는 비공개. 브라우저에서 바로 올리므로 버킷 CORS에 웹 주소와 `PUT` 허용 |
+| Cloud Storage | 공개 사진 버킷(`GCS_BUCKET`, 프로필 `profile/{회원 id}/`·리뷰 사진)은 `allUsers` 읽기 허용, 영수증·현장·문의 사진은 공개하지 않는 별도 버킷에 둔다(그 API를 만들 때 환경변수 추가). 브라우저에서 바로 올리므로 버킷 CORS에 웹 주소와 `PUT` 허용 |
 | DB | Cloud SQL for MySQL 8 또는 VM 안의 MySQL 8 컨테이너. `DATABASE_URL`만 바꾸면 된다 |
 
 GitHub 저장소 설정(Settings → Secrets and variables → Actions)에 필요한 값:

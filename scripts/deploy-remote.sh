@@ -3,6 +3,8 @@
 # 배포 스크립트 (워크플로가 이 파일을 stdin으로 넘긴다: ... --command 'bash -s' < scripts/deploy-remote.sh).
 # 22번 포트는 IAP 대역(35.235.240.0/20)에만 열어 두고, 저장소와 docker compose는
 # 배포용 사용자(deploy) 홈 디렉터리 기준이라 그 사용자 로그인 셸로 재실행한다.
+# SSH 사용자는 암호 없이 deploy로 전환할 수 있어야 한다 (gcloud compute ssh 사용자는 기본으로
+# google-sudoers 그룹이라 된다. 아니면 /etc/sudoers.d에 NOPASSWD로 추가).
 #
 # __GHCR_ACTOR__ / __GHCR_TOKEN__ 는 워크플로에서 sed로 실제 값을 채워 넣는
 # 플레이스홀더다 (GitHub Actions ${{ }} 치환은 이 파일엔 안 먹히므로).
@@ -13,6 +15,11 @@
 
 set -e
 
+if ! sudo -n -u deploy true 2>/dev/null; then
+  echo "이 SSH 사용자는 암호 없이 deploy 사용자로 전환할 수 없어 배포를 멈춘다 (README 배포 참고)" >&2
+  exit 1
+fi
+
 sudo -iu deploy bash -s <<'DEPLOY_SCRIPT'
 set -e
 cd ~/foonquer
@@ -22,8 +29,15 @@ git checkout develop
 git pull origin develop
 
 # 운영 환경변수는 Secret Manager의 foonquer-prod-env 하나에 .env 파일 내용 그대로 둔다.
-# VM 서비스 계정에 roles/secretmanager.secretAccessor가 필요하다.
-gcloud secrets versions access latest --secret=foonquer-prod-env > .env.new
+# VM 서비스 계정에 roles/secretmanager.secretAccessor가 필요하고, VM 액세스 범위(scope)가
+# cloud-platform이어야 한다 (기본 범위로 만든 VM은 Secret Manager를 부를 수 없다).
+# 비밀 값이 담기므로 임시 파일도 소유자만 읽게 만든다.
+umask 077
+if ! gcloud secrets versions access latest --secret=foonquer-prod-env > .env.new; then
+  echo "Secret Manager fetch failed, aborting" >&2
+  rm -f .env.new
+  exit 1
+fi
 
 if [ ! -s .env.new ]; then
   echo "Secret Manager fetch failed or empty, aborting" >&2
