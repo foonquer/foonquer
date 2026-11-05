@@ -1,4 +1,5 @@
 import { AppError } from '../../common/errors/app-error';
+import { withObjectParticle } from '../../common/josa';
 import { findCurrentSeason } from '../../common/season';
 import { toKstIso } from '../../common/time';
 import type { Prisma } from '../../generated/prisma/client';
@@ -16,6 +17,10 @@ const SLOT_CATEGORY = {
   skinItemId: 'SKIN',
   clubItemId: 'CLUB',
 } as const;
+
+const SLOT_OF_CATEGORY = Object.fromEntries(
+  Object.entries(SLOT_CATEGORY).map(([slot, category]) => [category, slot]),
+) as Record<string, keyof typeof SLOT_CATEGORY | undefined>;
 
 /** CHAR-01 내 먹깨비 */
 export async function getMyMukkaebi(userId: bigint) {
@@ -307,10 +312,17 @@ export async function markCelebrationSeen(userId: bigint, celebrationId: string,
   const id = BigInt(rawId);
   let count = 0;
   if (type === 'LEVEL_UP') {
-    ({ count } = await prisma.mukkaebi.updateMany({
-      where: { userId, level: { gte: Number(id) } },
-      data: { celebratedLevel: Number(id) },
-    }));
+    const level = Number(id);
+    const m = await prisma.mukkaebi.findUnique({ where: { userId } });
+    if (m && m.level >= level) {
+      count = 1;
+      // 이미 더 높은 레벨까지 확인했으면 낮추지 않는다
+      if (m.celebratedLevel < level)
+        await prisma.mukkaebi.updateMany({
+          where: { userId, celebratedLevel: { lt: level } },
+          data: { celebratedLevel: level },
+        });
+    }
   } else if (type === 'TIER_UP') {
     const stat = await prisma.seasonRegionStat.findUnique({ where: { id } });
     if (stat?.userId === userId) {
@@ -359,6 +371,14 @@ export async function craftItem(userId: bigint, itemId: number, now = new Date()
       where: { id: material.id },
       data: { quantity: { decrement: recipe.materialCount } },
     });
+    // 재료를 다 쓰면 착용 중이던 칸도 비운다 (가지지 않은 아이템을 착용한 상태가 되지 않게)
+    const slot = SLOT_OF_CATEGORY[recipe.materialItem.category];
+    if (material.quantity === recipe.materialCount && slot) {
+      await tx.mukkaebi.updateMany({
+        where: { userId, [slot]: recipe.materialItemId },
+        data: { [slot]: null },
+      });
+    }
     const made = await tx.memberItem.upsert({
       where: { userId_itemId: { userId, itemId } },
       update: { quantity: { increment: 1 }, seenAt: null },
@@ -370,7 +390,7 @@ export async function craftItem(userId: bigint, itemId: number, now = new Date()
       {
         category: 'MUKKAEBI',
         type: 'NEW_ITEM',
-        title: `${recipe.resultItem.name}을 만들었어요!`,
+        title: `${withObjectParticle(recipe.resultItem.name)} 만들었어요!`,
         content: `${recipe.materialItem.name} ${recipe.materialCount}개를 합쳤어요`,
         refType: 'ITEM',
         refId: itemId,

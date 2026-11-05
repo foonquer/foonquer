@@ -22,10 +22,16 @@ export const itemCategoryQuery = z.object({
 export type ItemCategoryQuery = z.infer<typeof itemCategoryQuery>;
 
 export const itemParams = z.object({ itemId: z.coerce.number().int().positive() });
+/** LEVEL_UP:{레벨 1~3자리} / 나머지:{id 1~18자리, BIGINT 범위 안} — 범위를 넘는 숫자가 DB 오류(500)가 되지 않게 */
 export const celebrationParams = z.object({
-  celebrationId: z.string().regex(/^(LEVEL_UP|TIER_UP|BACKGROUND|ACHIEVEMENT|SEASON_RESULT):\d+$/, {
-    error: 'CELEBRATION_NOT_FOUND',
-  }),
+  celebrationId: z
+    .string()
+    .regex(
+      /^(LEVEL_UP:[1-9]\d{0,2}|(TIER_UP|BACKGROUND|ACHIEVEMENT|SEASON_RESULT):[1-9]\d{0,17})$/,
+      {
+        error: 'CELEBRATION_NOT_FOUND',
+      },
+    ),
 });
 
 /** SHOP-01 — HONOR는 명예 아이템(왕관·밤하늘·방망이) */

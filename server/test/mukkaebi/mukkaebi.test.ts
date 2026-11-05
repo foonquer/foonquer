@@ -53,16 +53,28 @@ describe('SHOP·POINT 상점과 먹포인트', () => {
     expect((await prisma.mukkaebi.findUniqueOrThrow({ where: { userId: me.id } })).hatItemId).toBe(
       strawberry.itemId,
     );
+    expect(bought.body.message).toBe('딸기 모자를 샀어요!');
     expect(
-      (await api(me.id).post('/shop/purchases', { itemId: strawberry.itemId })).body.code,
-    ).toBe('ITEM_ALREADY_OWNED');
+      await prisma.memberItem.findUnique({
+        where: { userId_itemId: { userId: me.id, itemId: strawberry.itemId } },
+      }),
+    ).toMatchObject({ quantity: 1, acquiredType: 'P' });
+    const again = await api(me.id).post('/shop/purchases', { itemId: strawberry.itemId });
+    expect(again.status).toBe(409);
+    expect(again.body.code).toBe('ITEM_ALREADY_OWNED');
 
     const acorn = await itemId('HAT_ACORN');
     const poor = await api(me.id).post('/shop/purchases', { itemId: acorn });
+    expect(poor.status).toBe(409);
     expect(poor.body).toMatchObject({ code: 'POINT_NOT_ENOUGH', data: { shortage: 400 } });
-    expect(
-      (await api(me.id).post('/shop/purchases', { itemId: await itemId('HAT_CROWN') })).body.code,
-    ).toBe('ITEM_NOT_FOR_SALE');
+    const crown = await api(me.id).post('/shop/purchases', { itemId: await itemId('HAT_CROWN') });
+    expect(crown.status).toBe(400);
+    expect(crown.body.code).toBe('ITEM_NOT_FOR_SALE');
+    expect((await api(me.id).get('/shop/items/999999')).status).toBe(404);
+    expect((await api(me.id).get('/shop/items?category=SKIN')).body.code).toBe(
+      'INVALID_ITEM_CATEGORY',
+    );
+    expect((await request(app).get('/api/v1/shop/items')).status).toBe(401);
 
     const points = await api(me.id).get('/points/me');
     expect(points.body.data).toMatchObject({
@@ -73,6 +85,22 @@ describe('SHOP·POINT 상점과 먹포인트', () => {
     const spend = await api(me.id).get('/points/me/history?type=SPEND');
     expect(spend.body.data.items).toHaveLength(1);
     expect(spend.body.data.items[0]).toMatchObject({ amount: -300, title: '딸기 모자 구매' });
+  });
+
+  it('같은 아이템을 동시에 사도 한 번만 사고 포인트도 한 번만 뺀다', async () => {
+    const me = await createMember();
+    await give(me.id, 1000);
+    const hat = await itemId('HAT_STRAWBERRY');
+    const results = await Promise.all(
+      [1, 2, 3].map(() => api(me.id).post('/shop/purchases', { itemId: hat })),
+    );
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409, 409]);
+    expect((await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).pointBalance).toBe(
+      700,
+    );
+    expect(await prisma.pointHistory.count({ where: { userId: me.id, reason: 'PURCHASE' } })).toBe(
+      1,
+    );
   });
 });
 
@@ -110,10 +138,14 @@ describe('CHAR 먹깨비', () => {
       hat: { code: 'HAT_SPROUT' },
       face: { code: 'FACE_MUSTACHE' },
     });
-    expect(
-      (await api(me.id).put('/characters/me/appearance', { propItemId: await itemId('PROP_MIC') }))
-        .body.code,
-    ).toBe('ITEM_NOT_OWNED');
+    const notOwned = await api(me.id).put('/characters/me/appearance', {
+      propItemId: await itemId('PROP_MIC'),
+    });
+    expect(notOwned.status).toBe(403);
+    expect(notOwned.body.code).toBe('ITEM_NOT_OWNED');
+    expect((await api(me.id).put('/characters/me/appearance', {})).body.code).toBe(
+      'NO_FIELDS_TO_UPDATE',
+    );
     expect((await api(me.id).put('/characters/me/appearance', { propItemId: hat })).body.code).toBe(
       'INVALID_ITEM_SLOT',
     );
@@ -135,8 +167,10 @@ describe('CHAR 먹깨비', () => {
     await prisma.mukkaebi.update({ where: { userId: me.id }, data: { level: 3, exp: 220 } });
 
     const list = await api(me.id).get('/users/me/celebrations');
-    const types = (list.body.data.items as { type: string }[]).map((i) => i.type).sort();
-    expect(types).toEqual(['ACHIEVEMENT', 'LEVEL_UP', 'TIER_UP']);
+    const items = list.body.data.items as { type: string; occurredAt: string }[];
+    expect(items.map((i) => i.type).sort()).toEqual(['ACHIEVEMENT', 'LEVEL_UP', 'TIER_UP']);
+    const times = items.map((i) => i.occurredAt);
+    expect(times).toEqual([...times].sort());
     for (const item of list.body.data.items as { celebrationId: string }[]) {
       const seen = await api(me.id).patch(`/users/me/celebrations/${item.celebrationId}/seen`);
       expect(seen.status).toBe(200);
@@ -145,6 +179,18 @@ describe('CHAR 먹깨비', () => {
     expect((await api(me.id).patch('/users/me/celebrations/ACHIEVEMENT:999/seen')).body.code).toBe(
       'CELEBRATION_NOT_FOUND',
     );
+
+    // 이미 LV.3까지 확인했는데 LV.1을 확인해도 낮아지지 않는다
+    expect((await api(me.id).patch('/users/me/celebrations/LEVEL_UP:1/seen')).status).toBe(200);
+    expect(
+      (await prisma.mukkaebi.findUniqueOrThrow({ where: { userId: me.id } })).celebratedLevel,
+    ).toBe(3);
+    // 범위를 넘는 숫자는 500이 아니라 404
+    for (const id of ['LEVEL_UP:99999999999', 'TIER_UP:99999999999999999999']) {
+      const res = await api(me.id).patch(`/users/me/celebrations/${id}/seen`);
+      expect(res.status).toBe(404);
+      expect(res.body.code).toBe('CELEBRATION_NOT_FOUND');
+    }
   });
 
   it('황금 방망이 3개 → 전설의 방망이, 모자라면 409', async () => {
@@ -156,15 +202,31 @@ describe('CHAR 먹깨비', () => {
     });
     const short = await api(me.id).post(`/characters/me/items/${legend}/craft`);
     expect(short.body).toMatchObject({ code: 'NOT_ENOUGH_MATERIAL', data: { have: 2, need: 3 } });
+    expect(short.status).toBe(409);
     await prisma.memberItem.update({
       where: { userId_itemId: { userId: me.id, itemId: gold } },
       data: { quantity: 3 },
     });
+    await prisma.mukkaebi.upsert({
+      where: { userId: me.id },
+      update: { clubItemId: gold },
+      create: { userId: me.id, clubItemId: gold },
+    });
     const made = await api(me.id).post(`/characters/me/items/${legend}/craft`);
+    expect(made.body.message).toBe('전설의 방망이를 만들었어요!');
     expect(made.body.data).toMatchObject({
       item: { code: 'CLUB_LEGEND', quantity: 1 },
       material: { quantity: 0 },
     });
+    // 재료를 다 써서 착용 중이던 황금 방망이 칸이 비었다
+    expect(
+      (await prisma.mukkaebi.findUniqueOrThrow({ where: { userId: me.id } })).clubItemId,
+    ).toBeNull();
+    expect(
+      await prisma.memberItem.findUnique({
+        where: { userId_itemId: { userId: me.id, itemId: legend } },
+      }),
+    ).toMatchObject({ quantity: 1, acquiredType: 'M' });
     expect((await api(me.id).post(`/characters/me/items/${gold}/craft`)).body.code).toBe(
       'RECIPE_NOT_FOUND',
     );

@@ -270,10 +270,11 @@ export async function getSigunguRanking(userId: bigint, sigunguId: number, query
       : null,
     topPicks: top3.map((s) => {
       const list = picks.filter((p) => p.userId === s.userId);
+      const withdrawn = s.user.status === 'D';
       return {
         rank: s.rankNo,
-        userId: s.userId,
-        nickname: s.user.nickname,
+        userId: withdrawn ? null : s.userId,
+        nickname: withdrawn ? '탈퇴한 탐험가' : s.user.nickname,
         pickCount: list.length,
         restaurants: list
           .slice(0, 2)

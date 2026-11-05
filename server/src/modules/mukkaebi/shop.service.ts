@@ -1,3 +1,4 @@
+import { lockMember } from '../../common/db';
 import { AppError } from '../../common/errors/app-error';
 import { toPageResult } from '../../common/pagination';
 import { kstStartOfMonth, toKstDate, toKstIso } from '../../common/time';
@@ -105,6 +106,8 @@ export async function purchaseItem(userId: bigint, body: PurchaseBody, now = new
     throw new AppError(MukkaebiError.ITEM_NOT_FOR_SALE);
   const price = item.price;
   const balance = await prisma.$transaction(async (tx) => {
+    // 같은 아이템을 동시에 사면 앞 구매가 끝난 뒤에 가졌는지 다시 본다
+    await lockMember(tx, userId);
     const owned = await tx.memberItem.findUnique({
       where: { userId_itemId: { userId, itemId: item.id } },
     });
