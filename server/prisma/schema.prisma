@@ -28,7 +28,7 @@ model Member {
   ageGroup                Int?                      @map("age_group") @db.TinyInt
   /// 내 동네(member_local_region)를 마지막으로 바꾼 시각 — 내 동네는 한 시즌에 한 번만 바꿀 수 있다. 회원가입 때 처음 고른 것은 세지 않는다
   localChangedAt          DateTime?                 @map("local_changed_at")
-  /// 프로필 사진 S3 key · null이면 먹깨비를 프로필로 사용
+  /// 프로필 사진 스토리지 key · null이면 먹깨비를 프로필로 사용
   profileImageKey         String?                   @map("profile_image_key") @db.VarChar(255)
   /// 신뢰 온도 T — 1°~99°, 시작 50°. 도움돼요(방문자 +0.2°, 비방문자 +0.05°), 방문 인증 리뷰 작성(+0.1°), 별로예요 기준 충족(N ≥ 5이고 N ≥ 2H, 리뷰당 1번 −0.5°), 신고 확정(−3°), 허위 리뷰 판정(−5°)으로 바뀐다. 하루 최대 +1°, 75° 이상은 오르는 양이 절반. 바뀔 때마다 trust_temp_log에 남긴다. 작성자 가중치 w_user = 1 + (T − 50) / 50 (0.5~1.5)
   trustTemp               Decimal                   @default(50) @map("trust_temp") @db.Decimal(4, 2)
@@ -427,7 +427,7 @@ model Visit {
   status            String             @default("P") @db.Char(1)
   /// 영수증: UNREADABLE 영수증을 읽기 어려움 / DUPLICATE 이미 인증한 영수증 / STORE_MISMATCH 가게 정보가 다름 / EXPIRED 7일 지난 영수증 · 현장: TOO_FAR 매장 밖(100m 초과) / PHOTO_UNCLEAR 음식이 잘 보이지 않음 / PHOTO_MISMATCH 사진의 위치·촬영 시간이 맞지 않음
   failReason        String?            @map("fail_reason") @db.VarChar(20)
-  /// 영수증 사진 S3 key — 영수증 인증(method = R)만
+  /// 영수증 사진 스토리지 key — 영수증 인증(method = R)만
   receiptImageKey   String?            @map("receipt_image_key") @db.VarChar(255)
   /// CLOVA OCR(영수증 특화 모델) 응답 중 필요한 부분 — 매장 정보, 결제 내역, 금액, 메뉴 줄
   ocrRaw            Json?              @map("ocr_raw")
@@ -454,7 +454,7 @@ model Visit {
   checkinDistanceM  Int?               @map("checkin_distance_m") @db.SmallInt
   /// 위치 확인 시각
   checkinAt         DateTime?          @map("checkin_at")
-  /// 현장 인증: 갤러리에서 고른 음식 사진 S3 key (앱 안에서 직접 찍지 않는다)
+  /// 현장 인증: 갤러리에서 고른 음식 사진 스토리지 key (앱 안에서 직접 찍지 않는다)
   sitePhotoKey      String?            @map("site_photo_key") @db.VarChar(255)
   /// 사진 EXIF 촬영 시각 — 없으면 null
   photoTakenAt      DateTime?          @map("photo_taken_at")
@@ -585,7 +585,7 @@ model Review {
 model ReviewImage {
   id        BigInt   @id @default(autoincrement())
   reviewId  BigInt   @map("review_id")
-  /// S3 key
+  /// 스토리지 key
   imageKey  String   @map("image_key") @db.VarChar(255)
   /// 0~4 (최대 5장)
   sortOrder Int      @default(0) @map("sort_order") @db.TinyInt
@@ -1012,7 +1012,7 @@ model Inquiry {
   content    String    @db.VarChar(1000)
   /// 방문 인증(영수증·현장) 문제일 때 해당 인증
   refVisitId BigInt?   @map("ref_visit_id")
-  /// 첨부 사진 S3 key (선택)
+  /// 첨부 사진 스토리지 key (선택)
   imageKey   String?   @map("image_key") @db.VarChar(255)
   /// W 대기 / D 답변 완료
   status     String    @default("W") @db.Char(1)

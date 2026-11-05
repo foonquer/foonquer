@@ -8,7 +8,7 @@ import { objectExists } from '../../src/lib/storage';
 import { resetDb } from '../helpers/db';
 import { agreeConsents, bearer, createMember } from '../helpers/fixtures';
 
-// 프로필 사진이 S3에 있는지는 테스트마다 정한다 (기본: 없음).
+// 프로필 사진이 스토리지에 있는지는 테스트마다 정한다 (기본: 없음).
 vi.mock('../../src/lib/storage', () => ({ objectExists: vi.fn(() => Promise.resolve(false)) }));
 
 const app = createApp();
@@ -219,7 +219,7 @@ describe('USER-03 POST /users/me/profile', () => {
     expect(items[0]).toMatchObject({ itemId: item.id, acquiredType: 'D', quantity: 1 });
   });
 
-  it('S3에 올린 프로필 사진 key를 저장하고 URL로 준다', async () => {
+  it('스토리지에 올린 프로필 사진 key를 저장하고 URL로 준다', async () => {
     const me = await pendingMember();
     const key = `profile/${me.id}/${randomUUID()}.webp`;
     vi.mocked(objectExists).mockResolvedValue(true);
@@ -234,7 +234,7 @@ describe('USER-03 POST /users/me/profile', () => {
     ['다른 회원 폴더', (id: bigint) => `profile/${id + 1n}/${randomUUID()}.jpg`, true],
     ['허용하지 않는 확장자', (id: bigint) => `profile/${id}/${randomUUID()}.gif`, true],
     ['uuid가 아닌 이름', (id: bigint) => `profile/${id}/photo.jpg`, true],
-    ['S3에 없음', (id: bigint) => `profile/${id}/${randomUUID()}.png`, false],
+    ['스토리지에 없음', (id: bigint) => `profile/${id}/${randomUUID()}.png`, false],
   ])('사진 key가 잘못되면 400 PROFILE_IMAGE_NOT_FOUND (%s)', async (_, keyOf, exists) => {
     const me = await pendingMember();
     vi.mocked(objectExists).mockResolvedValue(exists);

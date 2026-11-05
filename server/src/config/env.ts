@@ -33,7 +33,6 @@ const envSchema = z.object({
     .url()
     .default('http://localhost:5173')
     .transform((v) => v.replace(/\/+$/, '')),
-  AWS_REGION: z.string().default('ap-northeast-2'),
   /** 이 API 서버의 바깥 주소. 카카오 로그인 redirect_uri({API_BASE_URL}/api/v1/auth/oauth/kakao/callback)에 쓴다 */
   API_BASE_URL: z
     .url()
@@ -43,9 +42,9 @@ const envSchema = z.object({
   KAKAO_REST_API_KEY: blankAsUndefined(z.string().optional()),
   /** 카카오 로그인 보안의 Client Secret을 켰을 때만 */
   KAKAO_CLIENT_SECRET: blankAsUndefined(z.string().optional()),
-  /** 사진·영수증을 두는 S3 버킷 이름. 비우면 올린 사진을 확인할 수 없어 사진 key를 받지 않는다 */
-  AWS_S3_BUCKET: blankAsUndefined(z.string().optional()),
-  /** 프로필·리뷰 사진 공개 주소(CloudFront). 예) https://img.example.com — 비우면 사진 URL을 null로 준다 */
+  /** 사진·영수증을 두는 Cloud Storage 버킷 이름. 비우면 올린 사진을 확인할 수 없어 사진 key를 받지 않는다 */
+  GCS_BUCKET: blankAsUndefined(z.string().optional()),
+  /** 프로필·리뷰 사진 공개 주소. 예) https://storage.googleapis.com/버킷 또는 Cloud CDN 도메인 — 비우면 사진 URL을 null로 준다 */
   IMAGE_BASE_URL: blankAsUndefined(
     z
       .url()
