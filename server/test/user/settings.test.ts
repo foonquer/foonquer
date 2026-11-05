@@ -16,7 +16,7 @@ import {
 import { refreshCookieHeader } from '../helpers/http';
 
 vi.mock('../../src/lib/storage', () => ({
-  objectExists: vi.fn(() => Promise.resolve(false)),
+  readObjectHead: vi.fn(() => Promise.resolve(null)),
   createUploadUrl: vi.fn(),
   deleteObjectQuietly: vi.fn(() => Promise.resolve()),
 }));
@@ -143,6 +143,19 @@ describe('SET-02 PATCH /users/me/notification-settings', () => {
     const res = await patch(me.id, { marketingAlarm: true });
     expect(res.body.message).toBe('알림 설정을 바꿨어요.');
     expect(await marketingRows(me.id)).toHaveLength(0);
+  });
+
+  it('같은 값으로 동시에 두 번 보내도 동의 이력은 한 번만 남긴다', async () => {
+    const me = await createMember();
+    const before = (await marketingRows(me.id)).length;
+    const results = await Promise.all([
+      patch(me.id, { marketingAlarm: true }),
+      patch(me.id, { marketingAlarm: true }),
+    ]);
+    expect(results.map((r) => r.status)).toEqual([200, 200]);
+    const rows = await marketingRows(me.id);
+    expect(rows).toHaveLength(before + 1);
+    expect(rows.at(-1)?.agreed).toBe(true);
   });
 
   it('빈 요청은 400 NO_FIELDS_TO_UPDATE, true/false가 아니면 400 VALIDATION_ERROR', async () => {

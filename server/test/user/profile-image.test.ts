@@ -3,13 +3,14 @@ import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app';
 import { prisma } from '../../src/lib/prisma';
-import { createUploadUrl, deleteObjectQuietly, objectExists } from '../../src/lib/storage';
+import { createUploadUrl, deleteObjectQuietly, readObjectHead } from '../../src/lib/storage';
 import { resetDb } from '../helpers/db';
 import { agreeConsents, bearer, createMember } from '../helpers/fixtures';
+import { imageHead } from '../helpers/image';
 
 // 실제 Cloud Storage는 부르지 않는다. 테스트마다 결과를 정한다.
 vi.mock('../../src/lib/storage', () => ({
-  objectExists: vi.fn(() => Promise.resolve(false)),
+  readObjectHead: vi.fn(() => Promise.resolve(null)),
   createUploadUrl: vi.fn(),
   deleteObjectQuietly: vi.fn(() => Promise.resolve()),
 }));
@@ -22,7 +23,7 @@ function keyOf(userId: bigint, ext = 'jpg') {
 
 beforeEach(async () => {
   await resetDb();
-  vi.mocked(objectExists).mockResolvedValue(false);
+  vi.mocked(readObjectHead).mockResolvedValue(null);
   vi.mocked(createUploadUrl).mockImplementation((key, contentType, maxBytes) =>
     Promise.resolve({
       url: `https://storage.googleapis.com/test-bucket/${key}?X-Goog-Signature=abc`,
@@ -120,7 +121,7 @@ describe('USER-06 PUT /users/me/profile-image', () => {
     const oldKey = `profile/1/${randomUUID()}.jpg`;
     const me = await createMember({ profileImageKey: oldKey });
     const key = keyOf(me.id, 'webp');
-    vi.mocked(objectExists).mockResolvedValue(true);
+    vi.mocked(readObjectHead).mockImplementation((k) => Promise.resolve(imageHead(k)));
 
     const res = await change(me.id, { imageKey: key });
 
@@ -130,7 +131,7 @@ describe('USER-06 PUT /users/me/profile-image', () => {
       profileImageUrl: `https://images.test/${key}`,
       profileImageSource: 'CUSTOM',
     });
-    expect(objectExists).toHaveBeenCalledWith(key);
+    expect(readObjectHead).toHaveBeenCalledWith(key, 12);
     expect((await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).profileImageKey).toBe(
       key,
     );
@@ -141,7 +142,7 @@ describe('USER-06 PUT /users/me/profile-image', () => {
     const me = await createMember();
     const key = keyOf(me.id);
     await prisma.member.update({ where: { id: me.id }, data: { profileImageKey: key } });
-    vi.mocked(objectExists).mockResolvedValue(true);
+    vi.mocked(readObjectHead).mockImplementation((k) => Promise.resolve(imageHead(k)));
 
     expect((await change(me.id, { imageKey: key })).status).toBe(200);
     expect(deleteObjectQuietly).not.toHaveBeenCalled();
@@ -150,7 +151,7 @@ describe('USER-06 PUT /users/me/profile-image', () => {
   it('key가 없으면 400 IMAGE_KEY_REQUIRED, 다른 회원 폴더면 403, 형식이 틀리거나 파일이 없으면 400', async () => {
     const me = await createMember();
     const other = await createMember();
-    vi.mocked(objectExists).mockResolvedValue(true);
+    vi.mocked(readObjectHead).mockImplementation((k) => Promise.resolve(imageHead(k)));
 
     const missing = await change(me.id, {});
     expect(missing.status).toBe(400);
@@ -164,7 +165,7 @@ describe('USER-06 PUT /users/me/profile-image', () => {
     expect(wrong.status).toBe(400);
     expect(wrong.body.code).toBe('PROFILE_IMAGE_NOT_FOUND');
 
-    vi.mocked(objectExists).mockResolvedValue(false);
+    vi.mocked(readObjectHead).mockResolvedValue(null);
     const notUploaded = await change(me.id, { imageKey: keyOf(me.id) });
     expect(notUploaded.status).toBe(400);
     expect(notUploaded.body.code).toBe('PROFILE_IMAGE_NOT_FOUND');
@@ -172,6 +173,24 @@ describe('USER-06 PUT /users/me/profile-image', () => {
     expect(
       (await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).profileImageKey,
     ).toBeNull();
+  });
+
+  it('올린 파일이 확장자와 다른(이미지가 아닌) 파일이면 지우고 400 UNSUPPORTED_IMAGE_TYPE', async () => {
+    const me = await createMember();
+    const key = keyOf(me.id, 'png');
+    vi.mocked(readObjectHead).mockResolvedValue(Buffer.from('<html><script>'));
+
+    const res = await change(me.id, { imageKey: key });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('UNSUPPORTED_IMAGE_TYPE');
+    expect(deleteObjectQuietly).toHaveBeenCalledWith(key);
+    expect(
+      (await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).profileImageKey,
+    ).toBeNull();
+
+    vi.mocked(readObjectHead).mockResolvedValue(Buffer.alloc(0));
+    const empty = await change(me.id, { imageKey: keyOf(me.id) });
+    expect(empty.body.code).toBe('UNSUPPORTED_IMAGE_TYPE');
   });
 
   it('프로필 설정 전 회원은 403 PROFILE_REQUIRED', async () => {

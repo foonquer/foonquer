@@ -11,13 +11,23 @@ function gcs() {
 }
 
 /**
- * Cloud Storage에 그 key의 파일이 있는지. 사진을 직접 올린(signed URL PUT) 뒤 그 key로 저장할 때 확인한다.
- * GCS_BUCKET이 없으면(로컬 등) 항상 false.
+ * 그 key 파일의 앞 bytes바이트를 읽는다. 사진을 직접 올린(signed URL PUT) 뒤 그 key로 저장할 때
+ * 파일이 있는지와 실제 형식(매직 바이트)을 확인한다. 파일이 없거나 GCS_BUCKET이 없으면(로컬 등) null, 빈 파일이면 빈 Buffer.
  */
-export async function objectExists(key: string): Promise<boolean> {
-  if (!env.GCS_BUCKET) return false;
-  const [exists] = await gcs().bucket(env.GCS_BUCKET).file(key).exists();
-  return exists;
+export async function readObjectHead(key: string, bytes: number): Promise<Buffer | null> {
+  if (!env.GCS_BUCKET) return null;
+  try {
+    const [head] = await gcs()
+      .bucket(env.GCS_BUCKET)
+      .file(key)
+      .download({ start: 0, end: bytes - 1 });
+    return head;
+  } catch (err) {
+    const code = (err as { code?: number }).code;
+    if (code === 404) return null;
+    if (code === 416) return Buffer.alloc(0); // 빈 파일은 범위를 읽을 수 없다
+    throw err;
+  }
 }
 
 export interface UploadUrl {
