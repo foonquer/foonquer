@@ -5,10 +5,16 @@ import { kstStartOfMonth, toKstDate, toKstIso } from '../../common/time';
 import type { Prisma } from '../../generated/prisma/client';
 import { prisma } from '../../lib/prisma';
 import { spendPoint } from '../reward/reward.service';
-import type { PointHistoryQuery, PurchaseBody, ShopQuery } from './mukkaebi.schema';
+import type {
+  PointHistoryQuery,
+  PurchaseBody,
+  SetPurchaseBody,
+  ShopQuery,
+} from './mukkaebi.schema';
 import { MukkaebiError } from './mukkaebi.errors';
 
 // 상점 (2026-10-06 회의: 먹포인트로 사는 것은 모자·얼굴·소품). 왕관·밤하늘·방망이는 명예 아이템이라 살 수 없다
+// v1.3: 왕관·밤하늘은 업적 보상, 방망이는 시즌 보상(황금은 업적 보상이기도), 세트는 상점 배너
 
 const SLOT_OF: Record<string, 'hatItemId' | 'faceItemId' | 'propItemId'> = {
   HAT: 'hatItemId',
@@ -16,15 +22,16 @@ const SLOT_OF: Record<string, 'hatItemId' | 'faceItemId' | 'propItemId'> = {
   PROP: 'propItemId',
 };
 
-type ItemRow = Prisma.ItemGetPayload<object>;
+const ITEM_INCLUDE = { requiredAchievement: { select: { id: true, name: true } } } as const;
+type ItemRow = Prisma.ItemGetPayload<{ include: typeof ITEM_INCLUDE }>;
 
-function isOnSale(item: ItemRow, now: Date) {
+function inSalePeriod(row: { saleStart: Date | null; saleEnd: Date | null }, now: Date) {
+  return (!row.saleStart || row.saleStart <= now) && (!row.saleEnd || row.saleEnd > now);
+}
+
+function isOnSale(item: Prisma.ItemGetPayload<object>, now: Date) {
   return (
-    item.status === 'A' &&
-    item.unlockType === 'P' &&
-    item.price !== null &&
-    (!item.saleStart || item.saleStart <= now) &&
-    (!item.saleEnd || item.saleEnd > now)
+    item.status === 'A' && item.unlockType === 'P' && item.price !== null && inSalePeriod(item, now)
   );
 }
 
@@ -57,6 +64,7 @@ function toShopItem(item: ItemRow, own: Awaited<ReturnType<typeof ownership>>, n
     name: item.name,
     description: item.description,
     category: item.category,
+    rarity: item.rarity,
     price: item.price,
     badge: item.badge,
     purchasable,
@@ -64,6 +72,9 @@ function toShopItem(item: ItemRow, own: Awaited<ReturnType<typeof ownership>>, n
     equipped: own.equipped.has(item.id),
     // 명예 아이템은 얻는 방법을 보여 준다
     unlockCondition: purchasable ? null : item.description,
+    requiredAchievement: item.requiredAchievement
+      ? { achievementId: item.requiredAchievement.id, name: item.requiredAchievement.name }
+      : null,
   };
 }
 
@@ -71,22 +82,68 @@ function toShopItem(item: ItemRow, own: Awaited<ReturnType<typeof ownership>>, n
 export async function listShopItems(userId: bigint, query: ShopQuery, now = new Date()) {
   const where: Prisma.ItemWhereInput =
     query.category === 'HONOR'
-      ? { status: 'A', unlockType: { in: ['S', 'M'] } }
+      ? { status: 'A', unlockType: { in: ['S', 'M', 'A'] } }
       : { status: 'A', category: query.category };
-  const [items, own] = await Promise.all([
-    prisma.item.findMany({ where, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }),
+  const [items, own, sets] = await Promise.all([
+    prisma.item.findMany({
+      where,
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+      include: ITEM_INCLUDE,
+    }),
     ownership(userId),
+    loadSets(now),
   ]);
   return {
     category: query.category,
     pointBalance: own.balance,
+    // 상점 위 추천 배너 (피그마 "딸기 모자 세트 · 450P 550P")
+    sets: sets.map((s) => toShopSet(s, own)),
     items: items.map((i) => toShopItem(i, own, now)),
+  };
+}
+
+const SET_INCLUDE = {
+  items: { include: { item: true }, orderBy: { itemId: 'asc' } },
+} as const;
+type SetRow = Prisma.ItemSetGetPayload<{ include: typeof SET_INCLUDE }>;
+
+async function loadSets(now: Date) {
+  const sets = await prisma.itemSet.findMany({
+    where: { status: 'A' },
+    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+    include: SET_INCLUDE,
+  });
+  return sets.filter((s) => inSalePeriod(s, now));
+}
+
+function toShopSet(set: SetRow, own: Awaited<ReturnType<typeof ownership>>) {
+  const ownedAny = set.items.some((i) => own.owned.has(i.itemId));
+  return {
+    setId: set.id,
+    code: set.code,
+    name: set.name,
+    description: set.description,
+    price: set.price,
+    // 따로 사면 (취소선 가격)
+    originalPrice: set.items.reduce((sum, i) => sum + (i.item.price ?? 0), 0),
+    badge: set.badge,
+    items: set.items.map((i) => ({
+      itemId: i.item.id,
+      code: i.item.code,
+      name: i.item.name,
+      category: i.item.category,
+      rarity: i.item.rarity,
+      owned: own.owned.has(i.itemId),
+    })),
+    // 세트 아이템을 하나라도 가졌으면 세트로는 못 산다
+    purchasable: !ownedAny,
+    canBuy: !ownedAny && own.balance >= set.price,
   };
 }
 
 /** SHOP-02 상품 상세 (구매 확인 시트) */
 export async function getShopItem(userId: bigint, itemId: number, now = new Date()) {
-  const item = await prisma.item.findUnique({ where: { id: itemId } });
+  const item = await prisma.item.findUnique({ where: { id: itemId }, include: ITEM_INCLUDE });
   if (!item || item.status !== 'A') throw new AppError(MukkaebiError.ITEM_NOT_FOUND);
   const own = await ownership(userId);
   const view = toShopItem(item, own, now);
@@ -142,6 +199,61 @@ export async function purchaseItem(userId: bigint, body: PurchaseBody, now = new
     price,
     pointBalance: balance,
     equipped: Boolean(body.equipNow && SLOT_OF[item.category]),
+  };
+}
+
+/** SHOP-04 세트 구매 — 세트 아이템을 하나도 안 가졌을 때만. 차감·지급·내역을 한 트랜잭션으로. equipNow면 바로 착용 */
+export async function purchaseSet(userId: bigint, body: SetPurchaseBody, now = new Date()) {
+  const set = await prisma.itemSet.findUnique({ where: { id: body.setId }, include: SET_INCLUDE });
+  if (!set || set.status !== 'A') throw new AppError(MukkaebiError.SET_NOT_FOUND);
+  if (!inSalePeriod(set, now) || set.items.length === 0)
+    throw new AppError(MukkaebiError.SET_NOT_FOR_SALE);
+  const itemIds = set.items.map((i) => i.itemId);
+  const balance = await prisma.$transaction(async (tx) => {
+    await lockMember(tx, userId);
+    const owned = await tx.memberItem.count({
+      where: { userId, itemId: { in: itemIds }, quantity: { gt: 0 } },
+    });
+    if (owned > 0) throw new AppError(MukkaebiError.SET_ITEM_OWNED);
+    const balance = await spendPoint(
+      tx,
+      userId,
+      set.price,
+      'PURCHASE',
+      `${set.name} 구매`,
+      { type: 'ITEM_SET', id: set.id },
+      now,
+    );
+    const equip: Record<string, number> = {};
+    for (const { item } of set.items) {
+      await tx.memberItem.upsert({
+        where: { userId_itemId: { userId, itemId: item.id } },
+        update: { quantity: 1, acquiredType: 'P', acquiredAt: now, seenAt: now },
+        create: { userId, itemId: item.id, acquiredType: 'P', acquiredAt: now, seenAt: now },
+      });
+      const slot = SLOT_OF[item.category];
+      if (slot) equip[slot] = item.id;
+    }
+    if (body.equipNow && Object.keys(equip).length > 0) {
+      await tx.mukkaebi.upsert({
+        where: { userId },
+        update: equip,
+        create: { userId, ...equip },
+      });
+    }
+    return balance;
+  });
+  return {
+    setId: set.id,
+    name: set.name,
+    price: set.price,
+    items: set.items.map((i) => ({
+      itemId: i.item.id,
+      name: i.item.name,
+      category: i.item.category,
+    })),
+    pointBalance: balance,
+    equipped: Boolean(body.equipNow),
   };
 }
 

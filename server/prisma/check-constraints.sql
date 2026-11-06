@@ -23,8 +23,13 @@ ALTER TABLE `item` ADD CONSTRAINT `item_purchase_price_chk` CHECK (unlock_type <
 ALTER TABLE `item` ADD CONSTRAINT `item_club_chk` CHECK (category <> 'CLUB' or (club_tier between 1 and 5 and price is null and ((club_tier < 5 and unlock_type = 'S') or (club_tier = 5 and unlock_type = 'M'))));
 ALTER TABLE `item` ADD CONSTRAINT `item_club_tier_chk` CHECK (category = 'CLUB' or club_tier is null);
 ALTER TABLE `item` ADD CONSTRAINT `item_craft_chk` CHECK (unlock_type <> 'M' or (category = 'CLUB' and club_tier = 5));
+ALTER TABLE `item` ADD CONSTRAINT `item_rarity_chk` CHECK (rarity in ('N','R','E','L','H'));
 ALTER TABLE `item_recipe` ADD CONSTRAINT `item_recipe_count_chk` CHECK (material_count >= 2);
 ALTER TABLE `member_item` ADD CONSTRAINT `member_item_quantity_chk` CHECK (quantity >= 0);
+ALTER TABLE `member_item_box` ADD CONSTRAINT `member_item_box_status_chk` CHECK (status in ('U','O'));
+ALTER TABLE `member_item_box` ADD CONSTRAINT `member_item_box_opened_chk` CHECK ((status = 'U') = (opened_at is null));
+ALTER TABLE `item_set` ADD CONSTRAINT `item_set_price_chk` CHECK (price >= 0);
+ALTER TABLE `item_set` ADD CONSTRAINT `item_set_status_chk` CHECK (status in ('A','H'));
 ALTER TABLE `restaurant_mapae` ADD CONSTRAINT `restaurant_mapae_reason_chk` CHECK (reason in ('A','E'));
 ALTER TABLE `restaurant_mapae` ADD CONSTRAINT `restaurant_mapae_status_chk` CHECK (status in ('A','R'));
 ALTER TABLE `review_aspect_mark` ADD CONSTRAINT `review_aspect_mark_polarity_chk` CHECK (polarity in ('G','B'));

@@ -247,6 +247,16 @@ describe('시즌 배치 · RANK-10 시즌 기록', () => {
       'HAT_CROWN',
       'SKIN_NIGHTSKY',
     ]);
+    // v1.3: 왕관·밤하늘은 시즌 보상표가 아니라 업적(구의 먹짱·시즌 TOP 10) 보상
+    expect(kingItems.find((i) => i.item.code === 'HAT_CROWN')?.acquiredType).toBe('A');
+    expect(kingItems.find((i) => i.item.code === 'CLUB_GOLD')?.acquiredType).toBe('S');
+    const itemNotices = await prisma.notification.findMany({
+      where: { userId: king.id, type: 'NEW_ITEM' },
+      orderBy: { id: 'asc' },
+    });
+    expect(itemNotices.map((n) => n.title)).toEqual(
+      expect.arrayContaining(['왕관을 얻었어요!', '밤하늘 먹깨비를 얻었어요!']),
+    );
     const codes = (
       await prisma.memberAchievement.findMany({
         where: { userId: king.id },
@@ -259,7 +269,8 @@ describe('시즌 배치 · RANK-10 시즌 기록', () => {
       where: { userId: last.id },
       include: { item: true },
     });
-    expect(lastItems.map((i) => i.item.code)).toEqual(['CLUB_WOOD']);
+    // 4명뿐이라 꼴찌도 구 TOP 10 → 시즌 TOP 10 업적 보상(밤하늘 먹깨비)
+    expect(lastItems.map((i) => i.item.code).sort()).toEqual(['CLUB_WOOD', 'SKIN_NIGHTSKY']);
 
     const records = await get(king.id, '/users/me/season-records');
     expect(records.body.data.records[0]).toMatchObject({

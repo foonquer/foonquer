@@ -34,7 +34,7 @@ describe('POINT-03 grantReward / addPoint / spendPoint', () => {
     const result = await prisma.$transaction((tx) =>
       grantReward(tx, me.id, 'VISIT_VERIFIED', '방문 인증', { type: 'VISIT', id: 2 }),
     );
-    expect(result.levelUp).toEqual({ from: 1, to: 2 });
+    expect(result.levelUp).toEqual({ from: 1, to: 2, itemBoxCount: 0 });
     const mukkaebi = await prisma.mukkaebi.findUniqueOrThrow({ where: { userId: me.id } });
     expect(mukkaebi).toMatchObject({ exp: 115, level: 2 });
     const reasons = (

@@ -9,7 +9,7 @@ async function main() {
   console.log(
     `seed: category ${result.categoryCount}개, policy_document 새로 ${result.policyDocumentCreated}개, ` +
       `region 서울 구 ${result.sigunguCount}개·동 ${result.dongCount}개, ` +
-      `아이템 ${result.itemCount}개, 업적 ${result.achievementCount}개, 시즌 ${seasonCount}개`,
+      `아이템 ${result.itemCount}개, 세트 ${result.itemSetCount}개, 업적 ${result.achievementCount}개, 시즌 ${seasonCount}개`,
   );
 }
 

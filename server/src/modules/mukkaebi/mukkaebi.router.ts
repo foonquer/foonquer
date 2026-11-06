@@ -9,12 +9,15 @@ import {
   appearanceBody,
   celebrationParams,
   type ItemCategoryQuery,
+  itemBoxParams,
   itemCategoryQuery,
   itemParams,
   type PointHistoryQuery,
   pointHistoryQuery,
   type PurchaseBody,
   purchaseBody,
+  type SetPurchaseBody,
+  setPurchaseBody,
   type ShopQuery,
   shopQuery,
 } from './mukkaebi.schema';
@@ -24,7 +27,9 @@ import {
   getMyItems,
   getMyMukkaebi,
   listCelebrations,
+  listItemBoxes,
   markCelebrationSeen,
+  openItemBox,
   saveAppearance,
 } from './mukkaebi.service';
 import {
@@ -33,11 +38,12 @@ import {
   getShopItem,
   listShopItems,
   purchaseItem,
+  purchaseSet,
 } from './shop.service';
 
 type ItemParams = z.infer<typeof itemParams>;
 
-/** /api/v1/characters — CHAR-01·02·03·07·10 */
+/** /api/v1/characters — CHAR-01·02·03·05·06·07·10 */
 export const characterRouter = Router();
 
 characterRouter.get('/me', requireAuth(), async (req, res) => {
@@ -86,6 +92,29 @@ characterRouter.post(
   },
 );
 
+characterRouter.get('/me/item-boxes', requireAuth(), async (req, res) => {
+  const { userId } = getAuthUser(req);
+  ok(res, await listItemBoxes(userId), '아이템 상자를 조회했어요.');
+});
+
+characterRouter.post(
+  '/me/item-boxes/:boxId/open',
+  requireAuth(),
+  validate({ params: itemBoxParams }),
+  async (req, res) => {
+    const { userId } = getAuthUser(req);
+    const { boxId } = req.params as unknown as z.infer<typeof itemBoxParams>;
+    const data = await openItemBox(userId, BigInt(boxId));
+    ok(
+      res,
+      data,
+      data.item
+        ? `${withObjectParticle(data.item.name)} 얻었어요!`
+        : `먹포인트 ${data.point ?? 0}P를 받았어요!`,
+    );
+  },
+);
+
 /** /api/v1/users/me/celebrations — CHAR-08·09 */
 export const celebrationRouter = Router();
 
@@ -105,7 +134,7 @@ celebrationRouter.patch(
   },
 );
 
-/** /api/v1/shop — SHOP-01·02·03 */
+/** /api/v1/shop — SHOP-01·02·03·04 */
 export const shopRouter = Router();
 
 shopRouter.get('/items', requireAuth(), validate({ query: shopQuery }), async (req, res) => {
@@ -133,6 +162,17 @@ shopRouter.post('/purchases', requireAuth(), validate({ body: purchaseBody }), a
   const data = await purchaseItem(userId, req.body as PurchaseBody);
   ok(res, data, `${withObjectParticle(data.name)} 샀어요!`);
 });
+
+shopRouter.post(
+  '/set-purchases',
+  requireAuth(),
+  validate({ body: setPurchaseBody }),
+  async (req, res) => {
+    const { userId } = getAuthUser(req);
+    const data = await purchaseSet(userId, req.body as SetPurchaseBody);
+    ok(res, data, `${withObjectParticle(data.name)} 샀어요!`);
+  },
+);
 
 /** /api/v1/points — POINT-01·02 */
 export const pointRouter = Router();

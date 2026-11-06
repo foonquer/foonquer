@@ -18,6 +18,8 @@ export interface RewardRef {
 export interface LevelUp {
   from: number;
   to: number;
+  /** 이번 레벨 업으로 받은 아이템 상자 수 (성장 단계가 바뀌는 레벨마다 1개) */
+  itemBoxCount: number;
 }
 
 export interface RewardResult {
@@ -125,6 +127,36 @@ async function levelOfExp(tx: Tx, exp: number) {
 }
 
 /**
+ * 성장 보상 아이템 상자 (피그마 "LV.10 성장 보상 · 아이템 상자 1개"): 성장 단계가 바뀌는 레벨(알→아기→어린이→어른)마다 1개.
+ * (user_id, source, source_ref) unique라 같은 레벨로 두 번 받지 않는다
+ * @returns 새로 받은 상자 수
+ */
+async function grantGrowthBoxes(
+  tx: Tx,
+  userId: bigint,
+  fromLevel: number,
+  toLevel: number,
+  now: Date,
+) {
+  const policies = await tx.levelPolicy.findMany({
+    where: { level: { gte: fromLevel, lte: toLevel } },
+    select: { level: true, stage: true },
+  });
+  const stageOf = new Map(policies.map((p) => [p.level, p.stage]));
+  const levels: number[] = [];
+  for (let lv = fromLevel + 1; lv <= toLevel; lv += 1) {
+    const stage = stageOf.get(lv);
+    if (stage && stage !== stageOf.get(lv - 1)) levels.push(lv);
+  }
+  if (levels.length === 0) return 0;
+  const { count } = await tx.memberItemBox.createMany({
+    data: levels.map((lv) => ({ userId, source: 'LEVEL_UP', sourceRef: lv, regDate: now })),
+    skipDuplicates: true,
+  });
+  return count;
+}
+
+/**
  * 경험치를 더하고 레벨이 오르면 레벨마다 LEVEL_UP 먹포인트를 준다. 이미 같은 원인으로 받았으면 0.
  * 먹깨비 행이 없으면(프로필 설정 전 테스트 데이터 등) 만든다.
  */
@@ -165,7 +197,8 @@ export async function addExp(
 
   let levelUp: LevelUp | null = null;
   if (level > before.level) {
-    levelUp = { from: before.level, to: level };
+    const itemBoxCount = await grantGrowthBoxes(tx, userId, before.level, level, now);
+    levelUp = { from: before.level, to: level, itemBoxCount };
     const policy = await tx.rewardPolicy.findUnique({ where: { reason: 'LEVEL_UP' } });
     for (let lv = before.level + 1; lv <= level; lv += 1) {
       await addPoint(
@@ -225,7 +258,11 @@ export function sumRewards(results: RewardResult[]): RewardResult {
       point: acc.point + r.point,
       exp: acc.exp + r.exp,
       levelUp: r.levelUp
-        ? { from: acc.levelUp?.from ?? r.levelUp.from, to: r.levelUp.to }
+        ? {
+            from: acc.levelUp?.from ?? r.levelUp.from,
+            to: r.levelUp.to,
+            itemBoxCount: (acc.levelUp?.itemBoxCount ?? 0) + r.levelUp.itemBoxCount,
+          }
         : acc.levelUp,
     }),
     NONE,

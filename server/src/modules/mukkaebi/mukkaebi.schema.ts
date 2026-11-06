@@ -22,6 +22,8 @@ export const itemCategoryQuery = z.object({
 export type ItemCategoryQuery = z.infer<typeof itemCategoryQuery>;
 
 export const itemParams = z.object({ itemId: z.coerce.number().int().positive() });
+/** CHAR-06 */
+export const itemBoxParams = z.object({ boxId: z.coerce.number().int().positive() });
 /** LEVEL_UP:{레벨 1~3자리} / 나머지:{id 1~18자리, BIGINT 범위 안} — 범위를 넘는 숫자가 DB 오류(500)가 되지 않게 */
 export const celebrationParams = z.object({
   celebrationId: z
@@ -48,6 +50,13 @@ export const purchaseBody = z.object({
   equipNow: z.boolean().optional(),
 });
 export type PurchaseBody = z.infer<typeof purchaseBody>;
+
+/** SHOP-04 세트 구매 */
+export const setPurchaseBody = z.object({
+  setId: z.number().int().positive(),
+  equipNow: z.boolean().optional(),
+});
+export type SetPurchaseBody = z.infer<typeof setPurchaseBody>;
 
 /** POINT-02 */
 export const pointHistoryQuery = z.object({

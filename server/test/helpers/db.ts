@@ -15,6 +15,8 @@ const KEEP_TABLES = new Set([
   'season_reward_rule',
   'achievement',
   'review_aspect',
+  'item_set',
+  'item_set_item',
 ]);
 
 let tableNames: string[] | null = null;

@@ -53,6 +53,7 @@ async function deletePersonalRows(tx: Prisma.TransactionClient, userId: bigint) 
   await tx.searchHistory.deleteMany({ where });
   await tx.memberActivityLog.deleteMany({ where });
   await tx.mukkaebi.deleteMany({ where });
+  await tx.memberItemBox.deleteMany({ where });
   await tx.memberItem.deleteMany({ where });
   await tx.memberAchievement.deleteMany({ where });
   await tx.memberRegionBackground.deleteMany({ where });
