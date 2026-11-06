@@ -255,7 +255,42 @@ describe('SET-04 DELETE /users/me', () => {
       data: { restaurantId: restaurant.id, conquerorCount: 2 },
     });
     const { visit } = await createConquest(me.id, restaurant, season.id);
-    await prisma.visit.update({ where: { id: visit.id }, data: { ocrRaw: { text: '영수증' } } });
+    await prisma.visit.update({
+      where: { id: visit.id },
+      data: {
+        ocrRaw: { text: '영수증' },
+        receiptImageKey: `receipt/${me.id}/r.jpg`,
+        ocrStoreName: '옛날손칼국수',
+        ocrApprovalNo: '12345678',
+        totalAmount: 18000,
+        paidAt: new Date(),
+        receiptHash: 'h'.repeat(64),
+      },
+    });
+    await prisma.visitReceiptItem.create({
+      data: { visitId: visit.id, menuName: '칼국수', quantity: 1, price: 9000 },
+    });
+    const siteVisit = await prisma.visit.create({
+      data: {
+        userId: me.id,
+        restaurantId: restaurant.id,
+        method: 'S',
+        status: 'V',
+        checkinLat: 37.5,
+        checkinLng: 127,
+        sitePhotoKey: `site/${me.id}/s.jpg`,
+        photoLat: 37.5,
+        photoLng: 127,
+      },
+    });
+    await prisma.inquiry.create({
+      data: {
+        userId: me.id,
+        category: 'ETC',
+        content: '문의',
+        imageKey: `inquiry/${me.id}/q.jpg`,
+      },
+    });
     const review = await prisma.review.create({
       data: { visitId: visit.id, userId: me.id, restaurantId: restaurant.id, overallScore: 4.5 },
     });
@@ -303,10 +338,30 @@ describe('SET-04 DELETE /users/me', () => {
         .conquerorCount,
     ).toBe(1);
 
-    // 리뷰와 방문은 남고 영수증 원문만 지운다
+    // 리뷰와 방문 행은 남고, 방문의 개인정보(사진·OCR·결제·좌표·메뉴)와 문의는 바로 지운다
     expect(await prisma.review.findUnique({ where: { id: review.id } })).not.toBeNull();
     const keptVisit = await prisma.visit.findUniqueOrThrow({ where: { id: visit.id } });
-    expect(keptVisit.ocrRaw).toBeNull();
+    expect(keptVisit).toMatchObject({
+      ocrRaw: null,
+      receiptImageKey: null,
+      ocrStoreName: null,
+      ocrApprovalNo: null,
+      totalAmount: null,
+      paidAt: null,
+      receiptHash: null,
+    });
+    expect(keptVisit.purgedAt).not.toBeNull();
+    expect(await prisma.visit.findUniqueOrThrow({ where: { id: siteVisit.id } })).toMatchObject({
+      checkinLat: null,
+      checkinLng: null,
+      sitePhotoKey: null,
+      photoLat: null,
+    });
+    expect(await prisma.visitReceiptItem.count()).toBe(0);
+    expect(await prisma.inquiry.count({ where: { userId: me.id } })).toBe(0);
+    for (const key of [`receipt/${me.id}/r.jpg`, `site/${me.id}/s.jpg`, `inquiry/${me.id}/q.jpg`]) {
+      expect(deleteObjectQuietly).toHaveBeenCalledWith(key, 'private');
+    }
 
     // 동의 중이던 항목은 철회 이력이 남는다
     const latest = await prisma.memberConsent.findMany({

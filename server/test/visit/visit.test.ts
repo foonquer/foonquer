@@ -388,3 +388,97 @@ describe('VISIT-03·04 영수증 인증', () => {
     expect(await prisma.pointHistory.count({ where: { userId: me.id } })).toBe(0);
   });
 });
+
+describe('VISIT-03·04·05 홈에서 바로 찍은 영수증', () => {
+  const receipt = (over: Partial<Awaited<ReturnType<typeof readReceipt>> & object> = {}) => ({
+    storeName: '옛날손칼국수 가양점',
+    businessNo: '1234567890',
+    paidAt: new Date(Date.now() - 2 * 3600_000),
+    totalAmount: 18000,
+    approvalNo: '12345678',
+    items: [{ menuName: '칼국수', quantity: 2, price: 18000 }],
+    raw: { ok: true },
+    ...over,
+  });
+  const submitHome = async (userId: bigint) => {
+    const res = await request(app)
+      .post('/api/v1/visit-verifications/receipt')
+      .set('Authorization', bearer(userId))
+      .send({ receiptImageKey: `receipt/${userId}/${randomUUID()}.jpg` });
+    await flushReceiptChecks();
+    return res.body.data.verificationId as number;
+  };
+  const confirm = (userId: bigint, id: number, restaurantId: bigint) =>
+    request(app)
+      .post(`/api/v1/visit-verifications/${id}/restaurant`)
+      .set('Authorization', bearer(userId))
+      .send({ restaurantId: Number(restaurantId) });
+
+  it('사업자번호로 후보를 찾아 "이 가게가 맞나요?"(R) → 가게를 고르면 인증(+50P)', async () => {
+    const { me, restaurant, lat, lng } = await setup();
+    vi.mocked(readReceipt).mockResolvedValue(receipt());
+    const id = await submitHome(me.id);
+    expect(await prisma.visit.findUniqueOrThrow({ where: { id: BigInt(id) } })).toMatchObject({
+      status: 'R',
+      restaurantId: null,
+      ocrBusinessNo: '1234567890',
+    });
+    const check = await request(app)
+      .get(`/api/v1/visit-verifications/${id}?lat=${lat}&lng=${lng}`)
+      .set('Authorization', bearer(me.id));
+    expect(check.body.data).toMatchObject({
+      status: 'RESTAURANT_CHECK',
+      restaurant: null,
+      candidates: [{ restaurantId: Number(restaurant.id), matchedBy: 'BUSINESS_NO', distanceM: 0 }],
+    });
+
+    const other = await createRestaurant({ name: '다른집' });
+    const wrong = await confirm(me.id, id, other.id);
+    expect(wrong.status).toBe(400);
+    expect(wrong.body.code).toBe('RESTAURANT_NOT_CANDIDATE');
+
+    const ok = await confirm(me.id, id, restaurant.id);
+    expect(ok.status).toBe(200);
+    expect(ok.body.data).toMatchObject({ status: 'VERIFIED', reward: { point: 50 } });
+    expect(await prisma.visit.findUniqueOrThrow({ where: { id: BigInt(id) } })).toMatchObject({
+      status: 'V',
+      restaurantId: restaurant.id,
+      businessNoMatched: true,
+    });
+    const again = await confirm(me.id, id, restaurant.id);
+    expect(again.status).toBe(409);
+    expect(again.body.code).toBe('INVALID_VISIT_STATE');
+  });
+
+  it('사업자번호가 없으면 가게명으로 후보를 찾고 가까운 순, 다른 사업자번호가 있는 지점은 뺀다', async () => {
+    const { me } = await setup();
+    const near = await createRestaurant({ name: '스이루 가양점' });
+    const far = await createRestaurant({ name: '스이루 강남점', lat: 37.4979, lng: 127.0276 });
+    await createRestaurant({ name: '스이루 홍대점', businessNo: '5555555555' });
+    vi.mocked(readReceipt).mockResolvedValue(
+      receipt({ storeName: '스이루', businessNo: '9999999999' }),
+    );
+    const id = await submitHome(me.id);
+    const check = await request(app)
+      .get(
+        `/api/v1/visit-verifications/${id}?lat=${near.lat.toNumber()}&lng=${near.lng.toNumber()}`,
+      )
+      .set('Authorization', bearer(me.id));
+    expect(
+      (check.body.data.candidates as { restaurantId: number }[]).map((c) => c.restaurantId),
+    ).toEqual([Number(near.id), Number(far.id)]);
+  });
+
+  it('맞는 가게가 하나도 없으면 STORE_NOT_FOUND 실패', async () => {
+    const { me } = await setup();
+    vi.mocked(readReceipt).mockResolvedValue(
+      receipt({ storeName: '세상에없는집', businessNo: null }),
+    );
+    const id = await submitHome(me.id);
+    const res = await request(app)
+      .get(`/api/v1/visit-verifications/${id}`)
+      .set('Authorization', bearer(me.id));
+    expect(res.body.data).toMatchObject({ status: 'FAILED', failReason: 'STORE_NOT_FOUND' });
+    expect(res.body.data.failMessage).toContain('가게를 찾지 못했어요');
+  });
+});

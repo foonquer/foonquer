@@ -39,7 +39,7 @@ export const pushUnsubscribeBody = z.object({
   endpoint: z.string(PUSH_ERROR).min(1, PUSH_ERROR).max(1024, PUSH_ERROR),
 });
 
-/** 알림을 눌렀을 때 갈 화면 (프론트 경로) */
+/** 알림을 눌렀을 때 갈 화면 — web/src/router.tsx 경로와 맞춘다 (경로를 바꾸면 여기도) */
 export function deepLinkOf(refType: string | null, refId: bigint | null) {
   const id = refId?.toString();
   switch (refType) {
@@ -48,17 +48,16 @@ export function deepLinkOf(refType: string | null, refId: bigint | null) {
     case 'REVIEW':
       return `/reviews/${id}`;
     case 'SIGUNGU':
-      return `/status/sigungus/${id}`;
+      return `/ranking?sigunguId=${id}`;
     case 'SEASON':
-      return '/me/season-records';
     case 'ACHIEVEMENT':
-      return '/me/achievements';
+      return '/me/seasons';
     case 'ITEM':
-      return '/mukkaebi/items';
+      return '/me/mukkaebi';
     case 'INQUIRY':
-      return `/support/inquiries/${id}`;
+      return `/support?inquiryId=${id}`;
     case 'NOTICE':
-      return `/notices/${id}`;
+      return `/notices?noticeId=${id}`;
     default:
       return null;
   }

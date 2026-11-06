@@ -6,9 +6,9 @@ ALTER TABLE `season` ADD CONSTRAINT `season_period_chk` CHECK (start_date < end_
 ALTER TABLE `visit` ADD CONSTRAINT `visit_restaurant_required_chk` CHECK (status in ('P','R','F') or restaurant_id is not null);
 ALTER TABLE `visit` ADD CONSTRAINT `visit_amount_chk` CHECK (total_amount is null or total_amount >= 0);
 ALTER TABLE `visit` ADD CONSTRAINT `visit_method_chk` CHECK (method in ('R','S'));
-ALTER TABLE `visit` ADD CONSTRAINT `visit_receipt_image_chk` CHECK (method <> 'R' or receipt_image_key is not null);
-ALTER TABLE `visit` ADD CONSTRAINT `visit_checkin_chk` CHECK (method <> 'S' or (checkin_lat is not null and checkin_lng is not null));
-ALTER TABLE `visit` ADD CONSTRAINT `visit_site_photo_chk` CHECK (method <> 'S' or status not in ('V','C') or site_photo_key is not null);
+ALTER TABLE `visit` ADD CONSTRAINT `visit_receipt_image_chk` CHECK (method <> 'R' or receipt_image_key is not null or purged_at is not null);
+ALTER TABLE `visit` ADD CONSTRAINT `visit_checkin_chk` CHECK (method <> 'S' or (checkin_lat is not null and checkin_lng is not null) or purged_at is not null);
+ALTER TABLE `visit` ADD CONSTRAINT `visit_site_photo_chk` CHECK (method <> 'S' or status not in ('V','C') or site_photo_key is not null or purged_at is not null);
 ALTER TABLE `review` ADD CONSTRAINT `review_overall_score_chk` CHECK (overall_score between 0.5 and 5.0 and overall_score * 2 = floor(overall_score * 2));
 ALTER TABLE `review` ADD CONSTRAINT `review_detail_score_chk` CHECK ((taste is null and cleanliness is null and portion is null and service is null and price is null) or (taste is not null and cleanliness is not null and portion is not null and service is not null and price is not null and taste between 1 and 5 and cleanliness between 1 and 5 and portion between 1 and 5 and service between 1 and 5 and price between 1 and 5));
 ALTER TABLE `review` ADD CONSTRAINT `review_image_count_chk` CHECK (image_count between 0 and 5);

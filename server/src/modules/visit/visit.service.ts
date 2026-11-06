@@ -12,7 +12,13 @@ import { RestaurantError } from '../restaurant/restaurant.errors';
 import { grantReward } from '../reward/reward.service';
 import { assertUploadedImage } from '../upload/uploaded-image';
 import { readReceipt } from './receipt-ocr';
-import type { LocationCheckBody, OnSiteBody, ReceiptBody } from './visit.schema';
+import type {
+  LocationCheckBody,
+  OnSiteBody,
+  ReceiptBody,
+  RestaurantConfirmBody,
+  VerificationQuery,
+} from './visit.schema';
 import { FAIL_MESSAGES, VisitError } from './visit.errors';
 
 /** 현장 인증 허용 거리 (m) — "매장에서 42m · 인증 범위 100m 이내" */
@@ -262,15 +268,22 @@ export async function flushReceiptChecks() {
   while (running.size > 0) await Promise.all([...running]);
 }
 
-/** VISIT-03 영수증 인증 요청 — status P로 접수하고 OCR은 따로 돌린다. 결과는 VISIT-04 */
+/**
+ * VISIT-03 영수증 인증 요청 — status P로 접수하고 OCR은 따로 돌린다. 결과는 VISIT-04.
+ * restaurantId가 없으면 홈에서 바로 찍은 영수증: OCR로 후보 가게를 찾아 status R("이 가게가 맞나요?") → VISIT-05
+ */
 export async function submitReceipt(userId: bigint, body: ReceiptBody, now = new Date()) {
-  const restaurant = await findOpenRestaurant(body.restaurantId);
-  await assertCanVerify(userId, restaurant.id, now);
+  let restaurantId: bigint | null = null;
+  if (body.restaurantId) {
+    const restaurant = await findOpenRestaurant(body.restaurantId);
+    await assertCanVerify(userId, restaurant.id, now);
+    restaurantId = restaurant.id;
+  }
   await assertUploadedImage(userId, 'RECEIPT', body.receiptImageKey);
   const visit = await prisma.visit.create({
     data: {
       userId,
-      restaurantId: restaurant.id,
+      restaurantId,
       method: 'R',
       status: 'P',
       receiptImageKey: body.receiptImageKey,
@@ -296,7 +309,135 @@ export function storeNameMatches(receiptName: string, restaurantName: string) {
   return a.includes(b) || b.includes(a);
 }
 
-/** 영수증 OCR → 검증 → 성공이면 인증 완료, 아니면 status F + fail_reason */
+interface StoreOcr {
+  storeName: string | null;
+  businessNo: string | null;
+}
+
+/** 영수증이 이 가게 것인지 — 사업자번호가 양쪽에 다 있으면 그것으로, 아니면 가게명으로 */
+function receiptMatch(restaurant: { name: string; businessNo: string | null }, ocr: StoreOcr) {
+  const businessNoMatched =
+    restaurant.businessNo && ocr.businessNo ? restaurant.businessNo === ocr.businessNo : null;
+  const storeNameMatched = ocr.storeName ? storeNameMatches(ocr.storeName, restaurant.name) : null;
+  const matched =
+    businessNoMatched === true || (businessNoMatched === null && storeNameMatched === true);
+  return { businessNoMatched, storeNameMatched, matched };
+}
+
+/** 후보를 찾을 때 이름 검색에 쓰는 앞부분 ("(주)옛날손칼국수 가양점" → "옛날손칼") */
+function nameSearchToken(storeName: string) {
+  const first = storeName
+    .replace(/\(주\)|㈜|주식회사/g, '')
+    .trim()
+    .split(/\s+/)[0];
+  return first.length >= 2 ? first.slice(0, 4) : null;
+}
+
+/**
+ * 영수증과 맞는 가게 후보 (홈 영수증 인증). 사업자번호가 같은 가게가 있으면 그것만,
+ * 없으면 가게명이 맞는 가게(다른 사업자번호가 등록된 가게는 다른 지점이라 뺀다). 이름이 똑같은 가게 → 가까운 가게 순
+ */
+export async function findReceiptCandidates(
+  ocr: StoreOcr,
+  near: { lat: number; lng: number } | null,
+  limit = 5,
+) {
+  const select = {
+    id: true,
+    name: true,
+    lat: true,
+    lng: true,
+    businessNo: true,
+    roadAddress: true,
+    category: { select: { name: true } },
+  } as const;
+  let rows = ocr.businessNo
+    ? await prisma.restaurant.findMany({
+        where: { status: 'A', businessNo: ocr.businessNo },
+        select,
+        take: 50,
+      })
+    : [];
+  if (rows.length === 0 && ocr.storeName) {
+    const token = nameSearchToken(ocr.storeName);
+    const found = token
+      ? await prisma.restaurant.findMany({
+          where: { status: 'A', name: { contains: token } },
+          select,
+          take: 300,
+        })
+      : [];
+    rows = found.filter((r) => receiptMatch(r, ocr).matched);
+  }
+  const target = ocr.storeName ? normalizeStoreName(ocr.storeName) : null;
+  const ranked = rows.map((r) => ({
+    r,
+    exact: target !== null && normalizeStoreName(r.name) === target,
+    distanceM: near
+      ? Math.round(distanceBetween(near.lat, near.lng, r.lat.toNumber(), r.lng.toNumber()))
+      : null,
+  }));
+  ranked.sort(
+    (a, b) =>
+      Number(b.exact) - Number(a.exact) ||
+      (a.distanceM ?? 0) - (b.distanceM ?? 0) ||
+      a.r.name.length - b.r.name.length,
+  );
+  return ranked.slice(0, limit).map(({ r, distanceM }) => ({
+    restaurantId: r.id,
+    name: r.name,
+    categoryName: r.category?.name ?? null,
+    roadAddress: r.roadAddress,
+    distanceM,
+    matchedBy: ocr.businessNo && r.businessNo === ocr.businessNo ? 'BUSINESS_NO' : 'NAME',
+  }));
+}
+
+/** 가게가 정해진 영수증 방문을 인증한다 (VISIT-03 가게 있음 / VISIT-05 공통). 같은 가게 인증이 이미 있으면 false */
+async function verifyReceiptVisit(
+  tx: Tx,
+  visit: { id: bigint; userId: bigint },
+  restaurant: { id: bigint; name: string; sigunguId: number; businessNo: string | null },
+  ocr: StoreOcr,
+  data: Prisma.VisitUncheckedUpdateInput,
+  now: Date,
+) {
+  // 같은 가게 영수증 두 장이 함께 읽히면 앞의 것만 인증한다 (잠금 순서: visit → member)
+  await lockMember(tx, visit.userId);
+  try {
+    await assertCanVerify(visit.userId, restaurant.id, now, visit.id, tx);
+  } catch (err) {
+    if (!(err instanceof AppError)) throw err;
+    return { ok: false as const, error: err };
+  }
+  await tx.visit.update({ where: { id: visit.id }, data });
+  // 처음 인증된 영수증의 사업자번호를 가게에 저장해 같은 이름 다른 지점을 구분한다.
+  // 이름이 포함 관계로만 맞은 경우(다른 지점일 수 있음)는 저장하지 않는다
+  const sameName =
+    ocr.storeName !== null &&
+    normalizeStoreName(ocr.storeName) === normalizeStoreName(restaurant.name);
+  if (!restaurant.businessNo && ocr.businessNo && sameName) {
+    await tx.restaurant.update({
+      where: { id: restaurant.id },
+      data: { businessNo: ocr.businessNo },
+    });
+  }
+  const reward = await completeVerification(
+    tx,
+    { id: visit.id, userId: visit.userId, restaurantId: restaurant.id },
+    restaurant.name,
+    restaurant.sigunguId,
+    now,
+  );
+  return { ok: true as const, reward };
+}
+
+const isExpiredReceipt = (paidAt: Date, now: Date) => {
+  const ageMs = now.getTime() - paidAt.getTime();
+  return ageMs > RECEIPT_VALID_DAYS * 86_400_000 || ageMs < -86_400_000;
+};
+
+/** 영수증 OCR → 검증 → 성공이면 인증 완료(가게 없음: 가게 확인 대기 R), 아니면 status F + fail_reason */
 export async function processReceipt(visitId: bigint, now = new Date()) {
   const visit = await prisma.visit.findUnique({
     where: { id: visitId },
@@ -304,7 +445,7 @@ export async function processReceipt(visitId: bigint, now = new Date()) {
       restaurant: { select: { id: true, name: true, sigunguId: true, businessNo: true } },
     },
   });
-  if (!visit || visit.status !== 'P' || !visit.restaurant || !visit.receiptImageKey) return;
+  if (!visit || visit.status !== 'P' || !visit.receiptImageKey) return;
   const restaurant = visit.restaurant;
 
   const fail = (failReason: string, extra: Prisma.VisitUpdateInput = {}) =>
@@ -323,6 +464,7 @@ export async function processReceipt(visitId: bigint, now = new Date()) {
     return;
   }
 
+  const ocr: StoreOcr = { storeName: receipt.storeName, businessNo: receipt.businessNo };
   const ocrFields = {
     ocrRaw: receipt.raw as Prisma.InputJsonValue,
     ocrStoreName: receipt.storeName?.slice(0, 100) ?? null,
@@ -331,22 +473,21 @@ export async function processReceipt(visitId: bigint, now = new Date()) {
     paidAt: receipt.paidAt,
     totalAmount: receipt.totalAmount,
   };
-  const ageMs = now.getTime() - receipt.paidAt.getTime();
-  if (ageMs > RECEIPT_VALID_DAYS * 86_400_000 || ageMs < -86_400_000) {
+  if (isExpiredReceipt(receipt.paidAt, now)) {
     await fail('EXPIRED', ocrFields);
     return;
   }
-  const businessNoMatched =
-    restaurant.businessNo && receipt.businessNo
-      ? restaurant.businessNo === receipt.businessNo
-      : null;
-  const storeNameMatched = receipt.storeName
-    ? storeNameMatches(receipt.storeName, restaurant.name)
-    : null;
-  const matched =
-    businessNoMatched === true || (businessNoMatched === null && storeNameMatched === true);
-  if (!matched) {
-    await fail('STORE_MISMATCH', { ...ocrFields, storeNameMatched, businessNoMatched });
+  const match = restaurant ? receiptMatch(restaurant, ocr) : null;
+  if (match && !match.matched) {
+    await fail('STORE_MISMATCH', {
+      ...ocrFields,
+      storeNameMatched: match.storeNameMatched,
+      businessNoMatched: match.businessNoMatched,
+    });
+    return;
+  }
+  if (!restaurant && (await findReceiptCandidates(ocr, null, 1)).length === 0) {
+    await fail('STORE_NOT_FOUND', ocrFields);
     return;
   }
   const receiptHash = createHash('sha256')
@@ -365,45 +506,39 @@ export async function processReceipt(visitId: bigint, now = new Date()) {
       const [locked] = await tx.$queryRaw<{ status: string }[]>`
         SELECT status FROM visit WHERE id = ${visit.id} FOR UPDATE`;
       if (locked?.status !== 'P') return;
-      // 같은 가게 영수증 두 장이 함께 읽히면 앞의 것만 인증한다
-      await lockMember(tx, visit.userId);
-      try {
-        await assertCanVerify(visit.userId, restaurant.id, now, visit.id, tx);
-      } catch (err) {
-        if (!(err instanceof AppError)) throw err;
-        await tx.visit.update({
-          where: { id: visit.id },
-          data: { ...ocrFields, status: 'F', failReason: 'ALREADY_VERIFIED' },
-        });
-        return;
-      }
-      await tx.visit.update({
-        where: { id: visit.id },
-        data: { ...ocrFields, storeNameMatched, businessNoMatched, receiptHash },
-      });
       if (receipt.items.length > 0) {
         await tx.visitReceiptItem.createMany({
           data: receipt.items.map((item) => ({ visitId: visit.id, ...item })),
         });
       }
-      // 처음 인증된 영수증의 사업자번호를 가게에 저장해 같은 이름 다른 지점을 구분한다.
-      // 이름이 포함 관계로만 맞은 경우(다른 지점일 수 있음)는 저장하지 않는다
-      const sameName =
-        receipt.storeName !== null &&
-        normalizeStoreName(receipt.storeName) === normalizeStoreName(restaurant.name);
-      if (!restaurant.businessNo && receipt.businessNo && sameName) {
-        await tx.restaurant.update({
-          where: { id: restaurant.id },
-          data: { businessNo: receipt.businessNo },
+      if (!restaurant || !match) {
+        // 홈 영수증: 같은 영수증 재사용은 여기서 막고(receipt_hash unique), 가게는 VISIT-05에서 고른다
+        await tx.visit.update({
+          where: { id: visit.id },
+          data: { ...ocrFields, receiptHash, status: 'R' },
         });
+        return;
       }
-      await completeVerification(
+      const result = await verifyReceiptVisit(
         tx,
-        { id: visit.id, userId: visit.userId, restaurantId: restaurant.id },
-        restaurant.name,
-        restaurant.sigunguId,
+        visit,
+        restaurant,
+        ocr,
+        {
+          ...ocrFields,
+          storeNameMatched: match.storeNameMatched,
+          businessNoMatched: match.businessNoMatched,
+          receiptHash,
+        },
         now,
       );
+      if (!result.ok) {
+        await tx.visitReceiptItem.deleteMany({ where: { visitId: visit.id } });
+        await tx.visit.update({
+          where: { id: visit.id },
+          data: { ...ocrFields, status: 'F', failReason: 'ALREADY_VERIFIED' },
+        });
+      }
     });
   } catch (err) {
     // 같은 영수증(receipt_hash unique)을 이미 다른 인증에 썼다
@@ -415,8 +550,70 @@ export async function processReceipt(visitId: bigint, now = new Date()) {
   }
 }
 
+/** VISIT-05 홈 영수증 — "이 가게가 맞나요?"에서 가게를 고르면 인증한다 (영수증과 맞는 가게만) */
+export async function confirmReceiptRestaurant(
+  userId: bigint,
+  visitId: number,
+  body: RestaurantConfirmBody,
+  now = new Date(),
+) {
+  const visit = await findMyVisit(userId, visitId);
+  if (visit.method !== 'R' || visit.status !== 'R')
+    throw new AppError(VisitError.INVALID_VISIT_STATE);
+  const restaurant = await findOpenRestaurant(body.restaurantId);
+  const ocr: StoreOcr = { storeName: visit.ocrStoreName, businessNo: visit.ocrBusinessNo };
+  const match = receiptMatch(restaurant, ocr);
+  if (!match.matched) throw new AppError(VisitError.RESTAURANT_NOT_CANDIDATE);
+  if (visit.paidAt && isExpiredReceipt(visit.paidAt, now)) {
+    await prisma.visit.update({
+      where: { id: visit.id },
+      data: { status: 'F', failReason: 'EXPIRED' },
+    });
+    return {
+      verificationId: visit.id,
+      status: STATUS_API.F,
+      failReason: 'EXPIRED',
+      failMessage: FAIL_MESSAGES.EXPIRED,
+      restaurant: null,
+      reward: null,
+    };
+  }
+  const reward = await prisma.$transaction(async (tx) => {
+    const [locked] = await tx.$queryRaw<{ status: string }[]>`
+      SELECT status FROM visit WHERE id = ${visit.id} FOR UPDATE`;
+    if (locked?.status !== 'R') throw new AppError(VisitError.INVALID_VISIT_STATE);
+    const result = await verifyReceiptVisit(
+      tx,
+      visit,
+      restaurant,
+      ocr,
+      {
+        restaurantId: restaurant.id,
+        storeNameMatched: match.storeNameMatched,
+        businessNoMatched: match.businessNoMatched,
+      },
+      now,
+    );
+    if (!result.ok) throw result.error;
+    return result.reward;
+  });
+  return {
+    verificationId: visit.id,
+    status: STATUS_API.V,
+    failReason: null,
+    failMessage: null,
+    restaurant: { restaurantId: restaurant.id, name: restaurant.name },
+    reward: { point: reward.point, levelUp: reward.levelUp },
+  };
+}
+
 /** VISIT-04 방문 인증 결과 조회 */
-export async function getVerification(userId: bigint, visitId: number, now = new Date()) {
+export async function getVerification(
+  userId: bigint,
+  visitId: number,
+  query: VerificationQuery = {},
+  now = new Date(),
+) {
   const visit = await prisma.visit.findUnique({
     where: { id: BigInt(visitId) },
     include: {
@@ -426,9 +623,17 @@ export async function getVerification(userId: bigint, visitId: number, now = new
     },
   });
   if (!visit || visit.userId !== userId) throw new AppError(VisitError.VISIT_NOT_FOUND);
-  const [receiptImageUrl, sitePhotoUrl] = await Promise.all([
+  const near =
+    query.lat !== undefined && query.lng !== undefined ? { lat: query.lat, lng: query.lng } : null;
+  const [receiptImageUrl, sitePhotoUrl, candidates] = await Promise.all([
     createReadUrl(visit.receiptImageKey),
     createReadUrl(visit.sitePhotoKey),
+    visit.status === 'R'
+      ? findReceiptCandidates(
+          { storeName: visit.ocrStoreName, businessNo: visit.ocrBusinessNo },
+          near,
+        )
+      : null,
   ]);
   const expiresAt =
     visit.status === 'L' && visit.checkinAt
@@ -476,6 +681,7 @@ export async function getVerification(userId: bigint, visitId: number, now = new
     verifiedAt: toKstIsoOrNull(visit.verifiedAt),
     expiresAt: expiresAt ? toKstIso(expiresAt) : null,
     isExpired: expiresAt ? expiresAt < now : false,
+    candidates,
     canRate: visit.status === 'V',
     reviewId: visit.review?.id ?? null,
   };

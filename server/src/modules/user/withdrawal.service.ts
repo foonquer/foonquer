@@ -42,7 +42,7 @@ export async function getWithdrawalSummary(userId: bigint) {
   };
 }
 
-/** 탈퇴할 때 회원의 행을 지우는 테이블 (리뷰·방문·신고·문의·운영 기록은 남긴다) */
+/** 탈퇴할 때 회원의 행을 지우는 테이블 (리뷰·방문·신고·운영 기록은 남긴다. 방문은 개인정보만 지운다) */
 async function deletePersonalRows(tx: Prisma.TransactionClient, userId: bigint) {
   const where = { userId };
   await tx.refreshToken.deleteMany({ where });
@@ -75,6 +75,8 @@ export async function withdrawMember(userId: bigint, body: WithdrawalBody, now =
   const reasonCode = body.reasonCode ?? null;
   const reasonDetail = reasonCode === 'ETC' ? body.reasonDetail?.trim() || null : null;
 
+  // 트랜잭션이 끝난 뒤 지울 비공개 버킷 파일 (영수증·현장·문의 사진)
+  const privateKeys: (string | null)[] = [];
   const profileImageKey = await prisma.$transaction(
     async (tx) => {
       // 동시에 두 번 눌러도 한 번만 처리되도록 회원 행을 잠근다.
@@ -117,12 +119,42 @@ export async function withdrawMember(userId: bigint, body: WithdrawalBody, now =
       }
       await tx.conquest.deleteMany({ where: { userId } });
 
-      // 방문 행은 리뷰가 참조해서 남기고 영수증 원문·사진 좌표만 지운다.
-      // 영수증·현장 사진 key와 체크인 좌표는 visit CHECK 제약(인증 방식별 필수)이 있어 남긴다 (명세서 SET-04 비고).
-      await tx.visit.updateMany({
-        where: { userId },
-        data: { ocrRaw: Prisma.DbNull, photoLat: null, photoLng: null },
+      // 방문 기록의 개인정보는 바로 지운다(보관 안 함, 2026-11-06). 방문 행은 리뷰가 참조해서 남기고 purged_at을 채운다(ERD v1.3).
+      const visits = await tx.visit.findMany({
+        where: { userId, purgedAt: null },
+        select: { id: true, receiptImageKey: true, sitePhotoKey: true },
       });
+      for (const v of visits) privateKeys.push(v.receiptImageKey, v.sitePhotoKey);
+      await tx.visitReceiptItem.deleteMany({ where: { visit: { userId } } });
+      await tx.visit.updateMany({
+        where: { userId, purgedAt: null },
+        data: {
+          purgedAt: now,
+          receiptImageKey: null,
+          ocrRaw: Prisma.DbNull,
+          ocrStoreName: null,
+          ocrBusinessNo: null,
+          ocrApprovalNo: null,
+          paidAt: null,
+          totalAmount: null,
+          receiptHash: null,
+          checkinLat: null,
+          checkinLng: null,
+          checkinAccuracy: null,
+          checkinDistanceM: null,
+          sitePhotoKey: null,
+          photoTakenAt: null,
+          photoLat: null,
+          photoLng: null,
+        },
+      });
+      // 1:1 문의도 내용·사진째 지운다
+      const inquiries = await tx.inquiry.findMany({
+        where: { userId },
+        select: { imageKey: true },
+      });
+      for (const q of inquiries) privateKeys.push(q.imageKey);
+      await tx.inquiry.deleteMany({ where: { userId } });
 
       await deletePersonalRows(tx, userId);
 
@@ -145,5 +177,6 @@ export async function withdrawMember(userId: bigint, body: WithdrawalBody, now =
   );
 
   await deleteObjectQuietly(profileImageKey);
+  await Promise.all(privateKeys.map((key) => deleteObjectQuietly(key, 'private')));
   return { withdrawnAt: toKstIso(now) };
 }

@@ -11,11 +11,15 @@ import {
   onSiteBody,
   type ReceiptBody,
   receiptBody,
+  type RestaurantConfirmBody,
+  restaurantConfirmBody,
   verificationParams,
+  verificationQuery,
 } from './visit.schema';
 import {
   checkLocation,
   completeOnSite,
+  confirmReceiptRestaurant,
   getVerification,
   scheduleReceiptCheck,
   submitReceipt,
@@ -73,10 +77,35 @@ visitRouter.post(
 visitRouter.get(
   '/:verificationId',
   requireAuth(),
-  validate({ params: verificationParams }),
+  validate({ params: verificationParams, query: verificationQuery }),
   async (req, res) => {
     const { userId } = getAuthUser(req);
     const { verificationId } = req.params as unknown as Params;
-    ok(res, await getVerification(userId, verificationId), '방문 인증 결과를 조회했어요.');
+    const data = await getVerification(userId, verificationId, req.query);
+    ok(res, data, '방문 인증 결과를 조회했어요.');
+  },
+);
+
+// VISIT-05 홈 영수증: "이 가게가 맞나요?"에서 가게 고르기 → 인증
+visitRouter.post(
+  '/:verificationId/restaurant',
+  requireAuth(),
+  verifyLimit,
+  validate({ params: verificationParams, body: restaurantConfirmBody }),
+  async (req, res) => {
+    const { userId } = getAuthUser(req);
+    const { verificationId } = req.params as unknown as Params;
+    const data = await confirmReceiptRestaurant(
+      userId,
+      verificationId,
+      req.body as RestaurantConfirmBody,
+    );
+    ok(
+      res,
+      data,
+      data.status === 'VERIFIED'
+        ? '방문 인증을 마쳤어요! 별점을 남기면 정복이 끝나요.'
+        : (data.failMessage ?? '인증하지 못했어요.'),
+    );
   },
 );

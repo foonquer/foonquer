@@ -475,6 +475,8 @@ model Visit {
   /// 인증 시점에 작성자의 내 동네 구(member_local_region) 중 가게의 구가 있는지 — 리뷰 카드의 로컬/외부 방문 표시와 현지인 방문 %에 사용. 나중에 내 동네를 바꿔도 이 값은 그대로 둔다
   isLocal           Boolean            @default(false) @map("is_local")
   verifiedAt        DateTime?          @map("verified_at")
+  /// 탈퇴로 영수증·현장 사진, 좌표, OCR·결제 정보를 지운 시각 (v1.3). 채워지면 인증 방식별 필수 CHECK를 보지 않는다
+  purgedAt          DateTime?          @map("purged_at")
   regDate           DateTime           @default(now()) @map("reg_date")
   updateDate        DateTime?          @updatedAt @map("update_date")
   user              Member             @relation(fields: [userId], references: [id])

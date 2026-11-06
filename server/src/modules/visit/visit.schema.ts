@@ -38,7 +38,21 @@ export type OnSiteBody = z.infer<typeof onSiteBody>;
 
 /** VISIT-03 */
 export const receiptBody = z.object({
-  restaurantId: z.number().int().positive(),
+  /** 없으면 홈에서 바로 찍은 영수증: OCR로 후보 가게를 찾아 "이 가게가 맞나요?"(status R) */
+  restaurantId: z.number().int().positive().optional(),
   receiptImageKey: z.string().min(1).max(255),
 });
 export type ReceiptBody = z.infer<typeof receiptBody>;
+
+/** VISIT-04 — 가게 확인 대기(R)일 때 후보 가게를 내 위치에서 가까운 순으로 */
+export const verificationQuery = z
+  .object({
+    lat: z.coerce.number().pipe(lat).optional(),
+    lng: z.coerce.number().pipe(lng).optional(),
+  })
+  .refine((q) => (q.lat === undefined) === (q.lng === undefined), COORD_ERROR);
+export type VerificationQuery = z.infer<typeof verificationQuery>;
+
+/** VISIT-05 */
+export const restaurantConfirmBody = z.object({ restaurantId: z.number().int().positive() });
+export type RestaurantConfirmBody = z.infer<typeof restaurantConfirmBody>;
