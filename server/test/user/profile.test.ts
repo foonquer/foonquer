@@ -36,6 +36,7 @@ async function setupBody(overrides: Record<string, unknown> = {}) {
     gender: 'F',
     ageGroup: 20,
     localRegionIds: [await regionId(GAYANG), await regionId(YEOKSAM)],
+    preferredCategoryIds: [6, 1], // 고깃집, 한식
     ...overrides,
   };
 }
@@ -149,6 +150,11 @@ describe('USER-03 POST /users/me/profile', () => {
       regDate: expect.stringMatching(/\+09:00$/),
     });
     expect(data.localRegions[1]).toMatchObject({ dongName: '역삼동', sortOrder: 1 });
+    // 좋아하는 음식은 칩 순서(카테고리 id 순서)로 돌려준다
+    expect(data.preferredCategories).toEqual([
+      { categoryId: 1, categoryName: '한식' },
+      { categoryId: 6, categoryName: '고깃집' },
+    ]);
     expect(data.welcome).toEqual({
       seasonNo: null,
       tierTitle: '강서구 초보 탐방러',
@@ -169,6 +175,11 @@ describe('USER-03 POST /users/me/profile', () => {
     });
     const mukkaebi = await prisma.mukkaebi.findUniqueOrThrow({ where: { userId: me.id } });
     expect(mukkaebi).toMatchObject({ level: 1, exp: 0 });
+    const preferred = await prisma.memberPreferredCategory.findMany({
+      where: { userId: me.id },
+      orderBy: { categoryId: 'asc' },
+    });
+    expect(preferred.map((p) => p.categoryId)).toEqual([1, 6]);
   });
 
   it('진행 중 시즌이 있으면 시즌 번호를, 레벨 정책이 있으면 그 단계를 준다', async () => {
@@ -246,6 +257,14 @@ describe('USER-03 POST /users/me/profile', () => {
     [{ localRegionIds: [1, 2, 3] }, 'LOCAL_REGION_COUNT_INVALID', undefined],
     [{ localRegionIds: undefined }, 'LOCAL_REGION_COUNT_INVALID', undefined],
     [{ localRegionIds: [5, 5] }, 'LOCAL_REGION_DUPLICATE', '같은 동네를 두 번 고를 수 없어요.'],
+    [
+      { preferredCategoryIds: [] },
+      'PREFERRED_CATEGORY_INVALID',
+      '좋아하는 음식을 1개 이상 골라 주세요.',
+    ],
+    [{ preferredCategoryIds: undefined }, 'PREFERRED_CATEGORY_INVALID', undefined],
+    [{ preferredCategoryIds: [1, 1] }, 'PREFERRED_CATEGORY_INVALID', undefined],
+    [{ preferredCategoryIds: [99] }, 'PREFERRED_CATEGORY_INVALID', undefined],
   ])('입력이 잘못되면 400 (%j → %s)', async (overrides, code, message) => {
     const me = await pendingMember();
     const res = await setup(me.id, await setupBody(overrides));

@@ -116,10 +116,39 @@ async function seedRegions(prisma: PrismaClient) {
   return { sigunguCount: SEOUL_SIGUNGU.length, dongCount: SEOUL_DONG.length };
 }
 
+// 신뢰도 가중 별점 계산식의 계수 (「신뢰 온도 · 가중 별점 계산식」 2026-11-05, ERD v1.0 rating_param).
+// 베타 운영 뒤 DB에서 바로 조정하므로, 이미 있는 행은 덮어쓰지 않는다. GLOBAL_MEAN은 하루 1번 배치가 바꾼다.
+const ratingParams = [
+  {
+    code: 'GLOBAL_MEAN',
+    value: 3.8,
+    description: '전체 평균 별점 m (하루 1번 갱신, 리뷰가 쌓이기 전 초기값)',
+  },
+  { code: 'PRIOR_WEIGHT', value: 5, description: '리뷰 수 보정 강도 C' },
+  { code: 'TEMP_BASE', value: 50, description: '작성자 가중치 w_user = 1 + (T − 50) / 50' },
+  { code: 'HELP_POS', value: 0.5, description: '공감 가중치 계수 (s ≥ 0)' },
+  { code: 'HELP_NEG', value: 0.3, description: '공감 가중치 계수 (s < 0)' },
+  { code: 'HELP_FULL_COUNT', value: 10, description: '반응이 이 개수부터 공감을 100% 반영 (k)' },
+  { code: 'REVISIT_WEIGHT', value: 1.1, description: '재방문 리뷰 가중치 v' },
+  { code: 'DECAY_RATE', value: 0.7, description: '시간 감쇠 d = 0.7 ^ n' },
+  { code: 'DECAY_MIN', value: 0.3, description: '시간 감쇠 최솟값' },
+  { code: 'DECAY_MONTHS', value: 6, description: '시간 감쇠 단위 개월 수' },
+  { code: 'TRUST_MIN', value: 0.5, description: 'clamp(w_user × w_help) 하한' },
+  { code: 'TRUST_MAX', value: 2.0, description: 'clamp(w_user × w_help) 상한' },
+];
+
+async function seedRatingParams(prisma: PrismaClient) {
+  for (const param of ratingParams) {
+    await prisma.ratingParam.upsert({ where: { code: param.code }, update: {}, create: param });
+  }
+  return ratingParams.length;
+}
+
 /** 기본 데이터를 모두 넣고 넣은 개수를 돌려준다 */
 export async function seedBaseData(prisma: PrismaClient) {
   const categoryCount = await seedCategories(prisma);
   const policyDocumentCreated = await seedPolicyDocuments(prisma);
   const regions = await seedRegions(prisma);
-  return { categoryCount, policyDocumentCreated, ...regions };
+  const ratingParamCount = await seedRatingParams(prisma);
+  return { categoryCount, policyDocumentCreated, ...regions, ratingParamCount };
 }

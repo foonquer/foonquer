@@ -15,7 +15,7 @@ type Props = {
 export function RestaurantCard({ item, note }: Props) {
   const score = formatScore(item.rating.score);
   const scoreLine = joinDot([
-    score ? `★ ${score}` : '아직 평가 없음',
+    score ? `★ ${score}` : '아직 별점 없음',
     item.revisitRate !== null ? `재방문 ${item.revisitRate}%` : null,
   ]);
 

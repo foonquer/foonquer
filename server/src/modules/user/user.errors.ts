@@ -20,6 +20,11 @@ export const UserError = defineErrors({
     code: 'LOCAL_REGION_COUNT_INVALID',
     message: '내 동네는 1~2곳 골라 주세요.',
   },
+  PREFERRED_CATEGORY_INVALID: {
+    status: 400,
+    code: 'PREFERRED_CATEGORY_INVALID',
+    message: '좋아하는 음식을 1개 이상 골라 주세요.',
+  },
   LOCAL_REGION_DUPLICATE_INPUT: {
     status: 400,
     code: 'LOCAL_REGION_DUPLICATE',

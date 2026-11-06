@@ -69,6 +69,12 @@ async function goToRegionStep() {
   fireEvent.click(await screen.findByRole('radio', { name: '남성' }));
   fireEvent.click(screen.getByRole('radio', { name: '20대' }));
   fireEvent.click(screen.getByRole('button', { name: '다음' }));
+  // S-05-1 좋아하는 음식: 하나 이상 골라야 다음으로
+  await screen.findByText('2/3 · 좋아하는 음식');
+  expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('checkbox', { name: '고깃집' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: '한식' }));
+  fireEvent.click(screen.getByRole('button', { name: '다음' }));
   await screen.findByText('3/3 · 내 동네');
 }
 
@@ -102,6 +108,7 @@ describe('프로필 설정 (S-04 ~ S-07)', () => {
       gender: 'M',
       ageGroup: 20,
       localRegionIds: [11],
+      preferredCategoryIds: [1, 6], // 칩 순서대로
     });
 
     fireEvent.click(screen.getByRole('button', { name: '첫 맛집 찾으러 가기' }));

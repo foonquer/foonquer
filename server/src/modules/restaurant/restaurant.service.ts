@@ -77,6 +77,7 @@ export async function getRestaurantPreview(
     dongName: r.region.name,
     distanceM: distanceMeters(from, { lat: r.lat.toNumber(), lng: r.lng.toNumber() }),
     rating: ratingOf(r.restaurantStat),
+    hasMapae: r.hasMapae,
     businessStatus: businessStatusOf(parseBusinessHours(r.businessHours), now),
     currentSeasonConquerorCount: conquerorCount,
     conquestState: state.conquestState,
@@ -126,6 +127,7 @@ export async function getRestaurantDetail(
     businessHours,
     businessStatus: businessStatusOf(businessHours, now),
     rating: ratingOf(r.restaurantStat),
+    hasMapae: r.hasMapae,
     stats: { ...detailStatsOf(r.restaurantStat), currentSeasonConquerorCount: conquerorCount },
     my: {
       conquestState: state.conquestState,

@@ -43,6 +43,10 @@ export function RecommendationsPage() {
   );
 
   const items = reco.data?.items ?? [];
+  // 추천 결과에 실제로 들어 있는 선호 카테고리만 안내한다 (선호 가게가 없으면 안내하지 않음)
+  const shownPreferred = (reco.data?.preferredCategories ?? []).filter((c) =>
+    items.some((item) => item.categoryId === c.categoryId),
+  );
 
   return (
     <Screen
@@ -58,6 +62,11 @@ export function RecommendationsPage() {
         <RegionChip region={region} onClick={() => setRegionOpen(true)} />
         <h2 className={styles.title}>이 동네의 다음 한 끼</h2>
         <p className={styles.subtitle}>현지인 방문·재방문·인증 리뷰를 바탕으로 골랐어요.</p>
+        {shownPreferred.length > 0 && (
+          <p className={styles.subtitle}>
+            좋아하는 {shownPreferred.map((c) => c.categoryName).join('·')} 가게부터 보여 드려요.
+          </p>
+        )}
         <div className={styles.chips}>
           <FilterChips
             label="추천 기준"

@@ -225,9 +225,28 @@ export async function searchRestaurants(userId: bigint, q: RestaurantSearchQuery
   };
 }
 
-/** RECO-01 추천 맛집 목록 (카카오는 부르지 않는다: 통계가 있는 가게는 이미 DB에 있다) */
+/** S-05-1에서 고른 좋아하는 음식 (카테고리 순서) */
+async function loadPreferredCategories(userId: bigint) {
+  const rows = await prisma.memberPreferredCategory.findMany({
+    where: { userId },
+    select: { category: { select: { id: true, name: true } } },
+    orderBy: { category: { sortOrder: 'asc' } },
+  });
+  return rows.map((r) => ({ categoryId: r.category.id, categoryName: r.category.name }));
+}
+
+/**
+ * RECO-01 추천 맛집 목록 (카카오는 부르지 않는다: 통계가 있는 가게는 이미 DB에 있다).
+ * 카테고리를 고르지 않았으면 좋아하는 음식(S-05-1) 가게를 먼저 보여 준다 (3차 멘토링 개인화).
+ */
 export async function getRecommendations(userId: bigint, q: RecommendationQuery) {
   const category = q.categoryId !== undefined ? await requireCategory(q.categoryId) : null;
+  const preferredCategories = await loadPreferredCategories(userId);
+  const preferredIds = preferredCategories.map((c) => c.categoryId);
+  const preferredFirst =
+    !category && preferredIds.length > 0
+      ? Prisma.sql`(r.category_id IN (${Prisma.join(preferredIds)})) DESC,`
+      : Prisma.empty;
   const area = await requireSeoulArea(
     await regionIdOrMyFirst(userId, q.regionId),
     '지금은 서울만 볼 수 있어요.',
@@ -237,13 +256,13 @@ export async function getRecommendations(userId: bigint, q: RecommendationQuery)
     q.type === 'REVISIT'
       ? Prisma.sql`s.visitor_count >= ${MIN_VISITORS_FOR_REVISIT}`
       : q.type === 'RATING'
-        ? Prisma.sql`s.review_count >= ${MIN_REVIEWS_FOR_RATING} AND s.weight_sum > 0`
+        ? Prisma.sql`s.review_count >= ${MIN_REVIEWS_FOR_RATING} AND s.display_score IS NOT NULL`
         : Prisma.sql`s.local_visit_count >= 1`;
   const orderBy =
     q.type === 'REVISIT'
       ? Prisma.sql`s.revisitor_count / s.visitor_count DESC, s.visitor_count DESC, r.id`
       : q.type === 'RATING'
-        ? Prisma.sql`s.weighted_score_sum / s.weight_sum DESC, s.review_count DESC, r.id`
+        ? Prisma.sql`s.display_score DESC, s.review_count DESC, r.id`
         : Prisma.sql`s.local_visit_count DESC, s.review_count DESC, r.id`;
   const where = Prisma.sql`
     r.status = 'A'
@@ -258,7 +277,7 @@ export async function getRecommendations(userId: bigint, q: RecommendationQuery)
     prisma.$queryRaw<{ id: bigint }[]>`
       SELECT r.id FROM restaurant r JOIN restaurant_stat s ON s.restaurant_id = r.id
       WHERE ${where}
-      ORDER BY ${orderBy}
+      ORDER BY ${preferredFirst} ${orderBy}
       LIMIT ${q.size} OFFSET ${(q.page - 1) * q.size}`,
   ]);
   const totalCount = Number(countRows[0]?.cnt ?? 0);
@@ -282,6 +301,8 @@ export async function getRecommendations(userId: bigint, q: RecommendationQuery)
 
   return {
     type: q.type,
+    // 좋아하는 음식 가게를 먼저 보여 줬는지 ("좋아하는 한식부터 보여 드려요" 안내용). 카테고리를 골랐으면 빈 배열
+    preferredCategories: category ? [] : preferredCategories,
     region: {
       regionId: area.level === 3 ? area.dong.id : area.sigungu.id,
       level: area.level,

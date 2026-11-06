@@ -29,6 +29,7 @@ export function toRestaurantCard(
     categoryName: row.category?.name ?? null,
     distanceM: distanceMeters(from, { lat: row.lat.toNumber(), lng: row.lng.toNumber() }),
     rating: ratingOf(row.restaurantStat),
+    hasMapae: row.hasMapae,
     revisitRate: revisitRateOf(row.restaurantStat),
     localVisitRate: localVisitRateOf(row.restaurantStat),
     conquestState: state.conquestState,

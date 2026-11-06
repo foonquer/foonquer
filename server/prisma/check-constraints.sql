@@ -24,3 +24,5 @@ ALTER TABLE `item` ADD CONSTRAINT `item_club_tier_chk` CHECK (category = 'CLUB' 
 ALTER TABLE `item` ADD CONSTRAINT `item_craft_chk` CHECK (unlock_type <> 'M' or (category = 'CLUB' and club_tier = 5));
 ALTER TABLE `item_recipe` ADD CONSTRAINT `item_recipe_count_chk` CHECK (material_count >= 2);
 ALTER TABLE `member_item` ADD CONSTRAINT `member_item_quantity_chk` CHECK (quantity >= 0);
+ALTER TABLE `restaurant_mapae` ADD CONSTRAINT `restaurant_mapae_reason_chk` CHECK (reason in ('A','E'));
+ALTER TABLE `restaurant_mapae` ADD CONSTRAINT `restaurant_mapae_status_chk` CHECK (status in ('A','R'));

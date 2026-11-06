@@ -41,6 +41,7 @@ async function giveStats(restaurantId: bigint) {
       scoreSum: 17,
       weightSum: 3.5,
       weightedScoreSum: 14.7,
+      displayScore: 4.2,
       tasteSum: 18,
       cleanlinessSum: 13,
       portionSum: 12,
@@ -110,6 +111,7 @@ describe('MAP-02 GET /restaurants/{restaurantId}/preview', () => {
       dongName: '가양동',
       distanceM: expect.any(Number),
       rating: { score: 4.2, reviewCount: 4 },
+      hasMapae: false,
       businessStatus: { isOpen: true, todayOpenTime: '11:00', todayCloseTime: '22:00' },
       currentSeasonConquerorCount: 2,
       conquestState: 'NOT_CONQUERED',
@@ -259,6 +261,7 @@ describe('REST-01 GET /restaurants/{restaurantId}', () => {
       businessHours: { ...HOURS, sun: [] },
       businessStatus: { isOpen: false, todayOpenTime: null, todayCloseTime: null },
       rating: { score: 4.2, reviewCount: 4 },
+      hasMapae: false,
       stats: {
         taste: 4.5,
         cleanliness: 4.3,
@@ -283,6 +286,21 @@ describe('REST-01 GET /restaurants/{restaurantId}', () => {
         isSaved: false,
       },
     });
+  });
+
+  it('마패가 붙은 가게는 hasMapae true', async () => {
+    const me = await createMember();
+    const r = await createRestaurant({ hasMapae: true });
+    const res = await detail(me.id, r.id);
+    expect(res.body.data.hasMapae).toBe(true);
+  });
+
+  it('리뷰는 있지만 신뢰도 가중 별점을 아직 계산하지 않았으면 score null', async () => {
+    const me = await createMember();
+    const r = await createRestaurant();
+    await prisma.restaurantStat.create({ data: { restaurantId: r.id, reviewCount: 3 } });
+    const res = await detail(me.id, r.id);
+    expect(res.body.data.rating).toEqual({ score: null, reviewCount: 3 });
   });
 
   it('통계가 아직 없는 가게는 평균·비율이 null, 개수는 0', async () => {

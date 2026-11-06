@@ -52,6 +52,52 @@
   width: 12px;
 }
 
+/* 신뢰도 가중 별점이라는 안내 (계산식 문서 5. 운영 규칙) */
+.trustNote {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--mk-subtle);
+}
+
+/* Figma "음식점 상세 · 마패": 가게 분류 아래 배너 346×58, 둥글기 14 */
+.mapae {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px solid #e8b25c;
+  border-radius: 14px;
+  background: #fff4e0;
+}
+
+.mapaeIcon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1.5px solid #99661f;
+  border-radius: 50%;
+  background: #d9a33d;
+  font-size: 11px;
+  font-weight: 700;
+  color: #5c380d;
+}
+
+.mapaeTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #73450f;
+}
+
+.mapaeSub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #8c6b40;
+}
+
 .myScore {
   font-size: 12px;
   font-weight: 700;

@@ -65,12 +65,24 @@ function isUniqueViolation(err: unknown) {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
 }
 
+/** S-05-1에서 고른 카테고리가 모두 있는지 확인하고 id 순서(= 칩 순서)로 돌려준다 */
+async function requirePreferredCategories(ids: number[]) {
+  const categories = await prisma.category.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, name: true },
+    orderBy: { sortOrder: 'asc' },
+  });
+  if (categories.length !== ids.length) throw new AppError(UserError.PREFERRED_CATEGORY_INVALID);
+  return categories;
+}
+
 /**
  * USER-03 프로필 설정 완료 (S-04 ~ S-06을 한 번에 저장).
- * 회원 상태를 P → A로 바꾸고 내 동네와 먹깨비(LV.1 알)를 만든다. 한 트랜잭션.
+ * 회원 상태를 P → A로 바꾸고 좋아하는 음식(S-05-1), 내 동네와 먹깨비(LV.1 알)를 만든다. 한 트랜잭션.
  */
 export async function completeProfile(userId: bigint, body: ProfileSetupBody, now = new Date()) {
   const regions = await Promise.all(body.localRegionIds.map((id) => requireSeoulDong(id)));
+  const preferredCategories = await requirePreferredCategories(body.preferredCategoryIds);
   if (body.profileImageKey) await assertProfileImage(userId, body.profileImageKey);
 
   try {
@@ -110,6 +122,9 @@ export async function completeProfile(userId: bigint, body: ProfileSetupBody, no
           sortOrder,
           regDate: now,
         })),
+      });
+      await tx.memberPreferredCategory.createMany({
+        data: preferredCategories.map((c) => ({ userId, categoryId: c.id, regDate: now })),
       });
       await tx.mukkaebi.create({ data: { userId } });
 
@@ -155,6 +170,10 @@ export async function completeProfile(userId: bigint, body: ProfileSetupBody, no
       status: member.status,
     },
     localRegions,
+    preferredCategories: preferredCategories.map((c) => ({
+      categoryId: c.id,
+      categoryName: c.name,
+    })),
     welcome: {
       seasonNo: season?.seasonNo ?? null,
       tierTitle: `${firstSigungu} ${FIRST_TIER_NAME}`,
