@@ -136,7 +136,6 @@ async function writeDetail(
   if (input.detailScores !== undefined) {
     const d = input.detailScores;
     Object.assign(data, {
-      taste: d?.taste ?? null,
       cleanliness: d?.cleanliness ?? null,
       portion: d?.portion ?? null,
       service: d?.service ?? null,
@@ -185,7 +184,7 @@ async function grantDetailRewards(
   review: {
     id: bigint;
     userId: bigint;
-    taste: number | null;
+    cleanliness: number | null;
     content: string | null;
     imageCount: number;
   },
@@ -195,7 +194,7 @@ async function grantDetailRewards(
 ): Promise<{ rewards: RewardResult; achievements: UnlockedAchievement[] }> {
   const ref = { type: 'REVIEW', id: review.id };
   const results: RewardResult[] = [];
-  if (review.taste !== null) {
+  if (review.cleanliness !== null) {
     results.push(
       await grantReward(tx, review.userId, 'REVIEW_DETAIL', `${restaurantName} 세부평가`, ref, now),
     );

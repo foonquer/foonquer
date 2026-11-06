@@ -1,7 +1,8 @@
 import { distanceMeters } from '../../common/geo';
 import { prisma } from '../../lib/prisma';
 import { type MyRestaurantState } from './my-state';
-import { localVisitRateOf, ratingOf, revisitRateOf } from './restaurant-stats';
+import type { TasteWeights } from '../user/taste-weights';
+import { localVisitRateOf, myOverallOf, ratingOf, revisitRateOf } from './restaurant-stats';
 
 /** 목록 카드에 쓰는 가게 정보를 id 순서대로 읽는다 (SQL로 정렬·페이지를 정한 뒤 부른다) */
 export async function loadRestaurantsInOrder(ids: bigint[]) {
@@ -21,6 +22,7 @@ export function toRestaurantCard(
   row: CardRow,
   state: MyRestaurantState,
   from: { lat?: number; lng?: number },
+  weights: TasteWeights,
 ) {
   return {
     restaurantId: row.id,
@@ -29,6 +31,8 @@ export function toRestaurantCard(
     categoryName: row.category?.name ?? null,
     distanceM: distanceMeters(from, { lat: row.lat.toNumber(), lng: row.lng.toNumber() }),
     rating: ratingOf(row.restaurantStat),
+    // "★ 4.6 맛 · 내 종합 4.4" (피그마 3-2)
+    myOverallScore: myOverallOf(row.restaurantStat, weights).score,
     hasMapae: row.hasMapae,
     revisitRate: revisitRateOf(row.restaurantStat),
     localVisitRate: localVisitRateOf(row.restaurantStat),

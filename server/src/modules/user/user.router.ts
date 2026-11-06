@@ -14,6 +14,7 @@ import {
   removeProfileImage,
 } from './profile-image.service';
 import { getSettings, updateNotificationSettings } from './settings.service';
+import { getTasteWeights, updateTasteWeights } from './taste-weights';
 import {
   localRegionAddBody,
   localRegionParams,
@@ -23,6 +24,8 @@ import {
   profileImageUploadBody,
   profileSetupBody,
   profileUpdateBody,
+  type TasteWeightsBody,
+  tasteWeightsBody,
   withdrawalBody,
 } from './user.schema';
 import {
@@ -167,6 +170,24 @@ userRouter.patch(
     const body = req.body as z.infer<typeof notificationSettingsBody>;
     const { data, message } = await updateNotificationSettings(userId, body);
     ok(res, data, message);
+  },
+);
+
+// USER-09 내 취향 조회
+userRouter.get('/me/taste-weights', requireAuth(), async (req, res) => {
+  const { userId } = getAuthUser(req);
+  ok(res, await getTasteWeights(userId), '내 취향을 조회했어요.');
+});
+
+// USER-10 내 취향 저장
+userRouter.put(
+  '/me/taste-weights',
+  requireAuth(),
+  validate({ body: tasteWeightsBody }),
+  async (req, res) => {
+    const { userId } = getAuthUser(req);
+    const data = await updateTasteWeights(userId, req.body as TasteWeightsBody);
+    ok(res, data, '내 취향을 저장했어요. 내 종합 별점에 바로 반영돼요.');
   },
 );
 

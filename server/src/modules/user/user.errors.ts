@@ -27,6 +27,11 @@ export const UserError = defineErrors({
     code: 'PREFERRED_CATEGORY_INVALID',
     message: '좋아하는 음식을 1개 이상 골라 주세요.',
   },
+  INVALID_TASTE_WEIGHT: {
+    status: 400,
+    code: 'INVALID_TASTE_WEIGHT',
+    message: '다섯 항목 모두 보통·중요·아주 중요 중에서 골라 주세요.',
+  },
   LOCAL_REGION_DUPLICATE_INPUT: {
     status: 400,
     code: 'LOCAL_REGION_DUPLICATE',

@@ -8,6 +8,7 @@ import { prisma } from '../../lib/prisma';
 import { requireSeoulDong } from '../region/region.service';
 import { listLocalRegions } from './local-region.service';
 import { assertProfileImage } from './profile-image.service';
+import { toWeightColumns } from './taste-weights';
 import { nicknameChangeableAt, nicknameProblem } from './nickname';
 import { UserError } from './user.errors';
 import type { ProfileSetupBody, ProfileUpdateBody } from './user.schema';
@@ -103,6 +104,7 @@ export async function completeProfile(userId: bigint, body: ProfileSetupBody, no
           profileImageKey: body.profileImageKey ?? null,
           gender: body.gender,
           ageGroup: body.ageGroup,
+          ...(body.tasteWeights ? toWeightColumns(body.tasteWeights) : {}),
           status: MemberStatus.ACTIVE,
         },
       });

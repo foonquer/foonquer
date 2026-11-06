@@ -127,6 +127,22 @@ export async function deleteObjectQuietly(
 }
 
 /**
+ * prefix 아래 파일 key와 올린 시각 (쓰이지 않는 업로드 정리용). 버킷이 없으면(로컬 등) 빈 목록, 실패하면 throw.
+ * 올린 시각을 모르는 파일은 지우지 않도록 목록에서 뺀다
+ */
+export async function listObjects(
+  prefix: string,
+  kind: BucketKind,
+): Promise<{ key: string; createdAt: Date }[]> {
+  const bucket = bucketName(kind);
+  if (!bucket) return [];
+  const [files] = await gcs().bucket(bucket).getFiles({ prefix });
+  return files.flatMap((f) =>
+    f.metadata.timeCreated ? [{ key: f.name, createdAt: new Date(f.metadata.timeCreated) }] : [],
+  );
+}
+
+/**
  * prefix 아래 파일을 모두 지운다 (탈퇴 회원 파일 재삭제용, 여러 번 돌려도 된다).
  * @returns 지웠거나 버킷이 없으면 true, 실패하면 false
  */

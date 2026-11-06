@@ -15,10 +15,9 @@ const detailScore = z
   .min(1, { error: 'INVALID_DETAIL_SCORES' })
   .max(5, { error: 'INVALID_DETAIL_SCORES' });
 
-/** 세부 별점 5항목 (다섯 개 모두 보내야 한다) */
+/** 세부 별점 4항목 — 청결·양·서비스·가격 (네 개 모두 보내야 한다). 맛은 맛 별점(overallScore)으로 따로 받는다 */
 export const detailScores = z.object(
   {
-    taste: detailScore,
     cleanliness: detailScore,
     portion: detailScore,
     service: detailScore,

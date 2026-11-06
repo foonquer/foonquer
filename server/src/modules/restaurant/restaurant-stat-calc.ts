@@ -8,6 +8,9 @@ import type { Db, Tx } from '../../common/db';
 //   시간 감쇠      d = max(DECAY_MIN, DECAY_RATE ^ floor(지난 개월 / DECAY_MONTHS))
 //   가게 별점      R = (C × m + Σ(w × r)) / (C + Σw), w = score_weight × d
 
+/** 맛 별점 3.0 이상이면 다시 먹을 의향 (피그마 3-2 "3.0↑ 다시 먹을 의향 · 2.5↓ 재방문 의사 없음") */
+export const REVISIT_INTENT_MIN_SCORE = 3;
+
 export interface RatingParams {
   GLOBAL_MEAN: number;
   PRIOR_WEIGHT: number;
@@ -112,7 +115,6 @@ export async function refreshRestaurantStat(
       where: { restaurantId, status: 'A' },
       select: {
         overallScore: true,
-        taste: true,
         cleanliness: true,
         portion: true,
         service: true,
@@ -139,7 +141,7 @@ export async function refreshRestaurantStat(
   let weightSum = 0;
   let weightedScoreSum = 0;
   let detailCount = 0;
-  const detail = { taste: 0, cleanliness: 0, portion: 0, service: 0, price: 0 };
+  const detail = { cleanliness: 0, portion: 0, service: 0, price: 0 };
   let textCount = 0;
   let photoCount = 0;
   let revisitIntent = 0;
@@ -149,13 +151,12 @@ export async function refreshRestaurantStat(
     const w = r.scoreWeight.toNumber() * decayOf(p, r.regDate, now);
     weightSum += w;
     weightedScoreSum += w * score;
-    if (score >= 2.5) revisitIntent += 1;
+    if (score >= REVISIT_INTENT_MIN_SCORE) revisitIntent += 1;
     if (r.content) textCount += 1;
     if (r.imageCount > 0) photoCount += 1;
-    if (r.taste !== null) {
+    if (r.cleanliness !== null) {
       detailCount += 1;
-      detail.taste += r.taste;
-      detail.cleanliness += r.cleanliness ?? 0;
+      detail.cleanliness += r.cleanliness;
       detail.portion += r.portion ?? 0;
       detail.service += r.service ?? 0;
       detail.price += r.price ?? 0;
@@ -181,7 +182,6 @@ export async function refreshRestaurantStat(
     weightedScoreSum: round(weightedScoreSum, 3),
     displayScore,
     displayScoreAt: now,
-    tasteSum: detail.taste,
     cleanlinessSum: detail.cleanliness,
     portionSum: detail.portion,
     serviceSum: detail.service,

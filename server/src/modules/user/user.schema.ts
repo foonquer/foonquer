@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { nicknameProblem } from './nickname';
+import { WEIGHT_LEVELS } from './taste-weights';
 
 const nicknameField = z
   .string({ error: 'INVALID_NICKNAME' })
@@ -22,6 +23,21 @@ export const nicknameAvailabilityQuery = z.object({
     .max(100, { error: 'NICKNAME_REQUIRED' }),
 });
 
+const weightLevel = z.enum(WEIGHT_LEVELS, { error: 'INVALID_TASTE_WEIGHT' });
+
+/** 내 취향 — 다섯 항목 모두 보통(NORMAL)·중요(IMPORTANT)·아주 중요(VERY) 중 하나 (피그마 3-2) */
+export const tasteWeightsBody = z.object(
+  {
+    taste: weightLevel,
+    cleanliness: weightLevel,
+    portion: weightLevel,
+    service: weightLevel,
+    price: weightLevel,
+  },
+  { error: 'INVALID_TASTE_WEIGHT' },
+);
+export type TasteWeightsBody = z.infer<typeof tasteWeightsBody>;
+
 /** USER-03 */
 export const profileSetupBody = z.object({
   nickname: nicknameField,
@@ -39,6 +55,8 @@ export const profileSetupBody = z.object({
     .min(1, { error: 'PREFERRED_CATEGORY_INVALID' })
     .max(12, { error: 'PREFERRED_CATEGORY_INVALID' })
     .refine((ids) => new Set(ids).size === ids.length, { error: 'PREFERRED_CATEGORY_INVALID' }),
+  /** S-05-2 중요하게 보는 것 (안 보내면 모두 보통) */
+  tasteWeights: tasteWeightsBody.optional(),
 });
 export type ProfileSetupBody = z.infer<typeof profileSetupBody>;
 

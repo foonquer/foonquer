@@ -3,14 +3,13 @@ import { distanceMeters } from '../../common/geo';
 import { type CurrentSeason, findCurrentSeason } from '../../common/season';
 import { toKstIso, toKstIsoOrNull } from '../../common/time';
 import { prisma } from '../../lib/prisma';
+import { loadTasteWeights } from '../user/taste-weights';
 import { businessStatusOf, parseBusinessHours } from './business-hours';
 import { loadMyStates, myStateOf } from './my-state';
 import { RestaurantError } from './restaurant.errors';
 import type { RestaurantLocationQuery } from './restaurant.schema';
-import { detailStatsOf, ratingOf } from './restaurant-stats';
-
-/** 종합 별점이 이 값 이상이면 "다시 갈 의향"으로 본다 (별점 기준) */
-const REVISIT_INTENT_MIN_SCORE = 2.5;
+import { REVISIT_INTENT_MIN_SCORE } from './restaurant-stat-calc';
+import { detailStatsOf, myOverallOf, ratingOf } from './restaurant-stats';
 
 /** 숨김(H) 가게는 없는 것처럼 404. 폐업(C)은 기록 확인을 위해 보여 준다 */
 async function findVisibleRestaurant(restaurantId: bigint) {
@@ -48,16 +47,17 @@ async function conquestReview(visitId: bigint) {
 async function loadContext(userId: bigint, restaurantId: bigint) {
   const restaurant = await findVisibleRestaurant(restaurantId);
   const season = await findCurrentSeason();
-  const [states, conquerorCount] = await Promise.all([
+  const [states, conquerorCount, weights] = await Promise.all([
     loadMyStates(userId, [restaurant.id], season),
     currentSeasonConquerorCount(restaurant.id, season),
+    loadTasteWeights(userId),
   ]);
   const state = myStateOf(states, restaurant.id);
   const review =
     state.conquestState === 'CONQUERED' && state.currentConquest
       ? await conquestReview(state.currentConquest.visitId)
       : null;
-  return { restaurant, state, conquerorCount, review, season };
+  return { restaurant, state, conquerorCount, review, season, weights };
 }
 
 /**
@@ -108,6 +108,7 @@ export async function getRestaurantPreview(
     conquerorCount,
     review,
     season,
+    weights,
   } = await loadContext(userId, restaurantId);
   const conquest = state.conquestState === 'CONQUERED' ? state.currentConquest : null;
   const moving = state.conquestState === 'MOVING' ? state.movingVisit : null;
@@ -122,6 +123,7 @@ export async function getRestaurantPreview(
     dongName: r.region.name,
     distanceM: distanceMeters(from, { lat: r.lat.toNumber(), lng: r.lng.toNumber() }),
     rating: ratingOf(r.restaurantStat),
+    myOverallScore: myOverallOf(r.restaurantStat, weights).score,
     hasMapae: r.hasMapae,
     businessStatus: businessStatusOf(parseBusinessHours(r.businessHours), now),
     currentSeasonConquerorCount: conquerorCount,
@@ -132,7 +134,7 @@ export async function getRestaurantPreview(
       ? {
           conqueredAt: toKstIso(conquest.conqueredAt),
           myScore: review ? review.overallScore.toNumber() : null,
-          // 재방문 의사 칸은 없어지고 종합 별점에 포함됐다 (ERD v1.0: 2.5 이상이면 다시 갈 의향)
+          // 재방문 의사 칸은 없어지고 맛 별점에 포함됐다 (3.0 이상이면 다시 먹을 의향)
           revisitIntent: review ? review.overallScore.toNumber() >= REVISIT_INTENT_MIN_SCORE : null,
           hasTextReview: !!review?.content,
           reviewId: review?.id ?? null,
@@ -150,7 +152,13 @@ export async function getRestaurantDetail(
   from: RestaurantLocationQuery,
   now = new Date(),
 ) {
-  const { restaurant: r, state, conquerorCount, review } = await loadContext(userId, restaurantId);
+  const {
+    restaurant: r,
+    state,
+    conquerorCount,
+    review,
+    weights,
+  } = await loadContext(userId, restaurantId);
   const conquest = state.conquestState === 'CONQUERED' ? state.currentConquest : null;
   const businessHours = parseBusinessHours(r.businessHours);
 
@@ -174,6 +182,8 @@ export async function getRestaurantDetail(
     businessHours,
     businessStatus: businessStatusOf(businessHours, now),
     rating: ratingOf(r.restaurantStat),
+    // 항목별 평균의 맛 자리에 보이는 "내 종합" + 계산 보기 시트 (피그마 3-2)
+    myOverall: myOverallOf(r.restaurantStat, weights),
     hasMapae: r.hasMapae,
     stats: { ...detailStatsOf(r.restaurantStat), currentSeasonConquerorCount: conquerorCount },
     my: {
