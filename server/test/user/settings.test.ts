@@ -299,6 +299,9 @@ describe('SET-04 DELETE /users/me', () => {
       data: { userId: me.id, source: 'LEVEL_UP', sourceRef: 3 },
     });
     await prisma.savedRestaurant.create({ data: { userId: me.id, restaurantId: restaurant.id } });
+    await prisma.memberPick.create({
+      data: { userId: me.id, restaurantId: restaurant.id, sortOrder: 0 },
+    });
     await prisma.memberBlock.create({ data: { blockerId: other.id, blockedId: me.id } });
 
     const res = await withdraw(me.id, {
@@ -336,6 +339,7 @@ describe('SET-04 DELETE /users/me', () => {
     expect(await prisma.memberItemBox.count({ where: { userId: me.id } })).toBe(0);
     expect(await prisma.memberLocalRegion.count({ where: { userId: me.id } })).toBe(0);
     expect(await prisma.savedRestaurant.count({ where: { userId: me.id } })).toBe(0);
+    expect(await prisma.memberPick.count({ where: { userId: me.id } })).toBe(0);
     expect(await prisma.memberBlock.count()).toBe(0);
     expect(
       (await prisma.restaurantStat.findUniqueOrThrow({ where: { restaurantId: restaurant.id } }))
