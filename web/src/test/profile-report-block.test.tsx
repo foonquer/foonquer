@@ -263,6 +263,18 @@ describe('신고하기 (REPORT-01)', () => {
     expect(await screen.findByText('신고를 접수했어요. 확인 후 조치할게요')).toBeInTheDocument();
   });
 
+  it('링크로 바로 들어와 신고하면 앱 밖이 아니라 그 탐험가 프로필로 간다', async () => {
+    mockApi({
+      'GET /users/:id/profile': ok(profile()),
+      'POST /reports': ok({ reportId: 3, status: 'RECEIVED' }, '신고를 접수했어요.'),
+    });
+    const { router } = renderRoute('/users/5/report');
+
+    fireEvent.click(await screen.findByRole('radio', { name: '스팸 · 광고' }));
+    fireEvent.click(screen.getByRole('button', { name: '신고 접수하기' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/users/5'));
+  });
+
   it('남의 리뷰 상세에서 리뷰를 신고한다', async () => {
     const server = mockApi({
       'GET /reviews/:id': ok(review()),
@@ -376,6 +388,17 @@ describe('프로필 수정 — 사진·소개글 (USER-02·05·06·07)', () => {
     fireEvent.click(screen.getByRole('button', { name: '기본 캐릭터(먹깨비)로 바꾸기' }));
     await waitFor(() =>
       expect(screen.queryByRole('img', { name: '내 프로필 사진' })).not.toBeInTheDocument(),
+    );
+
+    // 브라우저가 형식을 비워 주면 확장자로 정한다
+    fireEvent.change(screen.getByTestId('profile-photo-input'), {
+      target: { files: [new File(['webp'], 'me.WEBP', { type: '' })] },
+    });
+    await waitFor(() =>
+      expect(server.calls('POST /users/me/profile-image/upload-url').at(-1)?.body).toEqual({
+        contentType: 'image/webp',
+        fileSize: 4,
+      }),
     );
   });
 
