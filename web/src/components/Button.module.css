@@ -52,6 +52,11 @@
   color: var(--mk-muted);
 }
 
+.button[data-variant='plain'] {
+  background: var(--mk-white);
+  color: var(--mk-muted);
+}
+
 .button[data-variant='outline'] {
   border: 1.2px solid var(--mk-green);
   background: var(--mk-white);
@@ -67,4 +72,10 @@
 
 .button:active:not(:disabled) {
   opacity: 0.85;
+}
+
+/* 결과 화면의 "다시 보내기 (59초 후)"는 기다리는 동안에도 흰 버튼 그대로 */
+.button[data-variant='plain']:disabled {
+  background: var(--mk-white);
+  color: var(--mk-muted);
 }

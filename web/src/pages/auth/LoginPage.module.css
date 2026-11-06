@@ -1,0 +1,97 @@
+/* Figma S-03: 소개 카드 358×450 (top 52) / 버튼 3개 (top 540, 사이 10) / 로그인 링크 (top 736) */
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: calc(10px + var(--mk-safe-top)) 16px calc(24px + var(--mk-safe-bottom));
+}
+
+.card {
+  position: relative;
+  height: 450px;
+  overflow: hidden;
+  border-radius: 32px;
+  background: var(--mk-forest);
+  text-align: center;
+}
+
+.pin {
+  position: absolute;
+  filter: drop-shadow(0 3.5px 5.6px rgba(33, 61, 41, 0.09));
+}
+
+.logo {
+  margin-top: 92px;
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: -1.52px;
+  color: var(--mk-cream);
+}
+
+.tagline {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mk-green-soft);
+}
+
+/* 먹깨비 그림 250×269가 카드 아래로 걸쳐 잘린다 */
+.mukkaebi {
+  position: absolute;
+  top: 227px;
+  left: 50%;
+  width: 251px;
+  max-width: none;
+  transform: translateX(-50%);
+}
+
+.buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 38px 6px 0;
+}
+
+.buttons button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 52px;
+  border-radius: 18px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* 카카오·구글 로그인 버튼 색은 각 회사 디자인 가이드 */
+.kakao {
+  background: #fee500;
+  color: #191919;
+}
+
+.google {
+  border: 1px solid #dadce0;
+  background: var(--mk-white);
+  color: #1f1f1f;
+}
+
+.email {
+  border: 1px solid var(--mk-line-strong);
+  background: var(--mk-white);
+  color: var(--mk-forest);
+}
+
+.loginLink {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--mk-subtle);
+}
+
+.loginLink a {
+  font-weight: 700;
+  color: var(--mk-forest);
+  text-decoration: underline;
+}

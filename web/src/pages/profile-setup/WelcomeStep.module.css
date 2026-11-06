@@ -1,0 +1,130 @@
+/* Figma S-07: 탐험가 카드 358×420 (top 52, 둥글기 32) / 첫 목표 카드 (top 494) */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 8px 16px 0;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 420px;
+  padding-top: 28px;
+  overflow: hidden;
+  border-radius: 32px;
+  background: linear-gradient(180deg, #3a7250 0%, #1e4330 100%);
+  text-align: center;
+}
+
+.season {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.98px;
+  color: var(--mk-gold);
+}
+
+.confetti {
+  position: absolute;
+  border-radius: 1.5px;
+}
+
+/* 먹깨비 뒤 동그란 빛 170px, 알 먹깨비 150px */
+.glow {
+  width: 170px;
+  height: 170px;
+  margin-top: 23px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.egg {
+  position: absolute;
+  top: 74.6px;
+  left: 50%;
+  width: 150px;
+  transform: translateX(-50%);
+}
+
+.name {
+  margin-top: 24px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.56px;
+  color: var(--mk-white);
+}
+
+.tier {
+  margin-top: 13px;
+  padding: 5px 12px;
+  border-radius: 12px;
+  background: var(--mk-cream);
+  font-size: 13px;
+  font-weight: 700;
+  color: #7a5a1a;
+}
+
+.profile {
+  margin-top: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mk-green-soft);
+}
+
+.level {
+  margin-top: 12px;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mk-gold-light);
+}
+
+.goal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 6px;
+  padding: 16px 18px 18px;
+  border-radius: 20px;
+  background: var(--mk-white);
+}
+
+.goalHead {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.goalLabel {
+  color: var(--mk-green);
+}
+
+.goalCount {
+  color: var(--mk-subtle);
+}
+
+.goalText {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--mk-ink);
+  white-space: pre-line;
+}
+
+.bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #e6ebe2;
+}
+
+/* 0곳이어도 점 하나(8px)는 보인다 */
+.barFill {
+  min-width: 8px;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--mk-green);
+}

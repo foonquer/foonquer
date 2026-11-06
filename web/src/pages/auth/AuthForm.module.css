@@ -1,0 +1,97 @@
+/* 로그인·회원가입·비밀번호 화면 공통 */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 var(--mk-side);
+}
+
+/* Figma: 제목 아래 입력 폼 위치 (로그인 top 220, 회원가입 top 162, 새 비밀번호 top 190) */
+.form[data-gap='18'] {
+  gap: 18px;
+  margin-top: 52px;
+}
+
+.form[data-top='14'] {
+  margin-top: 14px;
+}
+
+.form[data-top='22'] {
+  margin-top: 22px;
+}
+
+.links {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 24px;
+  padding: 0 var(--mk-side);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.bar {
+  width: 1px;
+  height: 11px;
+  background: var(--mk-line);
+}
+
+.strong {
+  color: var(--mk-forest);
+}
+
+.note {
+  padding: 0 var(--mk-side);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--mk-muted);
+}
+
+.consents {
+  margin-top: 28px;
+  padding: 0 var(--mk-side) 24px;
+}
+
+/* 입력창 오른쪽 작은 글자 버튼 (인증 코드 받기) */
+.inlineAction {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+.inlineAction:disabled {
+  color: var(--mk-subtle);
+}
+
+.timer {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+.code input:not(:placeholder-shown) {
+  letter-spacing: 4px;
+}
+
+.resend {
+  margin-left: 4px;
+  font-weight: 500;
+  color: inherit;
+  text-decoration: underline;
+}
+
+.resend:disabled {
+  text-decoration: none;
+}
+
+.noteInline {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--mk-muted);
+}

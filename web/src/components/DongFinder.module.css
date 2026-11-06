@@ -1,0 +1,243 @@
+/* Figma S-06: 검색창 52 (둥글기 16) / 사이 12 / 현재 위치 버튼 46 / 사이 16 / 결과 판 (흰색 둥글기 20) */
+.finder {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 14px 0 16px;
+  border: 1.2px solid #dde3d7;
+  border-radius: 16px;
+  background: var(--mk-white);
+}
+
+.searchBox[data-active='true'],
+.searchBox:focus-within {
+  border: 1.5px solid var(--mk-green);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--mk-ink);
+}
+
+.searchInput::placeholder {
+  font-weight: 400;
+  color: #9aa096;
+}
+
+.clear {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: #c9cfc4;
+  color: var(--mk-white);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.here {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 46px;
+  margin-top: 12px;
+  border: 1.2px solid var(--mk-green);
+  border-radius: 16px;
+  background: var(--mk-white);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 240px;
+  margin-top: 16px;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--mk-white);
+}
+
+.panel[data-empty='true'] {
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.mukkaebi {
+  width: 66px;
+  margin: -14px -8px 0;
+  opacity: 0.6;
+}
+
+.emptyText {
+  font-size: 14px;
+  color: var(--mk-muted);
+}
+
+.suggestions {
+  display: flex;
+  gap: 8px;
+}
+
+.chip {
+  padding: 6px 12px;
+  border-radius: 99px;
+  background: var(--mk-green-50);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mk-forest);
+}
+
+.count {
+  padding: 16px 20px 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.count span {
+  color: var(--mk-green);
+}
+
+.notice {
+  padding: 24px 20px;
+  font-size: 14px;
+  color: var(--mk-muted);
+  text-align: center;
+}
+
+.list {
+  overflow-y: auto;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 18px 12px 20px;
+  border-bottom: 1px solid #eef1ea;
+  text-align: left;
+}
+
+.row[aria-pressed='true'] {
+  background: var(--mk-green-50);
+}
+
+.rowText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dongName {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.row[aria-pressed='true'] .dongName {
+  color: var(--mk-forest);
+}
+
+.mark {
+  background: none;
+  color: var(--mk-green);
+}
+
+.guName {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+/* 위치 권한이 꺼졌을 때: 왼쪽 구 116px, 오른쪽 동 */
+.picker {
+  display: flex;
+  flex: 1;
+  min-height: 300px;
+  max-height: 392px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--mk-white);
+}
+
+.guList {
+  flex-shrink: 0;
+  width: 116px;
+  overflow-y: auto;
+  background: #f6f8f4;
+}
+
+.guRow,
+.dongRow {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 43px;
+  padding-left: 18px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.guRow {
+  color: var(--mk-muted);
+}
+
+.guRow[aria-pressed='true'] {
+  background: var(--mk-white);
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.dongList {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.dongRow {
+  justify-content: space-between;
+  padding-right: 18px;
+  color: var(--mk-ink);
+}
+
+.dongRow[aria-pressed='true'] {
+  background: var(--mk-green-50);
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.pickerEmpty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mk-subtle);
+}
