@@ -6,7 +6,6 @@ import { Prisma } from '../../generated/prisma/client';
 import { publicImageUrl } from '../../lib/image-url';
 import { prisma } from '../../lib/prisma';
 import { objectExists } from '../../lib/storage';
-import { loginMethodsOf } from '../auth/social-login.service';
 import { requireSeoulDong } from '../region/region.service';
 import { listLocalRegions } from './local-region.service';
 import { nicknameChangeableAt, nicknameProblem } from './nickname';
@@ -173,14 +172,9 @@ export async function completeProfile(userId: bigint, body: ProfileSetupBody, no
 /** USER-04 내 프로필 조회 */
 export async function getMyProfile(userId: bigint, now = new Date()) {
   const member = await prisma.member.findUniqueOrThrow({ where: { id: userId } });
-  const [loginMethods, localRegions] = await Promise.all([
-    loginMethodsOf(member),
-    listLocalRegions(userId),
-  ]);
+  const localRegions = await listLocalRegions(userId);
   return {
     id: member.id,
-    email: member.email,
-    loginMethods,
     nickname: member.nickname,
     nicknameChangeableAt: toKstIsoOrNull(nicknameChangeableAt(member.nicknameChangedAt, now)),
     profileImageUrl: publicImageUrl(member.profileImageKey),

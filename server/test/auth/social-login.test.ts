@@ -42,15 +42,9 @@ async function exchange(code: string) {
   return request(app).post('/api/v1/auth/oauth/exchange').send({ oauthResultCode: code });
 }
 
-async function resultCode(
-  profile: { providerId: string; email?: string | null; emailVerified?: boolean },
-  slug: 'kakao' | 'google' = 'kakao',
-) {
-  return createOAuthResultCode(slug, {
-    providerId: profile.providerId,
-    email: profile.email ?? null,
-    emailVerified: profile.emailVerified ?? false,
-  });
+/** AUTH-07을 거친 것처럼 카카오 회원번호로 일회용 코드를 만든다 */
+function resultCode(kakaoId: string) {
+  return createOAuthResultCode({ kakaoId });
 }
 
 beforeEach(async () => {
@@ -62,7 +56,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('AUTH-06 GET /auth/oauth/{provider}', () => {
+describe('AUTH-06 GET /auth/oauth/kakao', () => {
   it('카카오 인증 화면으로 302 이동하고 state를 httpOnly 쿠키에 넣는다', async () => {
     const res = await request(app).get('/api/v1/auth/oauth/kakao');
 
@@ -74,6 +68,8 @@ describe('AUTH-06 GET /auth/oauth/{provider}', () => {
       'http://localhost:3000/api/v1/auth/oauth/kakao/callback',
     );
     expect(location.searchParams.get('response_type')).toBe('code');
+    // 이메일·닉네임 같은 동의 항목은 요청하지 않는다 (카카오 회원번호만 쓴다).
+    expect(location.searchParams.get('scope')).toBeNull();
 
     const stateCookie = cookiesOf(res).find((c) => c.startsWith('oauth_state='));
     expect(stateCookie).toContain('HttpOnly');
@@ -82,40 +78,21 @@ describe('AUTH-06 GET /auth/oauth/{provider}', () => {
     expect(stateCookie?.split(';')[0]).toBe(`oauth_state=${location.searchParams.get('state')}`);
   });
 
-  it('구글은 openid email 범위로 보낸다', async () => {
+  it('구글 로그인 주소는 없다 (404)', async () => {
     const res = await request(app).get('/api/v1/auth/oauth/google');
 
-    const location = new URL(String(res.headers.location));
-    expect(location.origin).toBe('https://accounts.google.com');
-    expect(location.searchParams.get('scope')).toBe('openid email');
-    expect(location.searchParams.get('client_id')).toBe('test-google-client-id');
-  });
-
-  it('지원하지 않는 방식이면 프론트 콜백으로 error=UNSUPPORTED_PROVIDER', async () => {
-    const res = await request(app).get('/api/v1/auth/oauth/naver');
-
-    expect(res.status).toBe(302);
-    expect(res.headers.location).toBe(
-      'http://localhost:5173/oauth/callback?error=UNSUPPORTED_PROVIDER',
-    );
+    expect(res.status).toBe(404);
   });
 });
 
-describe('AUTH-07 GET /auth/oauth/{provider}/callback', () => {
+describe('AUTH-07 GET /auth/oauth/kakao/callback', () => {
   function callback(query: Record<string, string>, state: string | null = 'state-1') {
     const req = request(app).get('/api/v1/auth/oauth/kakao/callback').query(query);
     return state ? req.set('Cookie', `oauth_state=${state}`) : req;
   }
 
-  it('사용자 정보를 받아 1분짜리 일회용 코드만 붙여 프론트로 보낸다', async () => {
-    const fetchMock = stubKakao({
-      id: 4242,
-      kakao_account: {
-        email: 'JunHyung@Kakao.com',
-        is_email_valid: true,
-        is_email_verified: true,
-      },
-    });
+  it('카카오 회원번호를 받아 1분짜리 일회용 코드만 붙여 프론트로 보낸다', async () => {
+    const fetchMock = stubKakao({ id: 4242 });
 
     const res = await callback({ code: 'auth-code', state: 'state-1' });
 
@@ -135,12 +112,7 @@ describe('AUTH-07 GET /auth/oauth/{provider}/callback', () => {
     const row = await prisma.authTemporaryToken.findFirstOrThrow({
       where: { tokenType: 'OAUTH_RESULT' },
     });
-    expect(row.payload).toEqual({
-      provider: 'K',
-      providerId: '4242',
-      email: 'junhyung@kakao.com',
-      emailVerified: true,
-    });
+    expect(row.payload).toEqual({ kakaoId: '4242' });
     expect(row.expiresAt.getTime() - row.regDate.getTime()).toBe(60_000);
   });
 
@@ -166,7 +138,7 @@ describe('AUTH-07 GET /auth/oauth/{provider}/callback', () => {
     );
   });
 
-  it('제공자 요청이 실패하면 SOCIAL_LOGIN_FAILED', async () => {
+  it('카카오 요청이 실패하면 SOCIAL_LOGIN_FAILED', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(() => Promise.resolve(jsonResponse({ error: 'invalid_grant' }, 400))),
@@ -183,14 +155,8 @@ describe('AUTH-07 GET /auth/oauth/{provider}/callback', () => {
 });
 
 describe('AUTH-08 POST /auth/oauth/exchange', () => {
-  it('② 처음 온 사람은 회원(P)과 소셜 계정을 만들고 TERMS_REQUIRED로 로그인시킨다', async () => {
-    const code = await resultCode({
-      providerId: 'k-new',
-      email: 'new@kakao.com',
-      emailVerified: true,
-    });
-
-    const res = await exchange(code);
+  it('② 처음 온 카카오 계정은 회원(P)을 만들고 TERMS_REQUIRED로 로그인시킨다', async () => {
+    const res = await exchange(await resultCode('k-new'));
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBe('약관에 동의하고 프로필을 설정해 주세요.');
@@ -199,23 +165,20 @@ describe('AUTH-08 POST /auth/oauth/exchange', () => {
       isNewUser: true,
       tokenType: 'Bearer',
       expiresIn: 3600,
-      user: { email: null, nickname: null, profileImageUrl: null, status: 'P' },
+      user: { nickname: null, profileImageUrl: null, status: 'P' },
     });
+    expect(res.body.data.user).not.toHaveProperty('email');
     expect(refreshCookieOf(res)).toBeTruthy();
 
-    const social = await prisma.socialAccount.findFirstOrThrow({ include: { user: true } });
-    expect(social).toMatchObject({ provider: 'K', providerId: 'k-new', email: 'new@kakao.com' });
-    expect(social.user).toMatchObject({ status: 'P', email: null, password: null });
-    expect(social.user.lastLoginAt).not.toBeNull();
+    const member = await prisma.member.findUniqueOrThrow({ where: { kakaoId: 'k-new' } });
+    expect(member.status).toBe('P');
+    expect(member.lastLoginAt).not.toBeNull();
   });
 
-  it('① 이미 연결된 소셜 계정이면 그 회원으로 로그인한다', async () => {
-    const member = await createMember({ nickname: '아기깨비' });
-    await prisma.socialAccount.create({
-      data: { userId: member.id, provider: 'K', providerId: 'k-1', email: 'a@kakao.com' },
-    });
+  it('① 이미 가입한 카카오 계정이면 그 회원으로 로그인한다', async () => {
+    const member = await createMember({ kakaoId: 'k-1', nickname: '아기깨비' });
 
-    const res = await exchange(await resultCode({ providerId: 'k-1' }));
+    const res = await exchange(await resultCode('k-1'));
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBe('로그인했어요.');
@@ -224,116 +187,52 @@ describe('AUTH-08 POST /auth/oauth/exchange', () => {
       isNewUser: false,
       user: { id: Number(member.id), nickname: '아기깨비', status: 'A' },
     });
+    expect(await prisma.member.count()).toBe(1);
   });
 
   it('① 가입 절차가 남은 회원은 약관 동의 여부에 따라 TERMS_REQUIRED / PROFILE_REQUIRED', async () => {
-    const member = await createMember({ status: 'P', nickname: null });
-    await prisma.socialAccount.create({
-      data: { userId: member.id, provider: 'G', providerId: 'g-1' },
-    });
+    const member = await createMember({ kakaoId: 'k-1', status: 'P', nickname: null });
 
-    const before = await exchange(await resultCode({ providerId: 'g-1' }, 'google'));
+    const before = await exchange(await resultCode('k-1'));
     expect(before.body.data.nextAction).toBe('TERMS_REQUIRED');
 
     await agreeConsents(member.id);
-    const after = await exchange(await resultCode({ providerId: 'g-1' }, 'google'));
+    const after = await exchange(await resultCode('k-1'));
     expect(after.body.data.nextAction).toBe('PROFILE_REQUIRED');
   });
 
   it('① 이용 정지 회원은 403 MEMBER_SUSPENDED', async () => {
-    const member = await createMember({ status: 'S' });
-    await prisma.socialAccount.create({
-      data: { userId: member.id, provider: 'K', providerId: 'k-1' },
-    });
+    await createMember({ kakaoId: 'k-1', status: 'S' });
 
-    const res = await exchange(await resultCode({ providerId: 'k-1' }));
+    const res = await exchange(await resultCode('k-1'));
 
     expect(res.status).toBe(403);
     expect(res.body.code).toBe('MEMBER_SUSPENDED');
   });
 
-  it('③ 검증된 같은 이메일의 계정이 있으면 로그인하지 않고 ACCOUNT_LINK_REQUIRED', async () => {
-    const member = await createMember({ email: 'junhyung@email.com', password: 'hash' });
-    await prisma.socialAccount.create({
-      data: { userId: member.id, provider: 'G', providerId: 'g-1', email: 'other@gmail.com' },
-    });
+  it('탈퇴하면 kakao_id를 비우므로 같은 카카오 계정은 새 회원으로 가입한다', async () => {
+    const withdrawn = await createMember({ kakaoId: null, status: 'D', nickname: null });
 
-    const res = await exchange(
-      await resultCode({ providerId: 'k-9', email: 'junhyung@email.com', emailVerified: true }),
-    );
-
-    expect(res.status).toBe(200);
-    expect(res.body.message).toBe('같은 이메일로 가입한 계정이 있어요. 계정을 연결할까요?');
-    expect(res.body.data).toEqual({
-      nextAction: 'ACCOUNT_LINK_REQUIRED',
-      accountLinkToken: expect.any(String),
-      accountLinkTokenExpiresIn: 300,
-      provider: 'K',
-      maskedEmail: 'jun***@email.com',
-      existingLoginMethods: ['EMAIL', 'GOOGLE'],
-    });
-    expect(refreshCookieOf(res)).toBeNull();
-    expect(await prisma.socialAccount.count({ where: { providerId: 'k-9' } })).toBe(0);
-  });
-
-  it('③ 다른 소셜 계정의 이메일과 같아도 연동을 묻는다', async () => {
-    const member = await createMember();
-    await prisma.socialAccount.create({
-      data: { userId: member.id, provider: 'G', providerId: 'g-1', email: 'same@gmail.com' },
-    });
-
-    const res = await exchange(
-      await resultCode({ providerId: 'k-1', email: 'same@gmail.com', emailVerified: true }),
-    );
-
-    expect(res.body.data.nextAction).toBe('ACCOUNT_LINK_REQUIRED');
-    expect(res.body.data.existingLoginMethods).toEqual(['GOOGLE']);
-  });
-
-  it('④ 이메일이 미검증이면 같은 이메일 계정이 있어도 새로 가입시킨다', async () => {
-    await createMember({ email: 'junhyung@email.com' });
-
-    const res = await exchange(
-      await resultCode({ providerId: 'k-1', email: 'junhyung@email.com', emailVerified: false }),
-    );
-
-    expect(res.body.data.nextAction).toBe('TERMS_REQUIRED');
-    expect(res.body.data.isNewUser).toBe(true);
-  });
-
-  it('탈퇴한 회원에 남은 소셜 연결이면 지우고 새 회원으로 가입시킨다', async () => {
-    const withdrawn = await createMember({ status: 'D', nickname: null });
-    await prisma.socialAccount.create({
-      data: { userId: withdrawn.id, provider: 'K', providerId: 'k-1' },
-    });
-
-    const res = await exchange(await resultCode({ providerId: 'k-1' }));
+    const res = await exchange(await resultCode('k-1'));
 
     expect(res.body.data).toMatchObject({ nextAction: 'TERMS_REQUIRED', isNewUser: true });
-    const social = await prisma.socialAccount.findFirstOrThrow({ where: { providerId: 'k-1' } });
-    expect(social.userId).not.toBe(withdrawn.id);
-    expect(await prisma.socialAccount.count()).toBe(1);
+    const member = await prisma.member.findUniqueOrThrow({ where: { kakaoId: 'k-1' } });
+    expect(member.id).not.toBe(withdrawn.id);
   });
 
-  it('미검증 이메일은 소셜 계정에 저장하지 않아서, 나중에 같은 이메일로 온 검증된 로그인의 연동 대상이 되지 않는다', async () => {
-    await exchange(
-      await resultCode({ providerId: 'k-1', email: 'same@email.com', emailVerified: false }),
-    );
-    const first = await prisma.socialAccount.findFirstOrThrow({ where: { providerId: 'k-1' } });
-    expect(first.email).toBeNull();
+  it('같은 카카오 계정으로 동시에 처음 들어와도 회원은 한 명만 생긴다', async () => {
+    const [a, b] = await Promise.all([
+      exchange(await resultCode('k-1')),
+      exchange(await resultCode('k-1')),
+    ]);
 
-    const res = await exchange(
-      await resultCode(
-        { providerId: 'g-1', email: 'same@email.com', emailVerified: true },
-        'google',
-      ),
-    );
-
-    expect(res.body.data).toMatchObject({ nextAction: 'TERMS_REQUIRED', isNewUser: true });
+    expect([a.status, b.status]).toEqual([200, 200]);
+    expect(await prisma.member.count({ where: { kakaoId: 'k-1' } })).toBe(1);
+    expect(a.body.data.user.id).toBe(b.body.data.user.id);
   });
 
   it('코드는 한 번만 쓸 수 있고, 만료되면 401, 없으면 400', async () => {
-    const code = await resultCode({ providerId: 'k-1' });
+    const code = await resultCode('k-1');
     await exchange(code);
 
     const reused = await exchange(code);
@@ -343,7 +242,7 @@ describe('AUTH-08 POST /auth/oauth/exchange', () => {
     const unknown = await exchange('made-up');
     expect(unknown.body.code).toBe('OAUTH_RESULT_CODE_INVALID');
 
-    const late = await resultCode({ providerId: 'k-2' });
+    const late = await resultCode('k-2');
     await prisma.authTemporaryToken.updateMany({
       where: { usedAt: null },
       data: { expiresAt: new Date(Date.now() - 1) },
@@ -356,108 +255,18 @@ describe('AUTH-08 POST /auth/oauth/exchange', () => {
     expect(missing.status).toBe(400);
     expect(missing.body.code).toBe('OAUTH_RESULT_CODE_REQUIRED');
   });
-});
 
-describe('AUTH-09 POST /auth/oauth/link', () => {
-  async function linkToken(email = 'junhyung@email.com', providerId = 'k-9') {
-    const res = await exchange(await resultCode({ providerId, email, emailVerified: true }));
-    return res.body.data.accountLinkToken as string;
-  }
-
-  function link(token: string) {
-    return request(app).post('/api/v1/auth/oauth/link').send({ accountLinkToken: token });
-  }
-
-  it('기존 회원에 소셜 계정을 붙이고 기존 회원으로 로그인한다', async () => {
-    const member = await createMember({
-      email: 'junhyung@email.com',
-      password: 'hash',
-      nickname: '아기깨비',
-    });
-
-    const res = await link(await linkToken());
-
-    expect(res.status).toBe(200);
-    expect(res.body.message).toBe('카카오 계정을 연결했어요.');
-    expect(res.body.data).toMatchObject({
-      nextAction: 'HOME',
-      tokenType: 'Bearer',
-      linkedProvider: 'K',
-      user: { id: Number(member.id), email: 'junhyung@email.com', nickname: '아기깨비' },
-    });
-    expect(refreshCookieOf(res)).toBeTruthy();
-    const social = await prisma.socialAccount.findFirstOrThrow({ where: { providerId: 'k-9' } });
-    expect(social.userId).toBe(member.id);
-
-    // 이제 같은 카카오 계정으로 들어오면 바로 로그인된다.
-    const again = await exchange(await resultCode({ providerId: 'k-9' }));
-    expect(again.body.data.user.id).toBe(Number(member.id));
-  });
-
-  it('토큰은 한 번만 쓸 수 있고, 만료되면 ACCOUNT_LINK_TOKEN_EXPIRED', async () => {
-    await createMember({ email: 'junhyung@email.com' });
-    const token = await linkToken();
-    await link(token);
-
-    const reused = await link(token);
-    expect(reused.status).toBe(401);
-    expect(reused.body.code).toBe('ACCOUNT_LINK_TOKEN_INVALID');
-
-    const other = await linkToken('junhyung@email.com', 'k-10');
+  it('카카오 전용 전에 발급된 결과 코드(kakaoId 없는 payload)는 400 OAUTH_RESULT_CODE_INVALID', async () => {
+    const code = await resultCode('k-1');
     await prisma.authTemporaryToken.updateMany({
-      where: { tokenType: 'ACCOUNT_LINK', usedAt: null },
-      data: { expiresAt: new Date(Date.now() - 1) },
-    });
-    const expired = await link(other);
-    expect(expired.status).toBe(401);
-    expect(expired.body.code).toBe('ACCOUNT_LINK_TOKEN_EXPIRED');
-
-    const missing = await request(app).post('/api/v1/auth/oauth/link').send({});
-    expect(missing.status).toBe(400);
-    expect(missing.body.code).toBe('ACCOUNT_LINK_TOKEN_REQUIRED');
-  });
-
-  it('그사이 탈퇴했으면 404 MEMBER_NOT_FOUND, 정지면 403', async () => {
-    const member = await createMember({ email: 'junhyung@email.com' });
-    const token = await linkToken();
-    await prisma.member.update({ where: { id: member.id }, data: { status: 'D' } });
-
-    const gone = await link(token);
-    expect(gone.status).toBe(404);
-    expect(gone.body.code).toBe('MEMBER_NOT_FOUND');
-
-    await prisma.member.update({ where: { id: member.id }, data: { status: 'S' } });
-    const suspendedToken = await linkToken('junhyung@email.com', 'k-11');
-    const suspended = await link(suspendedToken);
-    expect(suspended.status).toBe(403);
-    expect(suspended.body.code).toBe('MEMBER_SUSPENDED');
-  });
-
-  it('이미 다른 카카오 계정이 연결된 회원이면 409 PROVIDER_ALREADY_LINKED', async () => {
-    const member = await createMember({ email: 'junhyung@email.com' });
-    await prisma.socialAccount.create({
-      data: { userId: member.id, provider: 'K', providerId: 'k-old' },
+      where: { usedAt: null },
+      data: { payload: { provider: 'KAKAO', providerId: 'k-1', email: null } },
     });
 
-    const res = await link(await linkToken('junhyung@email.com', 'k-new'));
-
-    expect(res.status).toBe(409);
-    expect(res.body.code).toBe('PROVIDER_ALREADY_LINKED');
-    expect(res.body.message).toBe('이 계정에는 이미 다른 카카오 계정이 연결되어 있어요.');
-  });
-
-  it('그사이 그 소셜 계정이 다른 회원에 연결됐으면 409 SOCIAL_ACCOUNT_ALREADY_USED', async () => {
-    await createMember({ email: 'junhyung@email.com' });
-    const token = await linkToken('junhyung@email.com', 'k-9');
-    const someoneElse = await createMember();
-    await prisma.socialAccount.create({
-      data: { userId: someoneElse.id, provider: 'K', providerId: 'k-9' },
-    });
-
-    const res = await link(token);
-
-    expect(res.status).toBe(409);
-    expect(res.body.code).toBe('SOCIAL_ACCOUNT_ALREADY_USED');
+    const res = await exchange(code);
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('OAUTH_RESULT_CODE_INVALID');
+    expect(await prisma.member.count()).toBe(0);
   });
 });
 

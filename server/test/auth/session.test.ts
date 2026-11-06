@@ -3,24 +3,15 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app';
 import { sha256Hex } from '../../src/common/crypto';
 import { prisma } from '../../src/lib/prisma';
-import { hashSecret } from '../../src/modules/auth/password';
+import { createRefreshToken } from '../../src/modules/auth/refresh-token';
 import { resetDb } from '../helpers/db';
-import { agreeConsents, createMember } from '../helpers/fixtures';
+import { createMember } from '../helpers/fixtures';
 import { refreshCookieHeader, refreshCookieOf } from '../helpers/http';
 
 const app = createApp();
-const PASSWORD = 'mukjang2026';
-
-async function emailMember(data: Parameters<typeof createMember>[0] = {}) {
-  return createMember({
-    email: 'junhyung@email.com',
-    password: await hashSecret(PASSWORD),
-    ...data,
-  });
-}
-
-function login(email: string, password: string) {
-  return request(app).post('/api/v1/auth/login').send({ email, password });
+/** 카카오 로그인(AUTH-08)을 마친 것처럼 이 회원의 refreshToken을 하나 발급한다 */
+function login(memberId: bigint) {
+  return createRefreshToken(prisma, memberId);
 }
 
 function refresh(token: string | null) {
@@ -32,139 +23,10 @@ beforeEach(async () => {
   await resetDb();
 });
 
-describe('AUTH-05 POST /auth/login', () => {
-  it('맞으면 토큰·쿠키를 주고 실패 횟수를 0으로, 마지막 로그인 시각을 기록한다', async () => {
-    const member = await emailMember({ loginFailCount: 3, nickname: '아기깨비' });
-
-    const res = await login(' JunHyung@Email.com ', PASSWORD);
-
-    expect(res.status).toBe(200);
-    expect(res.body.message).toBe('로그인했어요.');
-    expect(res.body.data).toMatchObject({
-      tokenType: 'Bearer',
-      expiresIn: 3600,
-      nextAction: 'HOME',
-      user: {
-        id: Number(member.id),
-        email: 'junhyung@email.com',
-        nickname: '아기깨비',
-        profileImageUrl: null,
-        status: 'A',
-      },
-    });
-    expect(refreshCookieOf(res)).toBeTruthy();
-    const after = await prisma.member.findUniqueOrThrow({ where: { id: member.id } });
-    expect(after.loginFailCount).toBe(0);
-    expect(after.lastLoginAt).not.toBeNull();
-  });
-
-  it('프로필 설정 전이면 nextAction PROFILE_REQUIRED (약관 동의를 안 했으면 TERMS_REQUIRED)', async () => {
-    const pending = await emailMember({ status: 'P', nickname: null });
-
-    const noTerms = await login('junhyung@email.com', PASSWORD);
-    expect(noTerms.body.data.nextAction).toBe('TERMS_REQUIRED');
-
-    await agreeConsents(pending.id);
-    const res = await login('junhyung@email.com', PASSWORD);
-    expect(res.body.data.nextAction).toBe('PROFILE_REQUIRED');
-    expect(res.body.data.user.status).toBe('P');
-  });
-
-  it('틀리면 401과 실패 횟수, 5번째에 423 LOGIN_LOCKED로 10분 잠근다', async () => {
-    const member = await emailMember();
-
-    for (let i = 1; i <= 4; i += 1) {
-      const res = await login('junhyung@email.com', 'wrong1234');
-      expect(res.status).toBe(401);
-      expect(res.body).toEqual({
-        success: false,
-        code: 'LOGIN_INVALID_CREDENTIALS',
-        message: '이메일 또는 비밀번호가 맞지 않아요.',
-        data: { failCount: i, maxFailCount: 5 },
-      });
-    }
-
-    const fifth = await login('junhyung@email.com', 'wrong1234');
-    expect(fifth.status).toBe(423);
-    expect(fifth.body.code).toBe('LOGIN_LOCKED');
-    expect(fifth.body.data.lockedUntil).toMatch(/\+09:00$/);
-
-    // 잠겨 있는 동안은 맞는 비밀번호도 막는다.
-    const locked = await login('junhyung@email.com', PASSWORD);
-    expect(locked.status).toBe(423);
-
-    const row = await prisma.member.findUniqueOrThrow({ where: { id: member.id } });
-    expect(row.loginFailCount).toBe(0);
-    expect(row.lockedUntil).not.toBeNull();
-
-    // 잠금이 풀리면 로그인된다.
-    await prisma.member.update({
-      where: { id: member.id },
-      data: { lockedUntil: new Date(Date.now() - 1000) },
-    });
-    expect((await login('junhyung@email.com', PASSWORD)).status).toBe(200);
-  });
-
-  it('4번 틀린 상태에서 틀린 로그인이 동시에 와도 500 없이 잠그고 횟수는 0으로 둔다', async () => {
-    const member = await emailMember({ loginFailCount: 4 });
-
-    const results = await Promise.all([
-      login('junhyung@email.com', 'wrong1234'),
-      login('junhyung@email.com', 'wrong1234'),
-      login('junhyung@email.com', 'wrong1234'),
-    ]);
-
-    expect(results.map((r) => r.status)).toEqual([423, 423, 423]);
-    const row = await prisma.member.findUniqueOrThrow({ where: { id: member.id } });
-    expect(row.loginFailCount).toBe(0);
-    expect(row.lockedUntil!.getTime()).toBeGreaterThan(Date.now() + 9 * 60 * 1000);
-  });
-
-  it('같은 IP에서 1분에 20번을 넘으면 429 TOO_MANY_REQUESTS', async () => {
-    for (let i = 0; i < 20; i += 1) {
-      expect((await login(`nobody${i}@email.com`, 'wrong1234')).status).toBe(401);
-    }
-    const res = await login('nobody@email.com', 'wrong1234');
-    expect(res.status).toBe(429);
-    expect(res.body.code).toBe('TOO_MANY_REQUESTS');
-  });
-
-  it('가입하지 않은 이메일·소셜 전용 계정은 같은 코드로 답하고 failCount는 null', async () => {
-    await createMember({ email: 'social@email.com', password: null });
-
-    for (const email of ['nobody@email.com', 'social@email.com', 'not-an-email']) {
-      const res = await login(email, PASSWORD);
-      expect(res.status).toBe(401);
-      expect(res.body.code).toBe('LOGIN_INVALID_CREDENTIALS');
-      expect(res.body.data).toEqual({ failCount: null, maxFailCount: 5 });
-    }
-  });
-
-  it('이용 정지 회원은 403 MEMBER_SUSPENDED, 탈퇴 회원은 가입하지 않은 이메일과 같다', async () => {
-    await emailMember({ status: 'S' });
-    const suspended = await login('junhyung@email.com', PASSWORD);
-    expect(suspended.status).toBe(403);
-    expect(suspended.body.code).toBe('MEMBER_SUSPENDED');
-
-    await prisma.member.updateMany({ data: { status: 'D' } });
-    const withdrawn = await login('junhyung@email.com', PASSWORD);
-    expect(withdrawn.body.code).toBe('LOGIN_INVALID_CREDENTIALS');
-  });
-
-  it('이메일이나 비밀번호가 비어 있으면 400 VALIDATION_ERROR와 명세 문구', async () => {
-    const res = await request(app).post('/api/v1/auth/login').send({ email: 'a@b.com' });
-
-    expect(res.status).toBe(400);
-    expect(res.body.code).toBe('VALIDATION_ERROR');
-    expect(res.body.message).toBe('이메일과 비밀번호를 입력해 주세요.');
-  });
-});
-
 describe('AUTH-10 POST /auth/refresh', () => {
   it('새 accessToken과 새 refreshToken을 주고 쓴 토큰은 폐기한다', async () => {
-    await emailMember();
-    const loginRes = await login('junhyung@email.com', PASSWORD);
-    const first = refreshCookieOf(loginRes);
+    const member = await createMember();
+    const first = await login(member.id);
 
     const res = await refresh(first);
 
@@ -186,8 +48,8 @@ describe('AUTH-10 POST /auth/refresh', () => {
   });
 
   it('이미 쓴(폐기된) 토큰이 다시 오면 401 REFRESH_TOKEN_INVALID이고 그 회원의 토큰을 모두 폐기한다', async () => {
-    const member = await emailMember();
-    const first = refreshCookieOf(await login('junhyung@email.com', PASSWORD));
+    const member = await createMember();
+    const first = await login(member.id);
     const second = refreshCookieOf(await refresh(first));
 
     const reuse = await refresh(first);
@@ -211,16 +73,16 @@ describe('AUTH-10 POST /auth/refresh', () => {
     const unknown = await refresh('made-up');
     expect(unknown.body.code).toBe('REFRESH_TOKEN_INVALID');
 
-    await emailMember();
-    const token = refreshCookieOf(await login('junhyung@email.com', PASSWORD));
+    const member = await createMember();
+    const token = await login(member.id);
     await prisma.refreshToken.updateMany({ data: { expiresAt: new Date(Date.now() - 1) } });
     const expired = await refresh(token);
     expect(expired.body.code).toBe('REFRESH_TOKEN_EXPIRED');
   });
 
   it('정지 회원은 403 MEMBER_SUSPENDED, 탈퇴 회원은 403 MEMBER_WITHDRAWN', async () => {
-    const member = await emailMember();
-    const token = refreshCookieOf(await login('junhyung@email.com', PASSWORD));
+    const member = await createMember();
+    const token = await login(member.id);
 
     await prisma.member.update({ where: { id: member.id }, data: { status: 'S' } });
     const suspended = await refresh(token);
@@ -234,8 +96,8 @@ describe('AUTH-10 POST /auth/refresh', () => {
   });
 
   it('프로필 설정 전 회원은 nextAction으로 가입 절차를 알려 준다', async () => {
-    await emailMember({ status: 'P', nickname: null });
-    const token = refreshCookieOf(await login('junhyung@email.com', PASSWORD));
+    const member = await createMember({ status: 'P', nickname: null });
+    const token = await login(member.id);
 
     const res = await refresh(token);
 
@@ -245,9 +107,9 @@ describe('AUTH-10 POST /auth/refresh', () => {
 
 describe('AUTH-11 POST /auth/logout', () => {
   it('이 기기의 refreshToken만 폐기하고 쿠키를 지운다', async () => {
-    await emailMember();
-    const phone = refreshCookieOf(await login('junhyung@email.com', PASSWORD));
-    const laptop = refreshCookieOf(await login('junhyung@email.com', PASSWORD));
+    const member = await createMember();
+    const phone = await login(member.id);
+    const laptop = await login(member.id);
 
     const res = await request(app)
       .post('/api/v1/auth/logout')

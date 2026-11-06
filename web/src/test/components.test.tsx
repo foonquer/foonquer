@@ -9,21 +9,6 @@ import { ToastProvider, useToast } from '../components/Toast';
 import { useAsync } from '../lib/useAsync';
 
 describe('TextField', () => {
-  function PasswordInput() {
-    const [value, setValue] = useState('secret12');
-    return <TextField label="비밀번호" value={value} onChange={setValue} password />;
-  }
-
-  it('비밀번호는 가려 두고 "보기"를 누르면 보여 준다', () => {
-    render(<PasswordInput />);
-    const input = screen.getByLabelText('비밀번호');
-
-    expect(input).toHaveAttribute('type', 'password');
-    fireEvent.click(screen.getByRole('button', { name: '보기' }));
-    expect(input).toHaveAttribute('type', 'text');
-    expect(screen.getByRole('button', { name: '숨기기' })).toBeInTheDocument();
-  });
-
   it('ok 문구 앞에는 ✓, 에러면 입력창을 잘못됨으로 표시한다', () => {
     const { rerender } = render(
       <TextField

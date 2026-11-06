@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { getAccessToken, getSession } from '../lib/session';
+import { getSession } from '../lib/session';
 import { fail, mockApi, ok } from './http';
 import { renderRoute } from './render';
 
@@ -16,8 +16,6 @@ const lr = (localRegionId: number, regionId: number, dongName: string, sigunguNa
 
 const me = {
   id: 1,
-  email: 'a@b.com',
-  loginMethods: ['EMAIL', 'KAKAO'],
   nickname: '아기깨비',
   nicknameChangeableAt: null,
   profileImageUrl: null,
@@ -189,7 +187,7 @@ describe('내 동네 관리 (LOCAL-01·02·03)', () => {
   });
 });
 
-describe('설정·비밀번호 변경 (SET-05, AUTH-11)', () => {
+describe('설정 (AUTH-11)', () => {
   it('로그아웃을 확인하면 서버 쿠키를 지우고 로그인 화면으로 간다', async () => {
     const server = mockApi({
       'GET /users/me': ok(me),
@@ -197,7 +195,7 @@ describe('설정·비밀번호 변경 (SET-05, AUTH-11)', () => {
     });
     const { router } = renderRoute('/me/settings');
 
-    expect(await screen.findByText('이메일 · 카카오')).toBeInTheDocument();
+    expect(await screen.findByText('카카오')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /로그아웃/ }));
     fireEvent.click(
       within(screen.getByRole('alertdialog')).getByRole('button', { name: '로그아웃' }),
@@ -215,7 +213,7 @@ describe('설정·비밀번호 변경 (SET-05, AUTH-11)', () => {
     });
     renderRoute('/me/settings');
 
-    expect(await screen.findByText('이메일 · 카카오')).toBeInTheDocument();
+    expect(await screen.findByText('카카오')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /로그아웃/ }));
     fireEvent.click(
       within(screen.getByRole('alertdialog')).getByRole('button', { name: '로그아웃' }),
@@ -240,20 +238,6 @@ describe('설정·비밀번호 변경 (SET-05, AUTH-11)', () => {
 
     expect(status.addEventListener).not.toHaveBeenCalled();
     Object.defineProperty(navigator, 'permissions', { value: undefined, configurable: true });
-  });
-
-  it('계정 정보를 못 불러오면 알리고, 다시 불러오면 메뉴를 채운다', async () => {
-    let calls = 0;
-    mockApi({
-      'GET /users/me': () =>
-        ++calls === 1 ? fail(500, 'INTERNAL_SERVER_ERROR', '잠시 후 다시 시도해 주세요.') : ok(me),
-    });
-    renderRoute('/me/settings');
-
-    fireEvent.click(await screen.findByRole('button', { name: /불러오지 못했어요/ }));
-
-    expect(await screen.findByText('이메일 · 카카오')).toBeInTheDocument();
-    expect(screen.getByText('비밀번호 변경')).toBeInTheDocument();
   });
 
   it('위치 권한이 켜져 있다고 보여도 누르면 다시 확인한다', async () => {
@@ -281,52 +265,11 @@ describe('설정·비밀번호 변경 (SET-05, AUTH-11)', () => {
     Object.defineProperty(navigator, 'geolocation', { value: undefined, configurable: true });
   });
 
-  it('소셜로만 가입한 계정은 비밀번호 변경 메뉴가 없다', async () => {
-    mockApi({ 'GET /users/me': ok({ ...me, email: null, loginMethods: ['KAKAO'] }) });
+  it('연결된 계정은 카카오이고 비밀번호 변경 메뉴는 없다', async () => {
+    mockApi({ 'GET /users/me': ok(me) });
     renderRoute('/me/settings');
 
     expect(await screen.findByText('카카오')).toBeInTheDocument();
     expect(screen.queryByText('비밀번호 변경')).not.toBeInTheDocument();
-  });
-
-  it('비밀번호를 바꾸면 새 accessToken으로 이어서 쓴다', async () => {
-    const server = mockApi({
-      'PATCH /users/me/password': ok(
-        { accessToken: 'changed-token', accessTokenExpiresIn: 3600, passwordChangedAt: 'x' },
-        '비밀번호를 바꿨어요. 다른 기기에서는 다시 로그인해 주세요.',
-      ),
-    });
-    const { router } = renderRoute('/me/password');
-
-    fireEvent.change(screen.getByLabelText('지금 비밀번호'), { target: { value: 'oldpass12' } });
-    fireEvent.change(screen.getByLabelText('새 비밀번호'), { target: { value: 'newpass12' } });
-    fireEvent.change(screen.getByLabelText('새 비밀번호 확인'), { target: { value: 'newpass12' } });
-    fireEvent.click(screen.getByRole('button', { name: '비밀번호 바꾸기' }));
-
-    await waitFor(() => expect(router.state.location.pathname).toBe('/me/settings'));
-    expect(getAccessToken()).toBe('changed-token');
-    expect(server.calls('PATCH /users/me/password')[0].body).toEqual({
-      currentPassword: 'oldpass12',
-      newPassword: 'newpass12',
-      newPasswordConfirm: 'newpass12',
-    });
-  });
-
-  it('지금 비밀번호가 틀리면 그 칸에 알려 준다', async () => {
-    mockApi({
-      'PATCH /users/me/password': fail(
-        400,
-        'CURRENT_PASSWORD_INCORRECT',
-        '지금 비밀번호가 맞지 않아요.',
-      ),
-    });
-    renderRoute('/me/password');
-
-    fireEvent.change(screen.getByLabelText('지금 비밀번호'), { target: { value: 'wrong123' } });
-    fireEvent.change(screen.getByLabelText('새 비밀번호'), { target: { value: 'newpass12' } });
-    fireEvent.change(screen.getByLabelText('새 비밀번호 확인'), { target: { value: 'newpass12' } });
-    fireEvent.click(screen.getByRole('button', { name: '비밀번호 바꾸기' }));
-
-    expect(await screen.findByText('지금 비밀번호가 맞지 않아요')).toBeInTheDocument();
   });
 });

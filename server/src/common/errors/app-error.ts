@@ -4,7 +4,7 @@ import type { ErrorCodeDef } from './error-codes';
  * 서비스·라우터에서 던지는 에러. 에러 핸들러가 { success: false, code, message, data }로 바꿔 응답한다.
  * 예) throw new AppError(AuthError.TOKEN_EXPIRED)
  *     throw new AppError(UserError.INVALID_NICKNAME, '닉네임은 2~10자입니다.')   // 메시지만 바꾸기
- *     throw new AppError(AuthError.LOGIN_LOCKED, undefined, { lockedUntil })   // 화면에 필요한 값은 data로
+ *     throw new AppError(UserError.LOCAL_REGION_CHANGE_LIMITED, undefined, { nextChangeAvailableAt })   // 화면에 필요한 값은 data로
  */
 export class AppError extends Error {
   readonly status: number;

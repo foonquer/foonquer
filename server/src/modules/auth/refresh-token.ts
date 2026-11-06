@@ -57,9 +57,8 @@ export async function createRefreshToken(db: Db, userId: bigint, now = new Date(
  * 폐기 방식 두 가지 (refresh_token에 폐기 이유 컬럼이 없어서 expires_at으로 구분한다)
  * - 재발급(회전)으로 바뀐 토큰: revoked_at만 채운다 (expires_at은 원래대로 미래).
  *   이런 토큰이 다시 오면 탈취로 보고 그 회원의 토큰을 모두 폐기한다 (AUTH-10).
- * - 로그아웃·비밀번호 변경처럼 일부러 끝낸 토큰: revoked_at과 expires_at을 같이 지금으로.
- *   다른 기기에 남은 이런 토큰이 다시 와도 탈취로 보지 않는다. 그렇지 않으면 비밀번호를 바꾼 뒤
- *   다른 기기가 재발급을 시도하는 순간 방금 받은 새 토큰까지 폐기되어 버린다.
+ * - 로그아웃처럼 일부러 끝낸 토큰(탈취로 보고 모두 끝낸 토큰 포함): revoked_at과 expires_at을 같이 지금으로.
+ *   이런 토큰이 다시 와도 탈취로 보지 않는다 (만료로 처리).
  */
 
 /** 그 회원의 살아 있는 refreshToken을 모두 끝낸다 (모든 기기 로그아웃) */

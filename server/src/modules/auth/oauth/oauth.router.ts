@@ -4,10 +4,10 @@ import { readCookie } from '../../../common/cookies';
 import { randomToken } from '../../../common/crypto';
 import { env } from '../../../config/env';
 import { createOAuthResultCode } from '../social-login.service';
-import { authorizeUrl, fetchOAuthProfile, isProviderSlug, OAuthProviderError } from './providers';
+import { fetchKakaoProfile, kakaoAuthorizeUrl, OAuthProviderError } from './providers';
 
 /**
- * /api/v1/auth/oauth — 소셜 로그인 시작(AUTH-06)과 콜백(AUTH-07).
+ * /api/v1/auth/oauth — 카카오 로그인 시작(AUTH-06)과 콜백(AUTH-07). 로그인은 카카오 하나만 쓴다.
  * fetch로 부르는 API가 아니라 페이지 이동이라 JSON 대신 302로 답하고, 실패하면
  * {FRONTEND_URL}/oauth/callback?error=코드 로 보낸다.
  */
@@ -37,20 +37,14 @@ function sameState(a: string, b: string) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-// AUTH-06 소셜 로그인 시작
-oauthRouter.get('/:provider', (req, res) => {
-  const { provider } = req.params;
-  if (!isProviderSlug(provider)) {
-    redirectError(res, 'UNSUPPORTED_PROVIDER');
-    return;
-  }
-
+// AUTH-06 카카오 로그인 시작
+oauthRouter.get('/kakao', (_req, res) => {
   const state = randomToken(16);
   let location: string;
   try {
-    location = authorizeUrl(provider, state);
+    location = kakaoAuthorizeUrl(state);
   } catch (err) {
-    console.error('소셜 로그인 설정 오류', err);
+    console.error('카카오 로그인 설정 오류', err);
     redirectError(res, 'SOCIAL_LOGIN_FAILED');
     return;
   }
@@ -58,18 +52,13 @@ oauthRouter.get('/:provider', (req, res) => {
   res.redirect(302, location);
 });
 
-// AUTH-07 소셜 로그인 콜백
-oauthRouter.get('/:provider/callback', async (req, res) => {
-  const { provider } = req.params;
+// AUTH-07 카카오 로그인 콜백
+oauthRouter.get('/kakao/callback', async (req, res) => {
   const query = req.query as Record<string, unknown>;
   const savedState = readCookie(req, STATE_COOKIE);
   // state는 한 번만 쓴다.
   res.cookie(STATE_COOKIE, '', { ...stateCookieOptions(), maxAge: 0 });
 
-  if (!isProviderSlug(provider)) {
-    redirectError(res, 'UNSUPPORTED_PROVIDER');
-    return;
-  }
   if (
     savedState === null ||
     typeof query.state !== 'string' ||
@@ -88,12 +77,12 @@ oauthRouter.get('/:provider/callback', async (req, res) => {
   }
 
   try {
-    const profile = await fetchOAuthProfile(provider, query.code);
-    const oauthResultCode = await createOAuthResultCode(provider, profile);
+    const profile = await fetchKakaoProfile(query.code);
+    const oauthResultCode = await createOAuthResultCode(profile);
     res.redirect(302, frontCallback({ code: oauthResultCode }));
   } catch (err) {
     if (!(err instanceof OAuthProviderError)) throw err;
-    console.error('소셜 로그인 제공자 요청 실패', err);
+    console.error('카카오 요청 실패', err);
     redirectError(res, 'SOCIAL_LOGIN_FAILED');
   }
 });

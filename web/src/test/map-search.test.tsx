@@ -27,7 +27,6 @@ const MANGWON = {
 const me = {
   id: 1,
   nickname: '아기깨비',
-  loginMethods: ['EMAIL'],
   localRegions: [
     {
       localRegionId: 1,

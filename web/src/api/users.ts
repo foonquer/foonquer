@@ -24,19 +24,9 @@ export type LocalRegion = {
   regDate: string;
 };
 
-export type LoginMethod = 'EMAIL' | 'KAKAO' | 'GOOGLE';
-
-export const LOGIN_METHOD_LABEL: Record<LoginMethod, string> = {
-  EMAIL: '이메일',
-  KAKAO: '카카오',
-  GOOGLE: '구글',
-};
-
 /** USER-04 내 프로필 (약관 동의 전에도 부를 수 있다) */
 export type MyProfile = {
   id: number;
-  email: string | null;
-  loginMethods: LoginMethod[];
   nickname: string | null;
   /** 닉네임을 다시 바꿀 수 있는 시각 (지금 바꿀 수 있으면 null) */
   nicknameChangeableAt: string | null;
@@ -119,16 +109,4 @@ export const removeLocalRegion = (localRegionId: number) =>
   api.call<Omit<LocalRegionList, 'minCount' | 'maxCount' | 'added'>>(
     'DELETE',
     `/users/me/local-regions/${localRegionId}`,
-  );
-
-/** SET-05 비밀번호 변경. 다른 기기는 로그아웃되고 이 기기는 새 토큰을 받는다 */
-export const changePassword = (body: {
-  currentPassword: string;
-  newPassword: string;
-  newPasswordConfirm: string;
-}) =>
-  api.call<{ accessToken: string; accessTokenExpiresIn: number; passwordChangedAt: string }>(
-    'PATCH',
-    '/users/me/password',
-    { body },
   );
