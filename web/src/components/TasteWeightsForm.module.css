@@ -1,0 +1,96 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: var(--mk-white);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 42px;
+}
+
+.label {
+  min-width: 0;
+}
+
+.name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.hint {
+  font-size: 10px;
+  color: var(--mk-muted);
+}
+
+.options {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.option {
+  min-width: 46px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--mk-line);
+  border-radius: 8px;
+  background: var(--mk-white);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.option[aria-checked='true'] {
+  border: 1.5px solid var(--mk-green);
+  background: var(--mk-green-50);
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.reflect {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--mk-cream);
+}
+
+.reflectTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: #8a5a17;
+}
+
+.bar {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  margin-top: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.bar span {
+  height: 100%;
+  transition: width 0.2s;
+}
+
+.summary {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--mk-ink);
+}
+
+.example {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #b66a10;
+}

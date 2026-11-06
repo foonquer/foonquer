@@ -14,8 +14,11 @@ type Props = {
 /** 검색 결과·추천 목록의 음식점 카드. 누르면 음식점 상세 */
 export function RestaurantCard({ item, note }: Props) {
   const score = formatScore(item.rating.score);
+  const myOverall = formatScore(item.myOverallScore);
+  // 피그마 3-2: "★ 4.6 맛 · 내 종합 4.4 · 재방문 58%"
   const scoreLine = joinDot([
-    score ? `★ ${score}` : '아직 별점 없음',
+    score ? `★ ${score} 맛` : '아직 별점 없음',
+    myOverall ? `내 종합 ${myOverall}` : null,
     item.revisitRate !== null ? `재방문 ${item.revisitRate}%` : null,
   ]);
 

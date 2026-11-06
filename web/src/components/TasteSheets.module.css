@@ -1,0 +1,150 @@
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--mk-ink);
+}
+
+.caption {
+  font-size: 14px;
+  color: var(--mk-muted);
+}
+
+.big {
+  font-size: 20px;
+  color: var(--mk-ink);
+}
+
+.star {
+  color: var(--mk-star);
+}
+
+.note {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+}
+
+.criteria {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 14px 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.criteria li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--mk-ink);
+}
+
+.criteria li[data-low='true'] {
+  color: var(--mk-muted);
+}
+
+.criteria li[data-current='true'] {
+  background: var(--mk-cream);
+  font-weight: 700;
+}
+
+.criteriaScore {
+  width: 28px;
+  font-weight: 700;
+  color: var(--mk-star);
+}
+
+.table {
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #f7f9f5;
+  border-collapse: separate;
+  font-size: 13px;
+}
+
+.table th,
+.table td {
+  height: 26px;
+  padding: 0 4px;
+  text-align: left;
+  font-weight: 500;
+}
+
+.table thead th {
+  font-size: 11px;
+  color: var(--mk-muted);
+}
+
+.table tbody th {
+  font-weight: 700;
+}
+
+.table td:last-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: #e3e8df;
+  overflow: hidden;
+}
+
+.bar span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: #a7cfa6;
+}
+
+.bar span[data-strong='true'] {
+  background: var(--mk-star);
+}
+
+.percent {
+  width: 52px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+  color: var(--mk-forest);
+}
+
+.formula {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--mk-cream);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #8a5a17;
+}
+
+.formulaNote {
+  margin-top: 2px;
+  font-weight: 500;
+  color: #9a7442;
+}
+
+.buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.buttons > * {
+  flex: 1;
+  width: auto;
+}

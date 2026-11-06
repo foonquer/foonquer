@@ -1,0 +1,62 @@
+.row,
+.input {
+  display: inline-flex;
+  align-items: center;
+}
+
+.row {
+  gap: 1px;
+}
+
+.input {
+  gap: 10px;
+  border-radius: 8px;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--mk-green);
+  outline-offset: 4px;
+}
+
+.star {
+  display: block;
+  flex-shrink: 0;
+}
+
+.empty {
+  fill: #dfe3da;
+}
+
+.full {
+  fill: var(--mk-star);
+}
+
+.cell {
+  position: relative;
+  display: inline-block;
+}
+
+.hit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.hit[data-part='whole'] {
+  left: 0;
+  right: 0;
+}
+
+.hit[data-part='left'] {
+  left: 0;
+  width: 50%;
+}
+
+.hit[data-part='right'] {
+  right: 0;
+  width: 50%;
+}

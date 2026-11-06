@@ -1,6 +1,7 @@
-// 프로필·내 동네 API (USER-01·03·04·05, LOCAL-01~03)
+// 프로필·내 동네·내 취향 API (USER-01·03·04·05·09·10, LOCAL-01~03)
 
 import { api } from '../lib/api';
+import type { TasteKey } from './restaurants';
 
 export type Gender = 'F' | 'M' | 'N';
 export type AgeGroup = 10 | 20 | 30 | 40 | 50;
@@ -64,6 +65,8 @@ export const completeProfile = (body: {
   localRegionIds: number[];
   /** S-05-1 좋아하는 음식 (카테고리 id 1개 이상) */
   preferredCategoryIds: number[];
+  /** S-05-2 중요하게 보는 것 (안 보내면 모두 보통) */
+  tasteWeights?: TasteWeights;
 }) =>
   api.post<{
     nextAction: 'HOME';
@@ -113,3 +116,18 @@ export const removeLocalRegion = (localRegionId: number) =>
     'DELETE',
     `/users/me/local-regions/${localRegionId}`,
   );
+
+/** 내 취향: 항목마다 보통·중요·아주 중요 */
+export type WeightLevel = 'NORMAL' | 'IMPORTANT' | 'VERY';
+export type TasteWeights = Record<TasteKey, WeightLevel>;
+
+type TasteWeightsView = {
+  items: { key: TasteKey; level: WeightLevel; weightPercent: number }[];
+};
+
+/** USER-09 내 취향 조회 */
+export const getTasteWeights = () => api.get<TasteWeightsView>('/users/me/taste-weights');
+
+/** USER-10 내 취향 저장 (다섯 항목을 한 번에) */
+export const saveTasteWeights = (weights: TasteWeights) =>
+  api.call<TasteWeightsView>('PUT', '/users/me/taste-weights', { body: weights });

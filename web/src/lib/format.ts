@@ -23,3 +23,34 @@ export function formatDate(iso: string | null | undefined) {
 export function joinDot(parts: (string | null | undefined | false)[]) {
   return parts.filter(Boolean).join(' · ');
 }
+
+/** "2026-09-21T12:00:00+09:00" → "9.21" */
+export function formatMonthDay(iso: string | null | undefined) {
+  if (!iso) return null;
+  const m = /^\d{4}-(\d{2})-(\d{2})/.exec(iso);
+  return m ? `${Number(m[1])}.${Number(m[2])}` : null;
+}
+
+/** "2026-09-25T12:34:00+09:00" → "2026.09.25 12:34" (영수증 결제 시각) */
+export function formatDateTime(iso: string | null | undefined) {
+  if (!iso) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso);
+  return m ? `${m[1]}.${m[2]}.${m[3]} ${m[4]}:${m[5]}` : null;
+}
+
+/** 12000 → "12,000원" */
+export function formatWon(amount: number | null | undefined) {
+  return amount === null || amount === undefined ? null : `${amount.toLocaleString('ko-KR')}원`;
+}
+
+/** 1280 → "1,280P" */
+export function formatPoint(point: number) {
+  return `${point.toLocaleString('ko-KR')}P`;
+}
+
+/** "2026-09-25T…" → "9월 25일" */
+export function formatKoreanDate(iso: string | null | undefined) {
+  if (!iso) return null;
+  const m = /^\d{4}-(\d{2})-(\d{2})/.exec(iso);
+  return m ? `${Number(m[1])}월 ${Number(m[2])}일` : null;
+}
