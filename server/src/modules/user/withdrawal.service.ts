@@ -76,7 +76,7 @@ export async function withdrawMember(userId: bigint, body: WithdrawalBody, now =
   const reasonCode = body.reasonCode ?? null;
   const reasonDetail = reasonCode === 'ETC' ? body.reasonDetail?.trim() || null : null;
 
-  // 트랜잭션이 끝난 뒤 지울 비공개 버킷 파일 (영수증·현장·문의 사진)
+  // 트랜잭션이 끝난 뒤 지울 비공개 버킷 파일 (영수증·현장·문의 사진). 삭제가 실패해도 cleanup 작업이 7일 동안 폴더째 다시 지운다
   const privateKeys: (string | null)[] = [];
   const profileImageKey = await prisma.$transaction(
     async (tx) => {
@@ -126,7 +126,8 @@ export async function withdrawMember(userId: bigint, body: WithdrawalBody, now =
         select: { id: true, receiptImageKey: true, sitePhotoKey: true },
       });
       for (const v of visits) privateKeys.push(v.receiptImageKey, v.sitePhotoKey);
-      await tx.visitReceiptItem.deleteMany({ where: { visit: { userId } } });
+      // 방문 행을 먼저 바꿔 잠근다: OCR 처리(processReceipt)가 진행 중이면 그 트랜잭션이 끝난 뒤 지우고,
+      // 그 뒤에 시작하는 처리는 purged_at을 보고 아무것도 쓰지 않는다. 메뉴 줄은 잠근 뒤에 지워야 새로 들어온 줄까지 지운다
       await tx.visit.updateMany({
         where: { userId, purgedAt: null },
         data: {
@@ -149,6 +150,7 @@ export async function withdrawMember(userId: bigint, body: WithdrawalBody, now =
           photoLng: null,
         },
       });
+      await tx.visitReceiptItem.deleteMany({ where: { visit: { userId } } });
       // 1:1 문의도 내용·사진째 지운다
       const inquiries = await tx.inquiry.findMany({
         where: { userId },

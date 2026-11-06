@@ -254,7 +254,7 @@ export function scheduleReceiptCheck(visitId: bigint) {
       // READING(P)으로 영원히 남지 않게 실패로 바꾼다 (이미 바뀐 상태는 그대로)
       await prisma.visit
         .updateMany({
-          where: { id: visitId, status: 'P' },
+          where: { id: visitId, status: 'P', purgedAt: null },
           data: { status: 'F', failReason: 'UNREADABLE' },
         })
         .catch((e: unknown) => console.error(`영수증 실패 기록 실패 visit=${visitId}`, e));
@@ -334,6 +334,21 @@ function nameSearchToken(storeName: string) {
 }
 
 /**
+ * 이름에 token이 들어간 가게 id 300개. 프랜차이즈처럼 많으면 가까운 순(위치가 없으면 id 순)으로 자른다 —
+ * 집에서 올린 영수증이라 현재 위치 범위로 거르지는 않는다
+ */
+async function nameCandidateIds(token: string, near: { lat: number; lng: number } | null) {
+  const pattern = `%${token.replace(/[\\%_]/g, '\\$&')}%`;
+  // 경도 1도는 서울(북위 37.5도)에서 위도 1도의 약 0.8배 길이
+  const order = near
+    ? Prisma.sql`(POW(lat - ${near.lat}, 2) + POW((lng - ${near.lng}) * 0.8, 2)), id`
+    : Prisma.sql`id`;
+  const rows = await prisma.$queryRaw<{ id: bigint }[]>`
+    SELECT id FROM restaurant WHERE status = 'A' AND name LIKE ${pattern} ORDER BY ${order} LIMIT 300`;
+  return rows.map((r) => r.id);
+}
+
+/**
  * 영수증과 맞는 가게 후보 (홈 영수증 인증). 사업자번호가 같은 가게가 있으면 그것만,
  * 없으면 가게명이 맞는 가게(다른 사업자번호가 등록된 가게는 다른 지점이라 뺀다). 이름이 똑같은 가게 → 가까운 가게 순
  */
@@ -362,9 +377,8 @@ export async function findReceiptCandidates(
     const token = nameSearchToken(ocr.storeName);
     const found = token
       ? await prisma.restaurant.findMany({
-          where: { status: 'A', name: { contains: token } },
+          where: { id: { in: await nameCandidateIds(token, near) } },
           select,
-          take: 300,
         })
       : [];
     rows = found.filter((r) => receiptMatch(r, ocr).matched);
@@ -448,8 +462,12 @@ export async function processReceipt(visitId: bigint, now = new Date()) {
   if (!visit || visit.status !== 'P' || !visit.receiptImageKey) return;
   const restaurant = visit.restaurant;
 
-  const fail = (failReason: string, extra: Prisma.VisitUpdateInput = {}) =>
-    prisma.visit.update({ where: { id: visit.id }, data: { status: 'F', failReason, ...extra } });
+  // OCR 도중 탈퇴해서 파기된(purged_at) 방문에는 영수증 정보를 다시 쓰지 않는다
+  const fail = (failReason: string, extra: Prisma.VisitUpdateManyMutationInput = {}) =>
+    prisma.visit.updateMany({
+      where: { id: visit.id, status: 'P', purgedAt: null },
+      data: { status: 'F', failReason, ...extra },
+    });
 
   const url = await createReadUrl(visit.receiptImageKey, 600);
   const ext = visit.receiptImageKey.split('.').pop() ?? 'jpg';
@@ -503,9 +521,10 @@ export async function processReceipt(visitId: bigint, now = new Date()) {
 
   try {
     await prisma.$transaction(async (tx) => {
-      const [locked] = await tx.$queryRaw<{ status: string }[]>`
-        SELECT status FROM visit WHERE id = ${visit.id} FOR UPDATE`;
-      if (locked?.status !== 'P') return;
+      // 탈퇴(파기)와 같은 방문 행 잠금으로 순서를 맞춘다 — 파기가 먼저 끝났으면 아무것도 쓰지 않는다
+      const [locked] = await tx.$queryRaw<{ status: string; purged_at: Date | null }[]>`
+        SELECT status, purged_at FROM visit WHERE id = ${visit.id} FOR UPDATE`;
+      if (locked?.status !== 'P' || locked.purged_at !== null) return;
       if (receipt.items.length > 0) {
         await tx.visitReceiptItem.createMany({
           data: receipt.items.map((item) => ({ visitId: visit.id, ...item })),
@@ -564,6 +583,13 @@ export async function confirmReceiptRestaurant(
   const ocr: StoreOcr = { storeName: visit.ocrStoreName, businessNo: visit.ocrBusinessNo };
   const match = receiptMatch(restaurant, ocr);
   if (!match.matched) throw new AppError(VisitError.RESTAURANT_NOT_CANDIDATE);
+  // 후보 목록(findReceiptCandidates)과 같게: 사업자번호가 같은 가게가 있으면 그 가게만 고를 수 있다
+  if (ocr.businessNo && restaurant.businessNo !== ocr.businessNo) {
+    const sameBusinessNo = await prisma.restaurant.count({
+      where: { status: 'A', businessNo: ocr.businessNo },
+    });
+    if (sameBusinessNo > 0) throw new AppError(VisitError.RESTAURANT_NOT_CANDIDATE);
+  }
   if (visit.paidAt && isExpiredReceipt(visit.paidAt, now)) {
     await prisma.visit.update({
       where: { id: visit.id },

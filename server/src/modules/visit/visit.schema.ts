@@ -47,8 +47,8 @@ export type ReceiptBody = z.infer<typeof receiptBody>;
 /** VISIT-04 — 가게 확인 대기(R)일 때 후보 가게를 내 위치에서 가까운 순으로 */
 export const verificationQuery = z
   .object({
-    lat: z.coerce.number().pipe(lat).optional(),
-    lng: z.coerce.number().pipe(lng).optional(),
+    lat: z.coerce.number(COORD_ERROR).pipe(lat).optional(),
+    lng: z.coerce.number(COORD_ERROR).pipe(lng).optional(),
   })
   .refine((q) => (q.lat === undefined) === (q.lng === undefined), COORD_ERROR);
 export type VerificationQuery = z.infer<typeof verificationQuery>;

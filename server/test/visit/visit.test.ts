@@ -6,7 +6,13 @@ import { prisma } from '../../src/lib/prisma';
 import { readReceipt } from '../../src/modules/visit/receipt-ocr';
 import { flushReceiptChecks } from '../../src/modules/visit/visit.service';
 import { resetDb } from '../helpers/db';
-import { bearer, createActiveSeason, createMember, createRestaurant } from '../helpers/fixtures';
+import {
+  bearer,
+  createActiveSeason,
+  createMember,
+  createRestaurant,
+  createVisit,
+} from '../helpers/fixtures';
 import * as storage from '../../src/lib/storage';
 import { resetStorageMock } from '../helpers/storage-mock';
 
@@ -480,5 +486,134 @@ describe('VISIT-03·04·05 홈에서 바로 찍은 영수증', () => {
       .set('Authorization', bearer(me.id));
     expect(res.body.data).toMatchObject({ status: 'FAILED', failReason: 'STORE_NOT_FOUND' });
     expect(res.body.data.failMessage).toContain('가게를 찾지 못했어요');
+    expect(await prisma.visit.findUniqueOrThrow({ where: { id: BigInt(id) } })).toMatchObject({
+      status: 'F',
+      failReason: 'STORE_NOT_FOUND',
+      restaurantId: null,
+      ocrStoreName: '세상에없는집',
+    });
+  });
+
+  it('접수하면 receipt_hash·메뉴 줄을 저장하고, 같은 영수증을 또 올리면 DUPLICATE, 남의 인증은 404', async () => {
+    const { me, restaurant } = await setup();
+    const other = await createMember();
+    vi.mocked(readReceipt).mockResolvedValue(receipt());
+    const id = await submitHome(me.id);
+    const saved = await prisma.visit.findUniqueOrThrow({ where: { id: BigInt(id) } });
+    expect(saved.receiptHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(await prisma.visitReceiptItem.count({ where: { visitId: BigInt(id) } })).toBe(1);
+
+    const dup = await submitHome(me.id);
+    expect(await prisma.visit.findUniqueOrThrow({ where: { id: BigInt(dup) } })).toMatchObject({
+      status: 'F',
+      failReason: 'DUPLICATE',
+    });
+    expect(await prisma.visitReceiptItem.count({ where: { visitId: BigInt(dup) } })).toBe(0);
+
+    const peek = await request(app)
+      .get(`/api/v1/visit-verifications/${id}`)
+      .set('Authorization', bearer(other.id));
+    expect(peek.status).toBe(404);
+    expect(peek.body.code).toBe('VISIT_NOT_FOUND');
+    const steal = await confirm(other.id, id, restaurant.id);
+    expect(steal.status).toBe(404);
+    expect((await prisma.visit.findUniqueOrThrow({ where: { id: BigInt(id) } })).status).toBe('R');
+  });
+
+  it('결제 7일이 지난 영수증은 접수할 때도, 가게를 고를 때도 EXPIRED', async () => {
+    const { me, restaurant } = await setup();
+    vi.mocked(readReceipt).mockResolvedValue(
+      receipt({ paidAt: new Date(Date.now() - 8 * 86400_000), approvalNo: '11111111' }),
+    );
+    const old = await submitHome(me.id);
+    expect(await prisma.visit.findUniqueOrThrow({ where: { id: BigInt(old) } })).toMatchObject({
+      status: 'F',
+      failReason: 'EXPIRED',
+    });
+
+    vi.mocked(readReceipt).mockResolvedValue(receipt({ approvalNo: '22222222' }));
+    const id = await submitHome(me.id);
+    // "이 가게가 맞나요?"에서 오래 머물러 7일이 지났다
+    await prisma.visit.update({
+      where: { id: BigInt(id) },
+      data: { paidAt: new Date(Date.now() - 8 * 86400_000) },
+    });
+    const res = await confirm(me.id, id, restaurant.id);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ status: 'FAILED', failReason: 'EXPIRED', reward: null });
+    expect(await prisma.visit.findUniqueOrThrow({ where: { id: BigInt(id) } })).toMatchObject({
+      status: 'F',
+      failReason: 'EXPIRED',
+      restaurantId: null,
+    });
+    expect(await prisma.pointHistory.count({ where: { userId: me.id } })).toBe(0);
+  });
+
+  it('오늘 이미 인증한 가게를 고르면 409 ALREADY_VERIFIED_TODAY, 방문은 R로 남는다', async () => {
+    const { season, me, restaurant } = await setup();
+    await createVisit(me.id, restaurant.id, { seasonId: season.id, status: 'C' });
+    vi.mocked(readReceipt).mockResolvedValue(receipt());
+    const id = await submitHome(me.id);
+    const res = await confirm(me.id, id, restaurant.id);
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('ALREADY_VERIFIED_TODAY');
+    expect(await prisma.visit.findUniqueOrThrow({ where: { id: BigInt(id) } })).toMatchObject({
+      status: 'R',
+      restaurantId: null,
+    });
+  });
+
+  it('사업자번호가 같은 가게가 있으면 이름만 맞는 다른 가게는 고를 수 없다', async () => {
+    const { me } = await setup();
+    const branch = await createRestaurant({ name: '옛날손칼국수 가양점' });
+    vi.mocked(readReceipt).mockResolvedValue(receipt());
+    const id = await submitHome(me.id);
+    const res = await confirm(me.id, id, branch.id);
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('RESTAURANT_NOT_CANDIDATE');
+    // 다른 지점에 사업자번호가 잘못 저장되지 않았다
+    expect(
+      (await prisma.restaurant.findUniqueOrThrow({ where: { id: branch.id } })).businessNo,
+    ).toBeNull();
+  });
+
+  it('OCR 도중 탈퇴해서 파기된 방문에는 영수증 정보를 다시 쓰지 않는다', async () => {
+    const { me } = await setup();
+    const purgeDuringOcr = (result: ReturnType<typeof receipt>) => async () => {
+      await prisma.visit.updateMany({
+        where: { userId: me.id, purgedAt: null },
+        data: { purgedAt: new Date(), receiptImageKey: null },
+      });
+      return result;
+    };
+    vi.mocked(readReceipt).mockImplementationOnce(purgeDuringOcr(receipt()));
+    const ok = await submitHome(me.id);
+    vi.mocked(readReceipt).mockImplementationOnce(
+      purgeDuringOcr(receipt({ paidAt: new Date(Date.now() - 8 * 86400_000), approvalNo: '3' })),
+    );
+    const expired = await submitHome(me.id);
+    for (const id of [ok, expired]) {
+      expect(await prisma.visit.findUniqueOrThrow({ where: { id: BigInt(id) } })).toMatchObject({
+        status: 'P',
+        ocrRaw: null,
+        ocrStoreName: null,
+        paidAt: null,
+        receiptHash: null,
+      });
+      expect(await prisma.visitReceiptItem.count({ where: { visitId: BigInt(id) } })).toBe(0);
+    }
+  });
+
+  it('위치 쿼리가 숫자가 아니면 400 INVALID_COORDINATE', async () => {
+    const { me } = await setup();
+    vi.mocked(readReceipt).mockResolvedValue(receipt());
+    const id = await submitHome(me.id);
+    for (const q of ['lat=abc&lng=127', 'lat=37.5&lng=200', 'lat=37.5']) {
+      const res = await request(app)
+        .get(`/api/v1/visit-verifications/${id}?${q}`)
+        .set('Authorization', bearer(me.id));
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('INVALID_COORDINATE');
+    }
   });
 });
