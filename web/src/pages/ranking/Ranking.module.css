@@ -568,3 +568,8 @@
 .medal[data-rank='3'] {
   background: #c98a5b;
 }
+
+/* 닉네임 → 탐방러 프로필 */
+.profileLink {
+  color: inherit;
+}

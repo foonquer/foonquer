@@ -18,6 +18,7 @@ reviews:
       # 앞 PR 위에 쌓은 PR(base가 feat/·init/ 브랜치)도 리뷰한다.
       - 'feat/.*'
       - 'init/.*'
+      - 'modify/.*'
       - 'fix/.*'
       - 'refactor/.*'
   path_filters:

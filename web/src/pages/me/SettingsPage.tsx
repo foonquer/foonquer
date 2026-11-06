@@ -196,6 +196,7 @@ export function SettingsPage() {
             items={[
               // 로그인은 카카오 하나만 쓴다
               { label: '연결된 계정', value: '카카오' },
+              { label: '차단한 탐험가', to: '/me/blocks' },
               { label: '로그아웃', onClick: () => setLogoutOpen(true) },
               { label: '회원 탈퇴', to: '/me/withdraw', muted: true },
             ]}

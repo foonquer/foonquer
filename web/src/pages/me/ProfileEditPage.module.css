@@ -79,3 +79,73 @@
   color: var(--mk-forest);
   white-space: pre-line;
 }
+
+.photo {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatarChange:disabled {
+  color: var(--mk-disabled-text);
+}
+
+.bioBox {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px 8px;
+  border: 1px solid var(--mk-line);
+  border-radius: 14px;
+  background: var(--mk-white);
+}
+
+.bio {
+  min-height: 48px;
+  border: 0;
+  resize: none;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--mk-ink);
+}
+
+.bioBox:focus-within {
+  border-color: var(--mk-green);
+}
+
+.bio:focus {
+  outline: none;
+}
+
+.bioBox .counter {
+  align-self: flex-end;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.sheetTitle {
+  margin-bottom: 4px;
+  font-size: 13px;
+  text-align: center;
+  color: var(--mk-muted);
+}
+
+.sheetRow {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 54px;
+  border-bottom: 1px solid var(--mk-divider);
+  font-size: 16px;
+  text-align: left;
+  color: var(--mk-ink);
+}
+
+.sheetRow:last-of-type {
+  margin-bottom: 16px;
+}

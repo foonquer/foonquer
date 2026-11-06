@@ -1,18 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import {
   AGE_LABEL,
+  BIO_MAX,
+  changeProfileImage,
   checkNickname,
   GENDER_LABEL,
   getMe,
   NICKNAME_MAX,
   NICKNAME_PATTERN,
+  PROFILE_IMAGE_ACCEPT,
+  removeProfileImage,
   updateProfile,
   type AgeGroup,
   type Gender,
   type MyProfile,
 } from '../../api/users';
 import { AppHeader } from '../../components/AppHeader';
+import { BottomSheet } from '../../components/BottomSheet';
 import { Button } from '../../components/Button';
 import { ChoiceGroup } from '../../components/ChoiceGroup';
 import { MukkaebiAvatar } from '../../components/Mukkaebi';
@@ -35,7 +40,7 @@ const AGES = ([10, 20, 30, 40, 50] as const).map((value) => ({
 /** 닉네임을 쓰다 멈추면 이만큼 뒤에 중복 확인 (ms) */
 const CHECK_DELAY_MS = 400;
 
-/** 프로필 수정 /me/profile (USER-04 → USER-05) */
+/** 프로필 수정 /me/profile (USER-04 → USER-05, 사진은 USER-02·06·07로 바로 바꾼다) */
 export function ProfileEditPage() {
   const me = useAsync(getMe, []);
   if (me.error) {
@@ -65,8 +70,14 @@ function ProfileForm({ me }: { me: MyProfile }) {
   const [nickname, setNickname] = useState(me.nickname ?? '');
   const [gender, setGender] = useState<Gender | null>(me.gender);
   const [ageGroup, setAgeGroup] = useState<AgeGroup | null>(me.ageGroup);
+  const [bio, setBio] = useState(me.bio ?? '');
   const [check, setCheck] = useState<Check | null>(null);
   const [saving, setSaving] = useState(false);
+  const [photo, setPhoto] = useState(me.profileImageUrl);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const bioId = useId();
 
   const value = nickname.trim();
   const nicknameChanged = value !== me.nickname;
@@ -113,6 +124,7 @@ function ProfileForm({ me }: { me: MyProfile }) {
     ...(nicknameChanged ? { nickname: value } : {}),
     ...(gender && gender !== me.gender ? { gender } : {}),
     ...(ageGroup && ageGroup !== me.ageGroup ? { ageGroup } : {}),
+    ...(bio.trim() !== (me.bio ?? '') ? { bio: bio.trim() || null } : {}),
   };
   const dirty = Object.keys(changes).length > 0;
   const canSave = dirty && (!nicknameChanged || current?.status === 'ok') && !saving;
@@ -134,6 +146,21 @@ function ProfileForm({ me }: { me: MyProfile }) {
         toast(errorMessage(err));
       }
       setSaving(false);
+    }
+  };
+
+  // 사진은 저장 버튼과 따로 고르는 즉시 바꾼다
+  const applyPhoto = async (run: () => ReturnType<typeof removeProfileImage>) => {
+    setPhotoOpen(false);
+    setPhotoBusy(true);
+    try {
+      const { data, message } = await run();
+      setPhoto(data.profileImageUrl);
+      toast(message.replace(/\.$/, ''));
+    } catch (err) {
+      toast(errorMessage(err));
+    } finally {
+      setPhotoBusy(false);
     }
   };
 
@@ -160,10 +187,32 @@ function ProfileForm({ me }: { me: MyProfile }) {
       />
       <div className={styles.content}>
         <div className={styles.avatar}>
-          <MukkaebiAvatar size={88} />
-          <Link to="/me/mukkaebi" className={styles.avatarChange}>
-            변경
-          </Link>
+          {photo ? (
+            <img src={photo} alt="내 프로필 사진" className={styles.photo} />
+          ) : (
+            <MukkaebiAvatar size={88} />
+          )}
+          <button
+            type="button"
+            className={styles.avatarChange}
+            aria-label="프로필 사진 변경"
+            onClick={() => setPhotoOpen(true)}
+            disabled={photoBusy}
+          >
+            {photoBusy ? '바꾸는 중' : '변경'}
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept={PROFILE_IMAGE_ACCEPT}
+            hidden
+            data-testid="profile-photo-input"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (file) void applyPhoto(() => changeProfileImage(file));
+            }}
+          />
         </div>
 
         <TextField
@@ -186,6 +235,27 @@ function ProfileForm({ me }: { me: MyProfile }) {
           }
           messageStatus={current ? undefined : 'default'}
         />
+
+        <div className={styles.field}>
+          <label htmlFor={bioId} className={styles.fieldLabel}>
+            소개글
+          </label>
+          <div className={styles.bioBox}>
+            <textarea
+              id={bioId}
+              className={styles.bio}
+              placeholder="예: 국밥 · 칼국수 위주로 다녀요"
+              value={bio}
+              onChange={(e) => setBio([...e.target.value].slice(0, BIO_MAX).join(''))}
+            />
+            <span className={styles.counter}>
+              {[...bio].length}/{BIO_MAX}
+            </span>
+          </div>
+          <p className={styles.hint}>
+            SNS 아이디나 블로그 주소도 적을 수 있어요 · 링크가 아니라 글자로 보여요
+          </p>
+        </div>
 
         <ChoiceGroup
           label="성별"
@@ -217,6 +287,35 @@ function ProfileForm({ me }: { me: MyProfile }) {
           </p>
         </div>
       </div>
+
+      <BottomSheet open={photoOpen} onClose={() => setPhotoOpen(false)} label="프로필 사진">
+        <p className={styles.sheetTitle}>프로필 사진</p>
+        <button
+          type="button"
+          className={styles.sheetRow}
+          onClick={() => {
+            setPhotoOpen(false);
+            fileInput.current?.click();
+          }}
+        >
+          앨범에서 사진 고르기
+        </button>
+        {photo && (
+          <button
+            type="button"
+            className={styles.sheetRow}
+            onClick={() => void applyPhoto(removeProfileImage)}
+          >
+            기본 캐릭터(먹깨비)로 바꾸기
+          </button>
+        )}
+        <Link to="/me/mukkaebi/decorate" className={styles.sheetRow}>
+          먹깨비 꾸미러 가기
+        </Link>
+        <Button variant="gray" onClick={() => setPhotoOpen(false)}>
+          취소
+        </Button>
+      </BottomSheet>
     </Screen>
   );
 }

@@ -1,6 +1,6 @@
 // 프로필·내 동네·내 취향 API (USER-01·03·04·05·09·10, LOCAL-01~03)
 
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import type { TasteKey } from './restaurants';
 
 export type Gender = 'F' | 'M' | 'N';
@@ -33,6 +33,8 @@ export type MyProfile = {
   nicknameChangeableAt: string | null;
   profileImageUrl: string | null;
   profileImageSource: 'CUSTOM' | 'DEFAULT';
+  /** 탐방러 프로필 소개글 (60자) */
+  bio: string | null;
   gender: Gender | null;
   ageGroup: AgeGroup | null;
   status: 'P' | 'A' | 'S';
@@ -80,15 +82,74 @@ export const completeProfile = (body: {
 export const NICKNAME_PATTERN = /^[가-힣a-zA-Z0-9]{2,10}$/;
 export const NICKNAME_MAX = 10;
 
-/** USER-05 프로필 수정 (바꿀 값만 보낸다) */
-export const updateProfile = (body: { nickname?: string; gender?: Gender; ageGroup?: AgeGroup }) =>
+/** 소개글 최대 길이 (서버 USER-05와 같다, 글자 수) */
+export const BIO_MAX = 60;
+
+/** USER-05 프로필 수정 (바꿀 값만 보낸다, 소개글 null이면 지움) */
+export const updateProfile = (body: {
+  nickname?: string;
+  gender?: Gender;
+  ageGroup?: AgeGroup;
+  bio?: string | null;
+}) =>
   api.call<{
     id: number;
     nickname: string;
     nicknameChangeableAt: string | null;
     gender: Gender;
     ageGroup: AgeGroup;
+    bio: string | null;
   }>('PATCH', '/users/me', { body });
+
+/** 프로필 사진 형식·크기 (서버 USER-02와 같다) */
+export const PROFILE_IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp';
+export const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+type ProfileImage = { profileImageUrl: string | null; profileImageSource: 'CUSTOM' | 'DEFAULT' };
+
+const TYPE_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+};
+
+/**
+ * USER-02 → 스토리지 PUT → USER-06 프로필 사진 바꾸기.
+ * 여기 형식 검사는 안내용이고, 실제 형식(파일 앞부분)은 서버가 USER-06에서 확인한다
+ */
+export async function changeProfileImage(file: File) {
+  // 일부 브라우저는 형식을 비워 주므로 그때는 확장자로 정한다
+  const type =
+    file.type || TYPE_BY_EXTENSION[file.name.split('.').pop()?.toLowerCase() ?? ''] || '';
+  if (!PROFILE_IMAGE_ACCEPT.split(',').includes(type)) {
+    throw new ApiError(400, 'UNSUPPORTED_IMAGE_TYPE', 'JPG, PNG, WebP 사진만 올릴 수 있어요.');
+  }
+  if (file.size > PROFILE_IMAGE_MAX_BYTES) {
+    throw new ApiError(400, 'IMAGE_TOO_LARGE', '프로필 사진은 5MB까지 올릴 수 있어요.');
+  }
+  const target = await api.post<{
+    uploadUrl: string;
+    method: 'PUT';
+    headers: Record<string, string>;
+    imageKey: string;
+  }>('/users/me/profile-image/upload-url', { contentType: type, fileSize: file.size });
+  let res: Response;
+  try {
+    res = await fetch(target.uploadUrl, { method: 'PUT', headers: target.headers, body: file });
+  } catch {
+    throw new ApiError(0, 'NETWORK', '사진을 올리지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+  if (!res.ok) {
+    throw new ApiError(res.status, 'UPLOAD_FAILED', '사진을 올리지 못했어요. 다시 시도해 주세요.');
+  }
+  return api.call<ProfileImage>('PUT', '/users/me/profile-image', {
+    body: { imageKey: target.imageKey },
+  });
+}
+
+/** USER-07 프로필 사진 지우기 (기본 캐릭터로) */
+export const removeProfileImage = () => api.call<ProfileImage>('DELETE', '/users/me/profile-image');
 
 /** LOCAL-01 내 동네 목록 */
 export type LocalRegionList = {

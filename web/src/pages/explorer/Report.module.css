@@ -1,0 +1,99 @@
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px var(--mk-side) 24px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.sub {
+  margin-top: -4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+}
+
+.reasons {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0 0;
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--mk-white);
+}
+
+.reason {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  font-size: 14px;
+  color: var(--mk-ink);
+}
+
+.reason input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--mk-green);
+}
+
+.reason:has(input:checked) {
+  font-weight: 700;
+}
+
+.label {
+  margin-top: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.box {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px 10px;
+  border-radius: 20px;
+  background: var(--mk-white);
+}
+
+.textarea {
+  min-height: 72px;
+  border: 0;
+  resize: none;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+}
+
+.counter {
+  align-self: flex-end;
+  font-size: 11px;
+  color: var(--mk-muted);
+}
+
+.caption {
+  margin-bottom: 10px;
+  font-size: 11px;
+  text-align: center;
+  color: var(--mk-muted);
+}
+
+/* 피그마: 신고 접수 버튼은 코랄 (Button의 primary보다 구체적으로) */
+.submit.submit:not(:disabled) {
+  background: var(--mk-coral);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
