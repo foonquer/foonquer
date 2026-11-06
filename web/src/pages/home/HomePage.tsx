@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
+import { getHomeSummary } from '../../api/home';
 import { getMapRestaurants, type Bounds, type MapRestaurant } from '../../api/restaurants';
 import { getMe } from '../../api/users';
 import bellIcon from '../../assets/icons/bell.svg';
@@ -23,10 +24,14 @@ import styles from './HomePage.module.css';
 /** 지도를 멈추고 이만큼 기다렸다가 가게를 다시 불러온다 (ms) */
 const FETCH_DELAY_MS = 300;
 
-/** 홈: 프로필 줄 + 음식점 검색 + 지도(MAP-01) + 가게 미리보기(MAP-02) */
+/** 홈: 프로필 줄(HOME-01) + 음식점 검색 + 지도(MAP-01) + 가게 미리보기(MAP-02) */
 export function HomePage() {
   const toast = useToast();
   const me = useAsync(getMe, []);
+  // 레벨·칭호·안 읽은 알림 — 못 받아도 홈은 그대로 쓴다
+  const summary = useAsync(getHomeSummary, []);
+  const unread = summary.data?.unreadNotificationCount ?? 0;
+  const title = summary.data ? (summary.data.title ?? summary.data.rank.main?.tierTitle) : null;
   const { region, error: regionError, retry } = useViewRegion();
   const { coords } = useMyCoords();
   const [pins, setPins] = useState<MapRestaurant[]>([]);
@@ -77,9 +82,20 @@ export function HomePage() {
       <header className={styles.top}>
         <div className={styles.profileRow}>
           <MukkaebiAvatar size={54} />
-          <p className={styles.nickname}>{me.data?.nickname ?? ''}</p>
-          <Link to="/notifications" className={styles.iconButton} aria-label="알림">
+          <div className={styles.profileText}>
+            {summary.data && <span className={styles.level}>LV.{summary.data.mukkaebi.level}</span>}
+            <p className={styles.nickname}>
+              {me.data?.nickname ?? ''}
+              {title && <span className={styles.title}>{title}</span>}
+            </p>
+          </div>
+          <Link
+            to="/notifications"
+            className={styles.iconButton}
+            aria-label={unread > 0 ? `알림 ${unread}개 안 읽음` : '알림'}
+          >
             <img src={bellIcon} alt="" width={24} height={24} />
+            {unread > 0 && <span className={styles.dot} aria-hidden="true" />}
           </Link>
           <Link to="/me/settings" className={styles.iconButton} aria-label="설정">
             <img src={gearIcon} alt="" width={24} height={23} />

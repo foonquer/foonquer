@@ -17,8 +17,41 @@
   gap: 12px;
 }
 
-.nickname {
+.profileText {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.level {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+.title {
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 9px;
+  background: var(--mk-green-50);
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: 3px;
+  color: var(--mk-forest);
+}
+
+.dot {
+  position: absolute;
+  top: 10px;
+  right: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mk-coral);
+}
+
+.nickname {
   min-width: 0;
   overflow: hidden;
   font-size: 20px;
@@ -30,6 +63,7 @@
 }
 
 .iconButton {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
