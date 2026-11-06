@@ -1,5 +1,4 @@
 import { MemberStatus } from '../../common/auth/member-status';
-import { findLatestConsents } from '../../common/auth/consent';
 import { AppError } from '../../common/errors/app-error';
 import { toKstIso } from '../../common/time';
 import { Prisma } from '../../generated/prisma/client';
@@ -92,20 +91,8 @@ export async function withdrawMember(userId: bigint, body: WithdrawalBody, now =
         data: { userId, reasonCode, reasonDetail, regDate: now },
       });
 
-      // 동의 중인 항목은 철회 이력을 남긴다 (이력 자체는 보관).
-      const latest = await findLatestConsents(userId, tx);
-      const withdrawn = [...latest.values()]
-        .filter((row) => row.agreed)
-        .map((row) => ({
-          userId,
-          consentType: row.consentType,
-          agreed: false,
-          policyVersion: row.policyVersion,
-          agreedAt: null,
-          withdrawnAt: now,
-          regDate: now,
-        }));
-      if (withdrawn.length > 0) await tx.memberConsent.createMany({ data: withdrawn });
+      // 약관 동의·철회 이력도 보관하지 않고 지운다 (2026-11-06 결정, 탈퇴 회원 데이터는 바로 파기)
+      await tx.memberConsent.deleteMany({ where: { userId } });
 
       // 정복을 지운 만큼 가게의 정복자 수를 줄인다 (같은 가게를 여러 시즌 정복했어도 1명).
       const conquered = await tx.conquest.findMany({
