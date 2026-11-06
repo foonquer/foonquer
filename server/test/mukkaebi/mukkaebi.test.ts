@@ -2,6 +2,7 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app';
 import { prisma } from '../../src/lib/prisma';
+import { grantSeasonRankAchievements } from '../../src/modules/achievement/achievement.service';
 import { openItemBox } from '../../src/modules/mukkaebi/mukkaebi.service';
 import { addExp, addPoint } from '../../src/modules/reward/reward.service';
 import { requiredExpOf } from '../../prisma/seed-data';
@@ -292,6 +293,31 @@ describe('v1.3 아이템 상자 · 세트 · 업적 보상 아이템', () => {
     expect(rare.unopenedCount).toBe(0);
   });
 
+  it('같은 상자를 동시에 열어도 한 번만 열리고 아이템도 하나만 준다', async () => {
+    const me = await createMember();
+    await prisma.$transaction((tx) =>
+      addExp(tx, me.id, requiredExpOf(3), 'ADMIN', { type: 'ADMIN', id: 1 }),
+    );
+    const box = await prisma.memberItemBox.findFirstOrThrow({ where: { userId: me.id } });
+    // 테스트가 상자 행을 먼저 잠가 두고 두 요청을 보낸다 → 잠금을 풀면 경합한다.
+    // 상자 잠금(FOR UPDATE)이 없으면 두 요청 모두 "안 엶"을 읽어서 둘 다 200이 된다
+    let opening: Promise<request.Response[]> = Promise.resolve([]);
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM member_item_box WHERE id = ${box.id} FOR UPDATE`;
+      opening = Promise.all(
+        [1, 2].map(async () => api(me.id).post(`/characters/me/item-boxes/${box.id}/open`)),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    const results = await opening;
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    const given = await prisma.memberItem.findMany({ where: { userId: me.id, acquiredType: 'B' } });
+    expect(given).toHaveLength(1);
+    expect(
+      (await prisma.memberItemBox.findUniqueOrThrow({ where: { id: box.id } })).resultItemId,
+    ).toBe(given[0].itemId);
+  });
+
   it('레어를 다 가졌으면 일반, 모자·얼굴·소품을 다 가졌으면 먹포인트를 준다', async () => {
     const me = await createMember();
     await prisma.$transaction((tx) =>
@@ -329,6 +355,24 @@ describe('v1.3 아이템 상자 · 세트 · 업적 보상 아이템', () => {
     expect(
       await prisma.memberItemBox.findUniqueOrThrow({ where: { id: boxes[1].id } }),
     ).toMatchObject({ status: 'O', resultItemId: null, resultPoint: 100 });
+  });
+
+  it('업적 보상 아이템을 이미 가졌으면(지난 시즌 왕관 등) 개수를 늘리지 않고 알림도 보내지 않는다', async () => {
+    const season = await createActiveSeason(3);
+    const me = await createMember();
+    await owns(me.id, ['HAT_CROWN']);
+    const unlocked = await prisma.$transaction((tx) =>
+      grantSeasonRankAchievements(tx, me.id, season.id, 1),
+    );
+    expect(unlocked.flatMap((a) => a.rewardItems.map((i) => i.code))).toEqual(['SKIN_NIGHTSKY']);
+    const crown = await prisma.memberItem.findFirstOrThrow({
+      where: { userId: me.id, item: { code: 'HAT_CROWN' } },
+    });
+    expect(crown.quantity).toBe(1);
+    const titles = (
+      await prisma.notification.findMany({ where: { userId: me.id, type: 'NEW_ITEM' } })
+    ).map((n) => n.title);
+    expect(titles).toEqual(['밤하늘 먹깨비를 얻었어요!']);
   });
 
   it('세트 배너 → 세트 구매(포인트 450, 두 아이템 지급·착용), 하나라도 가졌으면 409', async () => {
