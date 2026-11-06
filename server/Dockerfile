@@ -39,7 +39,8 @@ COPY --from=builder --chown=node:node /app/server/dist ./server/dist
 COPY --from=builder --chown=node:node /app/server/prisma ./server/prisma
 COPY --from=builder --chown=node:node /app/server/prisma.config.ts ./server/prisma.config.ts
 COPY --from=builder --chown=node:node /app/server/package.json ./server/package.json
-COPY --from=builder --chown=node:node /app/server/src/generated ./server/src/generated
+# 배포 때 돌리는 seed(tsx prisma/seed.ts)가 src의 TypeScript 파일(prisma client·지역 데이터)을 import한다. src/generated도 여기 들어 있다.
+COPY --from=builder --chown=node:node /app/server/src ./server/src
 
 WORKDIR /app/server
 
