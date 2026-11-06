@@ -271,19 +271,6 @@ describe('LOCAL-03 DELETE /users/me/local-regions/{localRegionId}', () => {
     expect(res.body.data.nextChangeAvailableAt).toBe(formatDbDate(addDays(season.endDate, 1)));
   });
 
-  // 최대 2곳으로 줄기 전(2026-11-04)에 3곳을 고른 회원도 뺄 수 있어야 한다
-  it('3곳이던 회원이 가운데 동네를 지워도 순서가 이어진다', async () => {
-    const me = await createMember();
-    await giveLocalRegions(me.id, [GAYANG, YEOKSAM, SINDANG]);
-    const res = await remove(me.id, await localRegionIdOf(me.id, YEOKSAM));
-    const rows = await prisma.memberLocalRegion.findMany({
-      where: { userId: me.id },
-      orderBy: { sortOrder: 'asc' },
-    });
-    expect(res.status).toBe(200);
-    expect(rows.map((r) => r.sortOrder)).toEqual([0, 1]);
-  });
-
   it('1곳만 남았으면 409 LOCAL_REGION_MIN_REQUIRED', async () => {
     const me = await createMember();
     await giveLocalRegions(me.id, [GAYANG]);

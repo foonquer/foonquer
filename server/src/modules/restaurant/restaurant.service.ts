@@ -9,6 +9,9 @@ import { RestaurantError } from './restaurant.errors';
 import type { RestaurantLocationQuery } from './restaurant.schema';
 import { detailStatsOf, ratingOf } from './restaurant-stats';
 
+/** 종합 별점이 이 값 이상이면 "다시 갈 의향"으로 본다 (별점 기준) */
+const REVISIT_INTENT_MIN_SCORE = 2.5;
+
 /** 숨김(H) 가게는 없는 것처럼 404. 폐업(C)은 기록 확인을 위해 보여 준다 */
 async function findVisibleRestaurant(restaurantId: bigint) {
   const restaurant = await prisma.restaurant.findUnique({
@@ -36,7 +39,7 @@ function currentSeasonConquerorCount(restaurantId: bigint, season: CurrentSeason
 async function conquestReview(visitId: bigint) {
   const review = await prisma.review.findUnique({
     where: { visitId },
-    select: { id: true, scoreAvg: true, revisitIntent: true, content: true, status: true },
+    select: { id: true, overallScore: true, content: true, status: true },
   });
   return review && review.status !== 'D' ? review : null;
 }
@@ -86,8 +89,9 @@ export async function getRestaurantPreview(
     myConquest: conquest
       ? {
           conqueredAt: toKstIso(conquest.conqueredAt),
-          myScore: review ? review.scoreAvg.toNumber() : null,
-          revisitIntent: review?.revisitIntent ?? null,
+          myScore: review ? review.overallScore.toNumber() : null,
+          // 재방문 의사 칸은 없어지고 종합 별점에 포함됐다 (ERD v1.0: 2.5 이상이면 다시 갈 의향)
+          revisitIntent: review ? review.overallScore.toNumber() >= REVISIT_INTENT_MIN_SCORE : null,
           hasTextReview: !!review?.content,
           reviewId: review?.id ?? null,
         }
@@ -133,7 +137,7 @@ export async function getRestaurantDetail(
       conquestState: state.conquestState,
       conqueredInPastSeason: state.conqueredInPastSeason,
       conqueredAt: conquest ? toKstIso(conquest.conqueredAt) : null,
-      myScore: conquest && review ? review.scoreAvg.toNumber() : null,
+      myScore: conquest && review ? review.overallScore.toNumber() : null,
       myReviewId: conquest && review ? review.id : null,
       movingVisitId: state.conquestState === 'MOVING' ? (state.movingVisit?.id ?? null) : null,
       isSaved: state.isSaved,
