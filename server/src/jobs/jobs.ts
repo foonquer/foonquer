@@ -60,20 +60,30 @@ export async function runRatingJob(now = new Date()) {
   return { restaurants: restaurants.length, reviewCount: agg._count, failed };
 }
 
-/** cleanup이 한 번에 다시 지울 탈퇴 회원 수 (파일 삭제가 실패했던 회원) */
-const FILE_SWEEP_BATCH = 100;
+/** cleanup이 다시 지울 탈퇴 회원을 한 번에 읽는 수 (파일 삭제가 실패했던 회원) */
+export const FILE_SWEEP_BATCH = 100;
 
-/** 탈퇴할 때 사진 폴더 삭제가 실패한 회원(files_purged_at이 비어 있음)의 폴더를 다시 지운다. 다 지울 때까지 매일 다시 한다 */
+/**
+ * 탈퇴할 때 사진 폴더 삭제가 실패한 회원(files_purged_at이 비어 있음)의 폴더를 다시 지운다. 다 지울 때까지 매일 다시 한다.
+ * id 커서로 끝까지 돌아서, 계속 실패하는 회원이 앞에 쌓여도 뒤의 회원을 막지 않는다
+ */
 async function sweepWithdrawnFiles(now: Date) {
-  const members = await prisma.member.findMany({
-    where: { status: MemberStatus.WITHDRAWN, filesPurgedAt: null },
-    orderBy: { id: 'asc' },
-    take: FILE_SWEEP_BATCH,
-    select: { id: true },
-  });
+  let cursor = 0n;
+  let total = 0;
   let failed = 0;
-  for (const { id } of members) if (!(await purgeMemberFiles(id, now))) failed += 1;
-  return { withdrawnMembers: members.length, failed };
+  for (;;) {
+    const members = await prisma.member.findMany({
+      where: { status: MemberStatus.WITHDRAWN, filesPurgedAt: null, id: { gt: cursor } },
+      orderBy: { id: 'asc' },
+      take: FILE_SWEEP_BATCH,
+      select: { id: true },
+    });
+    if (members.length === 0) break;
+    for (const { id } of members) if (!(await purgeMemberFiles(id, now))) failed += 1;
+    total += members.length;
+    cursor = members[members.length - 1].id;
+  }
+  return { withdrawnMembers: total, failed };
 }
 
 /** cleanup: 30일 지난 알림, 만료된 로그인 토큰·카카오 결과 교환 코드 삭제, 탈퇴 회원 파일 다시 지우기 */

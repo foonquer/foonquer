@@ -326,13 +326,11 @@ function receiptMatch(restaurant: { name: string; businessNo: string | null }, o
 
 /** 후보를 찾을 때 이름 검색에 쓰는 앞부분 ("(주)옛날손칼국수 가양점" → "옛날손칼") */
 function nameSearchToken(storeName: string) {
-  const first = normalizeStoreName(
-    storeName
-      .replace(/\(주\)|㈜|주식회사/g, '')
-      .trim()
-      .split(/\s+/)[0],
-  );
-  return first.length >= 2 ? first.slice(0, 4) : null;
+  const name = storeName.replace(/\(주\)|㈜|주식회사/g, '').trim();
+  const first = normalizeStoreName(name.split(/\s+/)[0]);
+  // 첫 단어가 한 글자면("더 맛있는 식당") 공백을 뺀 전체 이름의 앞부분으로 찾는다
+  const token = first.length >= 2 ? first : normalizeStoreName(name);
+  return token.length >= 2 ? token.slice(0, 4) : null;
 }
 
 /**
