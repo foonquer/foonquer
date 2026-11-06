@@ -69,3 +69,19 @@ export function addDays(date: Date, days: number): Date {
 export function addSeconds(date: Date, seconds: number): Date {
   return new Date(date.getTime() + seconds * 1000);
 }
+
+/** 오늘(KST) 0시의 순간 */
+export function kstStartOfToday(now = new Date()): Date {
+  return kstStartOfDbDate(kstTodayAsDbDate(now));
+}
+
+/** 이번 달(KST) 1일 0시의 순간 */
+export function kstStartOfMonth(now = new Date()): Date {
+  const kst = new Date(now.getTime() + KST_OFFSET_MS);
+  return new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), 1) - KST_OFFSET_MS);
+}
+
+/** 두 순간 사이의 KST 날짜 차이 (b − a, 일) */
+export function kstDaysBetween(a: Date, b: Date): number {
+  return Math.round((kstTodayAsDbDate(b).getTime() - kstTodayAsDbDate(a).getTime()) / DAY_MS);
+}

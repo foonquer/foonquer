@@ -304,6 +304,8 @@ pnpm -C server db:migrate                                       # 적용
 | `FRONTEND_URL` | 웹 주소. 카카오 로그인이 끝나면 `{FRONTEND_URL}/oauth/callback`으로 보낸다 | `http://localhost:5173` |
 | `IMAGE_BASE_URL` | 프로필·리뷰 사진 공개 주소(`https://storage.googleapis.com/<버킷>` 또는 Cloud CDN 도메인). 비우면 사진 URL을 `null`로 준다 | 비워 둔다 |
 | `GCS_BUCKET` | 사진을 두는 Cloud Storage 버킷. 올린 사진 key가 실제로 있는지 확인한다. 비우면 사진 key를 받지 않는다(`PROFILE_IMAGE_NOT_FOUND`) | 비워 둔다 |
+| `GCS_PRIVATE_BUCKET` | 영수증·현장·문의 사진을 두는 비공개 버킷(UPLOAD-01). 조회는 서버가 만든 signed URL로만 한다 | 비워 둔다 |
+| `CLOVA_OCR_URL` · `CLOVA_OCR_SECRET` | 네이버 CLOVA OCR 영수증 특화 모델 주소·Secret Key(VISIT-03). 비우면 영수증 인증이 `UNREADABLE`로 실패한다 | 비워 둔다 |
 | `API_BASE_URL` | 이 API 서버의 바깥 주소. 카카오 로그인 redirect_uri를 만든다 | `http://localhost:3000` |
 | `KAKAO_REST_API_KEY` | 카카오 REST API 키 (카카오 로그인 client_id, 카카오 로컬 API) | 카카오 개발자 콘솔 |
 | `KAKAO_CLIENT_SECRET` | 카카오 로그인 Client Secret (콘솔에서 켰을 때만) | 비워 둔다 |
@@ -559,7 +561,7 @@ GCP에서 준비할 것:
 | VM | Compute Engine(서울 `asia-northeast3`), 액세스 범위(scope) `cloud-platform`으로 생성(기본 범위로는 Secret Manager를 부를 수 없다), Docker·git 설치, 배포용 사용자 `deploy` 홈에 저장소 clone. SSH 사용자가 암호 없이 `deploy`로 전환할 수 있어야 한다(`gcloud compute ssh` 사용자는 기본으로 된다) |
 | VM 서비스 계정 | `roles/secretmanager.secretAccessor`, 사진 버킷의 `roles/storage.objectViewer` (사진 업로드 URL을 서버가 만들게 되면 `roles/storage.objectAdmin`과 서명 권한 `roles/iam.serviceAccountTokenCreator`) |
 | Secret Manager | `foonquer-prod-env` — 운영 `.env` 내용 |
-| Cloud Storage | 공개 사진 버킷(`GCS_BUCKET`, 프로필 `profile/{회원 id}/`·리뷰 사진)은 `allUsers` 읽기 허용, 영수증·현장·문의 사진은 공개하지 않는 별도 버킷에 둔다(그 API를 만들 때 환경변수 추가). 브라우저에서 signed URL로 바로 올리므로(USER-02) 버킷 CORS에 웹 주소, `PUT`, 요청 헤더 `Content-Type`·`x-goog-content-length-range` 허용 |
+| Cloud Storage | 공개 사진 버킷(`GCS_BUCKET`, 프로필 `profile/{회원 id}/`·리뷰 사진)은 `allUsers` 읽기 허용, 영수증·현장·문의 사진은 공개하지 않는 별도 버킷에 둔다(`GCS_PRIVATE_BUCKET`, `receipt/`·`site/`·`inquiry/` 폴더). 브라우저에서 signed URL로 바로 올리므로(USER-02, UPLOAD-01) 두 버킷 모두 버킷 CORS에 웹 주소, `PUT`, 요청 헤더 `Content-Type`·`x-goog-content-length-range`·`x-goog-if-generation-match` 허용 |
 | DB | Cloud SQL for MySQL 8 또는 VM 안의 MySQL 8 컨테이너. `DATABASE_URL`만 바꾸면 된다 |
 
 GitHub 저장소 설정(Settings → Secrets and variables → Actions)에 필요한 값:

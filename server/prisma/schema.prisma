@@ -1,5 +1,5 @@
 // 먹장깨기 Prisma 스키마
-// 원본: docs ERD v0.7 (먹장깨기-ERD-v0.2.dbml). ERD를 바꾸면 이 파일도 같이 고친다.
+// 원본: docs ERD v1.2 (먹장깨기-ERD.dbml). ERD를 바꾸면 이 파일도 같이 고친다.
 // - 테이블·컬럼 이름은 DB에서 snake_case(@@map/@map), 코드에서는 camelCase로 쓴다.
 // - CHECK 제약은 Prisma가 표현하지 못해서 마이그레이션 SQL(prisma/migrations)에 직접 넣는다.
 // - 코드값 컬럼(char(1) 등)의 값 목록은 각 필드 위 주석에 있다.
@@ -30,6 +30,11 @@ model Member {
   localChangedAt          DateTime?                 @map("local_changed_at")
   /// 프로필 사진 스토리지 key · null이면 먹깨비를 프로필로 사용
   profileImageKey         String?                   @map("profile_image_key") @db.VarChar(255)
+  /// 탐방러 프로필 소개글 (선택, 60자) — 2026-10-13 인플루언서 소개글 결정, ERD v1.2
+  bio                     String?                   @db.VarChar(60)
+  /// 대표 칭호 종류 — A 업적 칭호(rep_title_ref = achievement.id) / T 시즌 티어 칭호(rep_title_ref = season_region_stat.id, 지금 티어 이름으로 보여 준다) · null이면 이번 시즌 가장 높은 티어 칭호 (ERD v1.2)
+  repTitleType            String?                   @map("rep_title_type") @db.Char(1)
+  repTitleRef             BigInt?                   @map("rep_title_ref")
   /// 신뢰 온도 T — 1°~99°, 시작 50°. 도움돼요(방문자 +0.2°, 비방문자 +0.05°), 방문 인증 리뷰 작성(+0.1°), 별로예요 기준 충족(N ≥ 5이고 N ≥ 2H, 리뷰당 1번 −0.5°), 신고 확정(−3°), 허위 리뷰 판정(−5°)으로 바뀐다. 하루 최대 +1°, 75° 이상은 오르는 양이 절반. 바뀔 때마다 trust_temp_log에 남긴다. 작성자 가중치 w_user = 1 + (T − 50) / 50 (0.5~1.5)
   trustTemp               Decimal                   @default(50) @map("trust_temp") @db.Decimal(4, 2)
   /// 먹포인트 잔액 — 항상 point_history 합계와 같아야 한다
@@ -75,6 +80,7 @@ model Member {
   trustTempLogs           TrustTempLog[]            @relation("trust_temp_log_user_id")
   actedTrustTempLogs      TrustTempLog[]            @relation("trust_temp_log_actor_id")
   activityLogs            MemberActivityLog[]
+  picks                   MemberPick[]
 
   @@map("member")
 }
@@ -306,6 +312,7 @@ model Restaurant {
   mukkaebis         Mukkaebi[]
   mapaes            RestaurantMapae[]
   aspectStats       RestaurantAspectStat[]
+  picks             MemberPick[]
 
   @@index([sigunguId, categoryId], map: "restaurant_sigungu_category_idx")
   @@index([regionId, categoryId], map: "restaurant_region_category_idx")
@@ -392,6 +399,10 @@ model SavedRestaurant {
   restaurantId BigInt     @map("restaurant_id")
   /// "저장한 지 12일이 지났어요" 알림을 보낸 시각 (중복 알림 방지)
   remindedAt   DateTime?  @map("reminded_at")
+  /// 메모 (선택, 50자) — 피그마 맛집 추가 · 저장하기 "예: 수제비도 맛있대요" (ERD v1.2)
+  memo         String?    @db.VarChar(50)
+  /// "2주 뒤에 알려 주기" — false면 저장 12일 알림을 보내지 않는다 (ERD v1.2)
+  remind       Boolean    @default(true)
   regDate      DateTime   @default(now()) @map("reg_date")
   user         Member     @relation(fields: [userId], references: [id])
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
@@ -730,6 +741,8 @@ model MemberAchievement {
   /// 시즌과 관련된 업적이면 처음 달성한 시즌
   seasonId      Int?        @map("season_id")
   achievedAt    DateTime    @default(now()) @map("achieved_at")
+  /// 달성 축하 화면을 본 시각 · null이면 축하 이벤트(CHAR-08)로 띄운다 (ERD v1.2)
+  seenAt        DateTime?   @map("seen_at")
   user          Member      @relation(fields: [userId], references: [id])
   achievement   Achievement @relation(fields: [achievementId], references: [id])
   season        Season?     @relation(fields: [seasonId], references: [id])
@@ -780,14 +793,16 @@ model Mukkaebi {
 /// - 한 번 얻으면 시즌이 바뀌어도 사라지지 않는다 (초안)
 /// - 10은 숫자를 바꿀 수 있게 reward_policy 같은 설정 값으로 두면 좋다
 model MemberRegionBackground {
-  id         BigInt   @id @default(autoincrement())
-  userId     BigInt   @map("user_id")
+  id         BigInt    @id @default(autoincrement())
+  userId     BigInt    @map("user_id")
   /// 얻은 구 배경 (region.level = 2)
-  sigunguId  Int      @map("sigungu_id")
+  sigunguId  Int       @map("sigungu_id")
   /// 얻은 시각
-  unlockedAt DateTime @map("unlocked_at")
-  user       Member   @relation(fields: [userId], references: [id])
-  sigungu    Region   @relation(fields: [sigunguId], references: [id])
+  unlockedAt DateTime  @map("unlocked_at")
+  /// 해금 축하 화면을 본 시각 · null이면 축하 이벤트(CHAR-08)로 띄운다 (ERD v1.2)
+  seenAt     DateTime? @map("seen_at")
+  user       Member    @relation(fields: [userId], references: [id])
+  sigungu    Region    @relation(fields: [sigunguId], references: [id])
 
   @@unique([userId, sigunguId], map: "member_region_background_uk")
   @@map("member_region_background")
@@ -1176,4 +1191,23 @@ model RestaurantAspectStat {
 
   @@id([restaurantId, aspectId])
   @@map("restaurant_aspect_stat")
+}
+
+/// 내 PICK (ERD v1.2, 피그마 내 PICK 편집·탐방러 프로필 PICK). 내가 정복한 가게 중에서 최대 10곳, 한 줄 코멘트는 선택.
+/// 탐방러 프로필과 구 랭킹 TOP 3에서 다른 탐방러에게 보인다. 고칠 때는 통째로 지우고 다시 넣는다(PICK-02)
+model MemberPick {
+  userId       BigInt     @map("user_id")
+  restaurantId BigInt     @map("restaurant_id")
+  /// 보여 주는 순서 0~9
+  sortOrder    Int        @map("sort_order") @db.TinyInt
+  /// 한 줄 코멘트 (선택, 30자)
+  comment      String?    @db.VarChar(30)
+  regDate      DateTime   @default(now()) @map("reg_date")
+  user         Member     @relation(fields: [userId], references: [id])
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@id([userId, restaurantId])
+  @@unique([userId, sortOrder], map: "member_pick_order_uk")
+  @@index([restaurantId], map: "member_pick_restaurant_idx")
+  @@map("member_pick")
 }

@@ -5,6 +5,7 @@ import { mapRouter } from './modules/map/map.router';
 import { regionRouter } from './modules/region/region.router';
 import { restaurantRouter } from './modules/restaurant/restaurant.router';
 import { recommendationRouter, searchRouter } from './modules/search/search.router';
+import { uploadRouter } from './modules/upload/upload.router';
 import { userRouter } from './modules/user/user.router';
 
 /**
@@ -21,3 +22,4 @@ router.use('/map', mapRouter);
 router.use('/restaurants', restaurantRouter);
 router.use('/search', searchRouter);
 router.use('/recommendations', recommendationRouter);
+router.use('/uploads', uploadRouter);
