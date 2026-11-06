@@ -74,6 +74,14 @@ describe('UPLOAD-01 POST /uploads/signed-url', () => {
     });
     expect(big.body.code).toBe('IMAGE_TOO_LARGE');
 
+    const webpReceipt = await issue(me.id, {
+      purpose: 'RECEIPT',
+      contentType: 'image/webp',
+      fileSize: 1,
+    });
+    expect(webpReceipt.status).toBe(400);
+    expect(webpReceipt.body.code).toBe('UNSUPPORTED_IMAGE_TYPE');
+
     vi.mocked(createUploadUrl).mockResolvedValueOnce(null);
     const noBucket = await issue(me.id, {
       purpose: 'RECEIPT',
