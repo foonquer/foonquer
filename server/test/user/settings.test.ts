@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app';
 import { toKstIso } from '../../src/common/time';
 import { prisma } from '../../src/lib/prisma';
+import { saveMemberConsents } from '../../src/modules/auth/consent.service';
+import { updateNotificationSettings } from '../../src/modules/user/settings.service';
 import { deletePrefixQuietly } from '../../src/lib/storage';
 import { resetDb, waitForRunningQueries } from '../helpers/db';
 import {
@@ -250,6 +252,16 @@ describe('SET-04 DELETE /users/me', () => {
     });
     const other = await createMember();
     await agreeConsents(me.id, { marketing: true });
+    // 동의했다가 철회한 이력도 함께 지우는지 본다
+    await prisma.memberConsent.create({
+      data: {
+        userId: me.id,
+        consentType: 'MARKETING',
+        agreed: false,
+        policyVersion: 'test',
+        withdrawnAt: new Date(),
+      },
+    });
     await giveLocalRegions(me.id, [GAYANG]);
     const restaurant = await createRestaurant();
     await prisma.restaurantStat.create({
@@ -431,6 +443,26 @@ describe('SET-04 DELETE /users/me', () => {
     expect(statuses[0]).toBe(200);
     expect([401, 409]).toContain(statuses[1]);
     expect(await prisma.memberWithdrawal.count({ where: { userId: me.id } })).toBe(1);
+  });
+
+  it('탈퇴 전에 인증을 통과해 회원 잠금을 기다리던 동의 저장·알림 설정은 동의 이력을 다시 만들지 않는다', async () => {
+    const me = await createMember();
+    await agreeConsents(me.id);
+    expect((await withdraw(me.id, { confirmed: true })).status).toBe(200);
+
+    // 요청 인증(requireAuth)은 탈퇴 전에 지나갔고, 서비스가 회원 행 잠금을 얻은 때는 이미 탈퇴한 뒤
+    await expect(updateNotificationSettings(me.id, { marketingAlarm: true })).rejects.toMatchObject(
+      { code: 'TOKEN_INVALID' },
+    );
+    await expect(
+      saveMemberConsents(me.id, 'A', {
+        terms: true,
+        privacy: true,
+        location: true,
+        marketing: true,
+      }),
+    ).rejects.toMatchObject({ code: 'TOKEN_INVALID' });
+    expect(await prisma.memberConsent.count({ where: { userId: me.id } })).toBe(0);
   });
 
   it('사진 삭제가 실패해도 탈퇴는 성공하고 files_purged_at이 비어 cleanup이 다시 지운다', async () => {

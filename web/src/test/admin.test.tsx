@@ -165,4 +165,33 @@ describe('운영 관리', () => {
     expect(screen.queryByRole('article', { name: '문의 21' })).not.toBeInTheDocument();
     expect(screen.getByText('0건 · 오래된 순')).toBeInTheDocument();
   });
+
+  it('답변 전 문의가 다음 쪽까지 있으면 답한 뒤 1쪽부터 다시 불러 "더 보기"에서 건너뛰지 않는다', async () => {
+    let answered = false;
+    const server = mockApi({
+      'GET /admin/inquiries': () =>
+        ok({
+          items: answered ? [inquiry({ inquiryId: 22 })] : [inquiry()],
+          page: 1,
+          size: 20,
+          totalCount: answered ? 21 : 22,
+          hasNext: true,
+        }),
+      'PATCH /admin/inquiries/:id/answer': () => {
+        answered = true;
+        return ok({ inquiryId: 21, status: 'ANSWERED', answeredAt: '', notified: true });
+      },
+    });
+    renderRoute('/admin?tab=inquiries');
+    const card = await screen.findByRole('article', { name: '문의 21' });
+    fireEvent.change(within(card).getByRole('textbox', { name: '답변' }), {
+      target: { value: '확인했어요' },
+    });
+    fireEvent.click(within(card).getByRole('button', { name: '답변 보내기' }));
+
+    expect(await screen.findByRole('article', { name: '문의 22' })).toBeInTheDocument();
+    const pages = server.calls('GET /admin/inquiries').map((c) => c.query.get('page'));
+    expect(pages).toEqual(['1', '1']);
+    expect(screen.getByText('21건 · 오래된 순')).toBeInTheDocument();
+  });
 });

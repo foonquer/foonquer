@@ -139,7 +139,11 @@ function NextReward({ reward }: { reward: NextConquestReward }) {
         aria-valuemax={reward.target}
         aria-valuenow={reward.current}
       >
-        <span style={{ width: `${(reward.current / reward.target) * 100}%` }} />
+        <span
+          style={{
+            width: `${Math.min(100, Math.max(0, (reward.current / reward.target) * 100))}%`,
+          }}
+        />
       </span>
       <p className={flow.progressFoot}>
         <strong>{PROGRESS[reward.conditionType](reward.current)}</strong>

@@ -305,16 +305,21 @@ function Inquiries() {
             <li key={i.inquiryId}>
               <InquiryCard
                 inquiry={i}
-                // 답변 전 목록에서는 답하면 빼고, 답변 완료 목록에서는 고친 답을 그 자리에 둔다
-                onAnswered={(answer) =>
-                  status === 'WAITING'
-                    ? list.edit((page) => ({
-                        ...page,
-                        items: page.items.filter((x) => x.inquiryId !== i.inquiryId),
-                        totalCount: Math.max(0, page.totalCount - 1),
-                      }))
-                    : list.update((x) => x.inquiryId === i.inquiryId, { ...i, answer })
-                }
+                // 답변 전 목록에서는 답하면 빼고, 답변 완료 목록에서는 고친 답을 그 자리에 둔다.
+                // 다음 쪽이 있으면 서버 쪽 번호가 한 칸씩 당겨져 "더 보기"에서 한 건을 건너뛰므로 처음부터 다시 부른다
+                onAnswered={(answer) => {
+                  if (status !== 'WAITING') {
+                    list.update((x) => x.inquiryId === i.inquiryId, { ...i, answer });
+                  } else if (list.hasNext) {
+                    list.reload();
+                  } else {
+                    list.edit((page) => ({
+                      ...page,
+                      items: page.items.filter((x) => x.inquiryId !== i.inquiryId),
+                      totalCount: Math.max(0, page.totalCount - 1),
+                    }));
+                  }
+                }}
               />
             </li>
           ))}
