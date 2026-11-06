@@ -9,6 +9,7 @@ import {
 } from '../../api/profile';
 import { getSeasons } from '../../api/ranking';
 import { getMemberReviews } from '../../api/reviews';
+import { AchievementIcon } from '../../components/AchievementIcon';
 import { AppHeader } from '../../components/AppHeader';
 import { BottomSheet } from '../../components/BottomSheet';
 import { Button, ButtonLink } from '../../components/Button';
@@ -126,7 +127,12 @@ function Profile({ p, onBlocked }: { p: MemberProfile; onBlocked: (blocked: bool
       />
       <div className={styles.content}>
         <section className={styles.hero} aria-label={`${name}의 프로필`}>
-          <MukkaebiFigure wearing={wearing} background={m.background?.sigunguName} height={240} />
+          <MukkaebiFigure
+            wearing={wearing}
+            stage={m.stage}
+            background={m.background?.sigunguName}
+            height={240}
+          />
           <p className={styles.worn}>
             {joinDot([`${m.stageName} 먹깨비`, ...Object.values(wearing).map((w) => w?.name)])}
           </p>
@@ -204,9 +210,7 @@ function Profile({ p, onBlocked }: { p: MemberProfile; onBlocked: (blocked: bool
             <ul className={styles.achievements}>
               {p.achievements.recent.map((a) => (
                 <li key={a.achievementId}>
-                  <span className={styles.medal} aria-hidden="true">
-                    ★
-                  </span>
+                  <AchievementIcon iconKey={a.iconKey} />
                   <strong>{a.name}</strong>
                   <small>{formatKoreanDate(a.achievedAt)}</small>
                 </li>

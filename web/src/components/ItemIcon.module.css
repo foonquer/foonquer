@@ -36,3 +36,15 @@
   background: #eceeea;
   color: #c9cec5;
 }
+
+/* 아이템 그림: 칸 안에 여백을 두고 비율대로 */
+.art {
+  width: 74%;
+  height: 74%;
+  object-fit: contain;
+}
+
+/* 갖지 않은 도감 칸은 그림을 실루엣으로 */
+.icon[data-owned='false'] .art {
+  filter: grayscale(1) brightness(1.35) opacity(0.45);
+}
