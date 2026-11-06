@@ -7,6 +7,7 @@ import {
   type OwnedTitle,
   setRepresentativeTitle,
 } from '../../api/ranking';
+import { AchievementIcon } from '../../components/AchievementIcon';
 import { AppHeader } from '../../components/AppHeader';
 import { Screen } from '../../components/Screen';
 import { EmptyState, Loading } from '../../components/StateViews';
@@ -191,6 +192,7 @@ export function SeasonsPage() {
         <ul className={styles.card}>
           {achievements.items.map((a) => (
             <li key={a.achievementId} className={styles.achievement} data-done={a.achieved}>
+              <AchievementIcon iconKey={a.iconKey} size={40} done={a.achieved} />
               <span className={styles.achievementText}>
                 <strong>{a.name}</strong>
                 <span className={styles.rowMeta}>{a.description}</span>

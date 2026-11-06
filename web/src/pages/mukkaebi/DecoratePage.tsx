@@ -11,6 +11,7 @@ import {
   type OwnedItem,
   saveAppearance,
 } from '../../api/mukkaebi';
+import mukkaebi from '../../assets/illust/mukkaebi.svg';
 import { AppHeader } from '../../components/AppHeader';
 import { Button } from '../../components/Button';
 import { ItemIcon } from '../../components/ItemIcon';
@@ -86,20 +87,23 @@ function Decorate({
   const saved = draftOf(m);
   const [draft, setDraft] = useState<Draft>(saved);
   const [saving, setSaving] = useState(false);
-  // 먹깨비(스킨)·방망이 칸은 가진 것이 있을 때만
+  // 종류(기본 먹깨비·밤하늘)는 늘 맨 앞 (피그마 302:3957), 방망이 칸은 가진 것이 있을 때만
   const tabs: Tab[] = [
+    'SKIN',
     'HAT',
     'FACE',
     'PROP',
     'BACKGROUND',
-    ...(['SKIN', 'CLUB'] as const).filter((c) => items.some((i) => i.category === c)),
+    ...(items.some((i) => i.category === 'CLUB') ? (['CLUB'] as const) : []),
   ];
   const tab: Tab = tabs.find((t) => t === params.get('tab')) ?? 'HAT';
+  const tabName = (t: Tab) =>
+    t === 'BACKGROUND' ? '배경' : t === 'SKIN' ? '종류' : CATEGORY_NAME[t];
   const changed = (Object.keys(draft) as Tab[]).filter((k) => draft[k] !== saved[k]);
 
   const nameOf = (c: ItemCategory) => {
     const item = items.find((i) => i.itemId === draft[c]);
-    return item ? { name: item.name, rarity: item.rarity } : null;
+    return item ? { code: item.code, name: item.name, rarity: item.rarity } : null;
   };
   const wearing = {
     HAT: nameOf('HAT'),
@@ -172,6 +176,7 @@ function Decorate({
         <MukkaebiFigure
           wearing={wearing}
           sizePercent={m.sizePercent}
+          stage={m.stage}
           background={bg?.sigunguName}
           badge="미리보기"
           height={250}
@@ -185,24 +190,30 @@ function Decorate({
               aria-selected={t === tab}
               onClick={() => setParams({ tab: t }, { replace: true })}
             >
-              {t === 'BACKGROUND' ? '배경' : CATEGORY_NAME[t]}
+              {tabName(t)}
             </button>
           ))}
         </div>
 
-        <div
-          className={styles.grid}
-          role="radiogroup"
-          aria-label={`${tab === 'BACKGROUND' ? '배경' : CATEGORY_NAME[tab]} 고르기`}
-        >
+        <div className={styles.grid} role="radiogroup" aria-label={`${tabName(tab)} 고르기`}>
           {tile(
             'none',
             draft[tab] === null,
             () => setDraft({ ...draft, [tab]: null }),
             <>
-              <span className={styles.none}>없음</span>
-              <span className={styles.tileName}>없음</span>
-              <span className={styles.tileSub}>해제</span>
+              {tab === 'SKIN' ? (
+                <>
+                  <img src={mukkaebi} alt="" className={styles.basicBody} />
+                  <span className={styles.tileName}>기본 먹깨비</span>
+                  <span className={styles.tileSub}>{saved.SKIN === null ? '사용 중' : '보유'}</span>
+                </>
+              ) : (
+                <>
+                  <span className={styles.none}>없음</span>
+                  <span className={styles.tileName}>없음</span>
+                  <span className={styles.tileSub}>해제</span>
+                </>
+              )}
             </>,
           )}
           {tab === 'BACKGROUND'
@@ -229,7 +240,7 @@ function Decorate({
                     () => setDraft({ ...draft, [tab]: i.itemId }),
                     <>
                       {i.isNew && <span className={styles.newTag}>NEW</span>}
-                      <ItemIcon category={i.category} rarity={i.rarity} size={52} />
+                      <ItemIcon category={i.category} rarity={i.rarity} code={i.code} size={52} />
                       <span className={styles.tileName}>{i.name}</span>
                       <span className={styles.tileSub}>
                         {saved[tab] === i.itemId ? '착용 중' : '보유'}
@@ -239,6 +250,9 @@ function Decorate({
                   ),
                 )}
         </div>
+        {tab === 'SKIN' && !items.some((i) => i.code === 'SKIN_NIGHTSKY') && (
+          <p className={styles.caption}>밤하늘 먹깨비는 시즌 TOP 10 업적으로 받아요.</p>
+        )}
         {tab === 'BACKGROUND' && backgrounds.length === 0 && (
           <p className={styles.caption}>
             한 구에서 서로 다른 가게 10곳을 정복하면 그 구 배경을 얻어요.
