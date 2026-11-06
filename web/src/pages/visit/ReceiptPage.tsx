@@ -71,7 +71,8 @@ export function ReceiptPage() {
 
   const retake = () => {
     setPhoto(null);
-    if (cam === 'live') void startCamera();
+    // 켜는 중에 앨범 사진을 골랐으면(starting) 그 요청은 버려졌으니 새로 켠다
+    if (cam === 'live' || cam === 'starting') void startCamera();
   };
 
   const retry = async () => {
