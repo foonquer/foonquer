@@ -5,7 +5,9 @@ import { seedBaseData } from './seed-data';
 
 async function main() {
   const result = await seedBaseData(prisma);
-  console.log(`seed: category ${result.categoryCount}개`);
+  console.log(
+    `seed: category ${result.categoryCount}개, policy_document 새로 ${result.policyDocumentCreated}개`,
+  );
 }
 
 main()

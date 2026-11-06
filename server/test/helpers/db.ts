@@ -2,7 +2,7 @@ import { prisma } from '../../src/lib/prisma';
 import { resetRateLimits } from '../../src/common/middlewares/rate-limit';
 
 // global-setup.ts가 넣은 기본 데이터 테이블은 비우지 않는다.
-const KEEP_TABLES = new Set(['_prisma_migrations', 'category', 'region']);
+const KEEP_TABLES = new Set(['_prisma_migrations', 'category', 'region', 'policy_document']);
 
 let tableNames: string[] | null = null;
 
