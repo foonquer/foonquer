@@ -217,7 +217,13 @@ function RankTab({
         <svg
           className={styles.seoul}
           viewBox={`0 0 ${SEOUL_VIEWBOX.width} ${SEOUL_VIEWBOX.height}`}
-          style={{ inset: `${INSET}%` }}
+          // 이름표(position)와 같은 좌표계: 판의 안쪽 여백만큼 줄인 상자 (svg는 너비를 안 주면 판 전체 너비가 된다)
+          style={{
+            left: `${INSET}%`,
+            top: `${INSET}%`,
+            width: `${100 - INSET * 2}%`,
+            height: `${100 - INSET * 2}%`,
+          }}
           aria-hidden="true"
         >
           {/* 고른 구는 테두리가 가려지지 않게 맨 위에 그린다 */}
