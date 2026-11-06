@@ -7,6 +7,7 @@ import {
   type MemberProfile,
   unblockMember,
 } from '../../api/profile';
+import { getSeasons } from '../../api/ranking';
 import { getMemberReviews } from '../../api/reviews';
 import { AppHeader } from '../../components/AppHeader';
 import { BottomSheet } from '../../components/BottomSheet';
@@ -298,24 +299,29 @@ function PickTab({ p }: { p: MemberProfile }) {
   );
 }
 
-/** 다녀온 가게 — 이번 시즌 정복 (PROFILE-02) */
+/** 다녀온 가게 — 시즌·구를 골라 본다, 처음엔 이번 시즌 전체 구 (PROFILE-02) */
 function VisitedTab({ p }: { p: MemberProfile }) {
-  const list = usePaged((page) => getVisitedRestaurants(p.userId, { page, size: 20 }), [p.userId]);
+  const [seasonId, setSeasonId] = useState(p.currentSeason?.seasonId);
+  const [sigunguId, setSigunguId] = useState<number>();
+  const seasons = useAsync(getSeasons, []);
+  const list = usePaged(
+    (page) => getVisitedRestaurants(p.userId, { seasonId, sigunguId, page, size: 20 }),
+    [p.userId, seasonId, sigunguId],
+  );
+  // 다시 불러오는 동안에도 구 고르기 칸이 비지 않게 마지막 목록을 둔다
+  const [sigungus, setSigungus] = useState(list.first?.sigungus ?? []);
+  if (list.first && list.first.sigungus !== sigungus) setSigungus(list.first.sigungus);
+  const shownSeasonId = seasonId ?? list.first?.seasonId ?? undefined;
+
+  let body;
   if (list.error !== undefined && list.items.length === 0) {
-    return <EmptyState title={errorMessage(list.error)} onRetry={list.reload} />;
-  }
-  if (list.loading && list.items.length === 0) return <Loading />;
-  if (list.items.length === 0) {
-    return <EmptyState title="이번 시즌에 정복한 가게가 없어요" />;
-  }
-  return (
-    <section aria-label="다녀온 가게">
-      <p className={styles.listHead}>
-        <strong>
-          {p.currentSeason ? `시즌 ${p.currentSeason.seasonNo} · ` : ''}
-          {list.totalCount}곳
-        </strong>
-      </p>
+    body = <EmptyState title={errorMessage(list.error)} onRetry={list.reload} />;
+  } else if (list.loading && list.items.length === 0) {
+    body = <Loading />;
+  } else if (list.items.length === 0) {
+    body = <EmptyState title="이 시즌에 정복한 가게가 없어요" />;
+  } else {
+    body = (
       <ul className={styles.rows}>
         {list.items.map((r) => (
           <li key={`${r.restaurantId}-${r.conqueredAt}`}>
@@ -344,6 +350,48 @@ function VisitedTab({ p }: { p: MemberProfile }) {
           </li>
         ))}
       </ul>
+    );
+  }
+
+  return (
+    <section aria-label="다녀온 가게">
+      <div className={styles.listHead}>
+        <span className={styles.pickers}>
+          <select
+            aria-label="시즌"
+            className={styles.sort}
+            value={shownSeasonId ?? ''}
+            onChange={(e) => {
+              setSeasonId(Number(e.target.value));
+              setSigunguId(undefined);
+            }}
+          >
+            {!seasons.data && p.currentSeason && (
+              <option value={p.currentSeason.seasonId}>시즌 {p.currentSeason.seasonNo}</option>
+            )}
+            {seasons.data?.items.map((s) => (
+              <option key={s.seasonId} value={s.seasonId}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="구"
+            className={styles.sort}
+            value={sigunguId ?? ''}
+            onChange={(e) => setSigunguId(Number(e.target.value) || undefined)}
+          >
+            <option value="">전체 구</option>
+            {sigungus.map((g) => (
+              <option key={g.sigunguId} value={g.sigunguId}>
+                {g.sigunguName} {g.conquestCount}곳
+              </option>
+            ))}
+          </select>
+        </span>
+        <strong>{list.totalCount}곳</strong>
+      </div>
+      {body}
       {list.hasNext && (
         <Button variant="white" size="sm" onClick={list.loadMore} disabled={list.loading}>
           더 보기

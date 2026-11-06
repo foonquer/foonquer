@@ -258,6 +258,26 @@ describe('아이템 상자·축하·먹포인트', () => {
     expect(server.calls('PATCH /users/me/celebrations/:id/seen')).toHaveLength(2);
   });
 
+  it('축하는 홈이 아닌 탭 화면에서도 뜨고, 누르면 그 화면으로 간다', async () => {
+    mockApi({
+      'GET /users/me/celebrations': ok({
+        items: [
+          {
+            celebrationId: 'BACKGROUND:3',
+            type: 'BACKGROUND',
+            occurredAt: '2026-09-25T12:00:00+09:00',
+            data: { sigunguId: 3, sigunguName: '강서구', bgKey: null },
+          },
+        ],
+      }),
+      'PATCH /users/me/celebrations/:id/seen': ok({ seen: true }),
+    });
+    const { router } = renderRoute('/list');
+    const dialog = await screen.findByRole('dialog', { name: '강서구 배경을 얻었어요!' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '배경 바꾸러 가기' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/me/mukkaebi/decorate'));
+  });
+
   it('먹포인트 내역을 날짜별로 묶고 모은/쓴 내역으로 거른다', async () => {
     const server = mockApi({
       'GET /points/me': ok({ pointBalance: 1280, monthEarned: 410, monthSpent: 300 }),

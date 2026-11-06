@@ -329,15 +329,27 @@ describe('별점 → 정복 → 세부평가 → 적립', () => {
             sigunguName: '강서구',
             conquestCount: 8,
             rank: 7,
+            previousRank: 8,
             topPercent: 11,
             tier: 'REGULAR',
             tierTitle: '강서구 단골',
+            nextTier: { tierName: '미식가', remaining: 12 },
           },
           rewards: { point: 100, levelUp: { from: 6, to: 7, itemBoxCount: 1 } },
           celebrations: {
             tierUp: { from: 'BEGINNER', to: 'REGULAR', tierTitle: '강서구 단골' },
             backgroundUnlocked: null,
             achievements: [],
+          },
+          nextReward: {
+            achievementId: 10,
+            name: '한 시즌 30곳 정복',
+            conditionType: 'SEASON_CONQUEST',
+            current: 8,
+            target: 30,
+            remaining: 22,
+            rewardPoint: 300,
+            rewardItems: [{ itemId: 28, code: 'CLUB_GOLD', name: '황금 방망이' }],
           },
         });
       },
@@ -372,7 +384,13 @@ describe('별점 → 정복 → 세부평가 → 적립', () => {
 
     expect(await screen.findByText('새맛집, 정복 완료!')).toBeInTheDocument();
     expect(server.calls('POST /visits/:id/rating')[0].body).toEqual({ overallScore: 4.5 });
-    expect(screen.getByText('강서구 7위 · 강서구 단골 · 이번 시즌 8곳')).toBeInTheDocument();
+    expect(screen.getByText('강서구 8위 → 7위 · 미식가까지 12곳')).toBeInTheDocument();
+    const next = screen.getByRole('region', { name: '다음 정복 보상' });
+    expect(within(next).getByText('황금 방망이')).toBeInTheDocument();
+    expect(within(next).getByText('22곳만 더 정복하면 내 것이 돼요!')).toBeInTheDocument();
+    expect(within(next).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '8');
+    expect(within(next).getByText('한 시즌에 정복 8곳')).toBeInTheDocument();
+    expect(within(next).getByText('30곳 달성 시 해금')).toBeInTheDocument();
     expect(screen.getByText('강서구 단골이 됐어요')).toBeInTheDocument();
     expect(screen.getByText('먹깨비 Lv.6 → Lv.7')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '세부평가 남기고 포인트 쌓기' }));
@@ -458,6 +476,14 @@ describe('리뷰', () => {
     await waitFor(() =>
       expect(server.calls('GET /restaurants/:id/reviews').at(-1)?.query.get('sort')).toBe(
         'SCORE_LOW',
+      ),
+    );
+
+    // 재방문 의사 있음 = 맛 별점 3.0 이상만
+    fireEvent.click(screen.getByRole('radio', { name: '재방문 의사 있음' }));
+    await waitFor(() =>
+      expect(server.calls('GET /restaurants/:id/reviews').at(-1)?.query.get('revisitOnly')).toBe(
+        'true',
       ),
     );
   });

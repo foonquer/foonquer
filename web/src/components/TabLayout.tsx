@@ -1,9 +1,10 @@
-import { NavLink, Outlet } from 'react-router';
+import { NavLink, Outlet, useLocation } from 'react-router';
 import tabHome from '../assets/icons/tab-home.svg';
 import tabList from '../assets/icons/tab-list.svg';
 import tabMe from '../assets/icons/tab-me.svg';
 import tabRanking from '../assets/icons/tab-ranking.svg';
 import tabReco from '../assets/icons/tab-reco.svg';
+import { CelebrationLayer } from './CelebrationLayer';
 import { Icon } from './Icon';
 import styles from './TabLayout.module.css';
 
@@ -16,11 +17,13 @@ const TABS = [
   { to: '/me', label: '내 정보', icon: tabMe, w: 16.32, h: 18.15 },
 ] as const;
 
-/** 하단 탭이 있는 화면들의 틀 */
+/** 하단 탭이 있는 화면들의 틀. 안 본 축하는 탭 화면 어디서든 띄운다 (화면을 옮길 때마다 다시 확인) */
 export function TabLayout() {
+  const { pathname } = useLocation();
   return (
     <div className={styles.layout}>
       <Outlet />
+      <CelebrationLayer key={pathname} />
       <nav className={styles.tabBar} aria-label="하단 메뉴">
         {TABS.map((tab) => (
           <NavLink key={tab.to} to={tab.to} end className={styles.tab}>

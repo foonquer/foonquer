@@ -155,8 +155,30 @@ describe('탐방러 프로필 (PROFILE-01·02, REVIEW-10)', () => {
     );
   });
 
-  it('다녀온 가게 탭: 이번 시즌 정복한 가게와 맛 별점', async () => {
-    mockApi({
+  it('다녀온 가게 탭: 이번 시즌 정복한 가게와 맛 별점, 시즌·구를 고르면 다시 부른다', async () => {
+    const server = mockApi({
+      'GET /seasons': ok({
+        items: [
+          {
+            seasonId: 3,
+            seasonNo: 3,
+            name: '시즌 3',
+            startDate: '2026-09-01',
+            endDate: '2027-02-28',
+            status: 'ACTIVE',
+            daysLeft: 100,
+          },
+          {
+            seasonId: 2,
+            seasonNo: 2,
+            name: '시즌 2',
+            startDate: '2026-03-01',
+            endDate: '2026-08-31',
+            status: 'FINALIZED',
+            daysLeft: 0,
+          },
+        ],
+      }),
       'GET /users/:id/profile': ok(
         profile({ picks: [], counts: { visitedRestaurants: 1, reviews: 0, picks: 0 } }),
       ),
@@ -174,6 +196,11 @@ describe('탐방러 프로필 (PROFILE-01·02, REVIEW-10)', () => {
           },
         ]),
         seasonId: 3,
+        sigunguId: null,
+        sigungus: [
+          { sigunguId: 3, sigunguName: '강서구', conquestCount: 1 },
+          { sigunguId: 9, sigunguName: '중구', conquestCount: 1 },
+        ],
         isMe: false,
       }),
     });
@@ -187,6 +214,22 @@ describe('탐방러 프로필 (PROFILE-01·02, REVIEW-10)', () => {
     expect(row).toHaveTextContent('맛 ★ 4.8');
     expect(row).toHaveTextContent('9.16 방문');
     expect(row).toHaveAttribute('href', '/reviews/60');
+
+    fireEvent.change(screen.getByRole('combobox', { name: '구' }), { target: { value: '9' } });
+    await waitFor(() =>
+      expect(
+        server.calls('GET /users/:id/visited-restaurants').at(-1)?.query.get('sigunguId'),
+      ).toBe('9'),
+    );
+    // 시즌을 바꾸면 구는 전체로 돌아간다
+    fireEvent.change(await screen.findByRole('combobox', { name: '시즌' }), {
+      target: { value: '2' },
+    });
+    await waitFor(() => {
+      const query = server.calls('GET /users/:id/visited-restaurants').at(-1)?.query;
+      expect(query?.get('seasonId')).toBe('2');
+      expect(query?.get('sigunguId')).toBeNull();
+    });
   });
 
   it('••• → 차단하기 → 리뷰 대신 차단 안내, 다시 풀 수 있다 (BLOCK-01·02)', async () => {

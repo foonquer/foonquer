@@ -73,9 +73,13 @@ export type RatingResult = {
     sigunguName: string;
     conquestCount: number | null;
     rank: number | null;
+    /** 이번 정복 전 순위 (이 구 첫 정복이면 null) */
+    previousRank: number | null;
     topPercent: number | null;
     tier: string | null;
     tierTitle: string | null;
+    /** 정복자·먹짱은 순위로 정해져서 remaining이 null */
+    nextTier: { tierName: string; remaining: number | null } | null;
   };
   rewards: Rewards;
   celebrations: {
@@ -83,6 +87,19 @@ export type RatingResult = {
     backgroundUnlocked: { sigunguId: number; sigunguName: string; bgKey: string | null } | null;
     achievements: UnlockedAchievement[];
   };
+  /** 다음 정복 보상: 정복으로 채우는 업적 중 남은 수가 가장 적은 것 */
+  nextReward: NextConquestReward | null;
+};
+
+export type NextConquestReward = {
+  achievementId: number;
+  name: string;
+  conditionType: 'CONQUEST_TOTAL' | 'SIGUNGU_CONQUEST' | 'DISTRICT_COUNT' | 'SEASON_CONQUEST';
+  current: number;
+  target: number;
+  remaining: number;
+  rewardPoint: number;
+  rewardItems: { itemId: number; code: string; name: string }[];
 };
 
 /** REVIEW-01 맛 별점 등록 → 정복 완료 */
@@ -147,6 +164,8 @@ export const getRestaurantReviews = (
     sort?: RestaurantReviewSort;
     photoOnly?: boolean;
     localOnly?: boolean;
+    /** 재방문 의사 있음 (맛 별점 3.0 이상) */
+    revisitOnly?: boolean;
     page?: number;
     size?: number;
   } = {},

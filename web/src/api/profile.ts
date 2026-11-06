@@ -17,15 +17,19 @@ export type VisitedRestaurant = {
   conqueredAt: string;
 };
 
-/** PROFILE-02 다녀온 가게 (시즌별, 최근 정복순) */
+/** PROFILE-02 다녀온 가게 (시즌·구별, 최근 정복순). sigungus는 그 시즌에 정복한 구 (정복 많은 순) */
 export const getVisitedRestaurants = (
   userId: number,
-  query: { seasonId?: number; page?: number; size?: number },
+  query: { seasonId?: number; sigunguId?: number; page?: number; size?: number },
 ) =>
-  api.get<Page<VisitedRestaurant> & { seasonId: number | null; isMe: boolean }>(
-    `/users/${userId}/visited-restaurants`,
-    query,
-  );
+  api.get<
+    Page<VisitedRestaurant> & {
+      seasonId: number | null;
+      sigunguId: number | null;
+      sigungus: { sigunguId: number; sigunguName: string; conquestCount: number }[];
+      isMe: boolean;
+    }
+  >(`/users/${userId}/visited-restaurants`, query);
 
 export type Pick = {
   order: number;

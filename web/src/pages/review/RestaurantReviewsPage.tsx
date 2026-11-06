@@ -17,7 +17,7 @@ import { usePaged } from '../../lib/usePaged';
 import { ScoreStats } from '../restaurant/ScoreStats';
 import styles from './Review.module.css';
 
-type Filter = 'ALL' | 'PHOTO' | 'LOCAL';
+type Filter = 'ALL' | 'PHOTO' | 'REVISIT' | 'LOCAL';
 
 const SORTS: { value: RestaurantReviewSort; label: string }[] = [
   { value: 'LATEST', label: '최신순' },
@@ -38,6 +38,7 @@ export function RestaurantReviewsPage() {
         sort,
         photoOnly: filter === 'PHOTO' || undefined,
         localOnly: filter === 'LOCAL' || undefined,
+        revisitOnly: filter === 'REVISIT' || undefined,
         page,
         size: 10,
       }),
@@ -72,12 +73,17 @@ export function RestaurantReviewsPage() {
         )}
 
         <FilterChips
+          scroll
           label="리뷰 거르기"
           value={filter}
           onChange={setFilter}
           options={[
             { value: 'ALL', label: `전체 ${r?.rating.reviewCount ?? ''}`.trim() },
             { value: 'PHOTO', label: `사진 리뷰 ${r?.stats.photoReviewCount ?? ''}`.trim() },
+            {
+              value: 'REVISIT',
+              label: `재방문 의사 있음 ${r?.stats.revisitIntentCount ?? ''}`.trim(),
+            },
             { value: 'LOCAL', label: '로컬 리뷰' },
           ]}
         />

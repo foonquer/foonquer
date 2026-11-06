@@ -210,3 +210,52 @@
   font-weight: 700;
   color: var(--mk-forest);
 }
+
+/* 다음 정복 보상 (정복 완료) */
+.rewardLabel {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.rewardName {
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--mk-ink);
+}
+
+.rewardText {
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.progress {
+  display: block;
+  height: 10px;
+  margin-top: 12px;
+  border-radius: 5px;
+  background: var(--mk-divider);
+  overflow: hidden;
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+  background: var(--mk-green);
+}
+
+.progressFoot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.progressFoot strong {
+  color: var(--mk-forest);
+}
