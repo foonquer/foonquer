@@ -56,7 +56,8 @@ export async function getMapRestaurants(userId: bigint, q: MapRestaurantsQuery) 
     return { items: [], totalCount: 0, truncated: false, kakaoSynced: true };
   }
 
-  const kakaoSynced = await syncKakaoPlaces(bounds);
+  // 내 가게는 이미 DB에 있으니 mineOnly면 카카오를 부르지 않는다
+  const kakaoSynced = q.mineOnly ? true : await syncKakaoPlaces(bounds);
   const season = await findCurrentSeason();
 
   // 내 정복 상태 필터 (loadMyStates와 같은 기준): 별점 대기 방문(visit.status = V)이 있으면
@@ -75,6 +76,12 @@ export async function getMapRestaurants(userId: bigint, q: MapRestaurantsQuery) 
       : q.conquestState === 'NOT_CONQUERED'
         ? Prisma.sql`AND (NOT ${conqueredNow} OR ${moving})`
         : Prisma.empty;
+  const mineFilter = q.mineOnly
+    ? Prisma.sql`AND (
+        EXISTS (SELECT 1 FROM saved_restaurant s WHERE s.restaurant_id = r.id AND s.user_id = ${userId})
+        OR EXISTS (SELECT 1 FROM conquest c WHERE c.restaurant_id = r.id AND c.user_id = ${userId})
+        OR ${moving})`
+    : Prisma.empty;
 
   const centerLat = (q.swLat + q.neLat) / 2;
   const centerLng = (q.swLng + q.neLng) / 2;
@@ -85,6 +92,7 @@ export async function getMapRestaurants(userId: bigint, q: MapRestaurantsQuery) 
       AND r.lng BETWEEN ${q.swLng} AND ${q.neLng}
       ${q.categoryId !== undefined ? Prisma.sql`AND r.category_id = ${q.categoryId}` : Prisma.empty}
       ${conquestFilter}
+      ${mineFilter}
     ORDER BY ST_Distance_Sphere(POINT(r.lng, r.lat), POINT(${centerLng}, ${centerLat})), r.id
     LIMIT ${MAX_MAP_ITEMS + 1}`;
 

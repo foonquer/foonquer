@@ -21,6 +21,11 @@ export const mapRestaurantsQuery = z
       .positive({ error: 'INVALID_CATEGORY' })
       .optional(),
     conquestState: z.enum(['CONQUERED', 'NOT_CONQUERED']).optional(),
+    /** true면 내가 찜한 곳·정복한 곳(지난 시즌, 별점 대기 방문 포함)만 */
+    mineOnly: z
+      .enum(['true', 'false'])
+      .transform((v) => v === 'true')
+      .optional(),
   })
   .refine((q) => q.swLat < q.neLat && q.swLng < q.neLng, { error: 'INVALID_MAP_BOUNDS' })
   .refine((q) => distanceBetween(q.swLat, q.swLng, q.neLat, q.neLng) <= MAX_MAP_DIAGONAL_M, {
