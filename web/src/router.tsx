@@ -23,6 +23,7 @@ import { ItemBoxesPage } from './pages/mukkaebi/ItemBoxesPage';
 import { MukkaebiPage } from './pages/mukkaebi/MukkaebiPage';
 import { PointsPage } from './pages/mukkaebi/PointsPage';
 import { ShopPage } from './pages/mukkaebi/ShopPage';
+import { MukjjangCardPage } from './pages/me/MukjjangCardPage';
 import { SeasonsPage } from './pages/me/SeasonsPage';
 import { SettingsPage } from './pages/me/SettingsPage';
 import { TasteWeightsPage } from './pages/me/TasteWeightsPage';
@@ -110,6 +111,7 @@ export const routes: RouteObject[] = [
           { path: '/me/reviews', element: <MyReviewsPage /> },
           { path: '/me/conquests', element: <ConquestsPage /> }, // ?seasonId=
           { path: '/me/seasons', element: <SeasonsPage /> },
+          { path: '/me/mukjjang-card', element: <MukjjangCardPage /> },
           { path: '/me/pick', element: <PickEditPage /> },
           { path: '/me/mukkaebi', element: <MukkaebiPage /> },
           { path: '/me/mukkaebi/decorate', element: <DecoratePage /> }, // ?tab=
