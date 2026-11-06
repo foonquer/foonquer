@@ -11,7 +11,7 @@ import { getSeasons } from '../../api/ranking';
 import { getMemberReviews } from '../../api/reviews';
 import { AppHeader } from '../../components/AppHeader';
 import { BottomSheet } from '../../components/BottomSheet';
-import { Button } from '../../components/Button';
+import { Button, ButtonLink } from '../../components/Button';
 import { MukkaebiFigure } from '../../components/MukkaebiFigure';
 import { ReviewCard } from '../../components/ReviewCard';
 import { Screen } from '../../components/Screen';
@@ -94,8 +94,17 @@ function Profile({ p, onBlocked }: { p: MemberProfile; onBlocked: (blocked: bool
     { value: 'reviews', label: '리뷰', count: p.counts.reviews },
   ];
 
+  const showPickMap = tab === 'pick' && !p.isBlocked && p.picks.length > 0;
   return (
-    <Screen>
+    <Screen
+      footer={
+        showPickMap && (
+          <ButtonLink to={`/users/${p.userId}/picks`}>
+            PICK {p.picks.length}곳 지도에서 보기
+          </ButtonLink>
+        )
+      }
+    >
       <AppHeader
         title="탐방러 프로필"
         right={
@@ -274,6 +283,9 @@ function PickTab({ p }: { p: MemberProfile }) {
     <section aria-label="PICK">
       <p className={styles.listHead}>
         <strong>{p.nickname ?? '탐험가'}의 PICK</strong>
+        <Link to={`/users/${p.userId}/picks`} className={styles.headerLink}>
+          지도로 보기 ›
+        </Link>
       </p>
       <p className={styles.verified}>✓ 모두 직접 방문 인증한 가게 중에서 고른 곳이에요</p>
       <ol className={styles.rows}>

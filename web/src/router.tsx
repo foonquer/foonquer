@@ -52,6 +52,7 @@ import { ReceiptPage } from './pages/visit/ReceiptPage';
 import { VerificationPage } from './pages/visit/VerificationPage';
 import { VisitNewPage } from './pages/visit/VisitNewPage';
 import { ExplorerProfilePage } from './pages/explorer/ExplorerProfilePage';
+import { PickMapPage } from './pages/explorer/PickMapPage';
 import { ReportPage } from './pages/explorer/ReportPage';
 
 export const routes: RouteObject[] = [
@@ -118,6 +119,7 @@ export const routes: RouteObject[] = [
           { path: '/me/points', element: <PointsPage /> },
           { path: '/me/withdraw', element: <WithdrawPage /> },
           { path: '/users/:userId', element: <ExplorerProfilePage /> }, // ?tab=pick|visited|reviews
+          { path: '/users/:userId/picks', element: <PickMapPage /> },
           { path: '/users/:userId/report', element: <ReportPage /> },
           { path: '/notifications', element: <NotificationsPage /> },
           { path: '/notices', element: <NoticesPage /> }, // ?noticeId=

@@ -155,6 +155,32 @@ describe('탐방러 프로필 (PROFILE-01·02, REVIEW-10)', () => {
     );
   });
 
+  it('PICK 탭에서 지도로 보기 → PICK 지도, 핀이나 목록을 누르면 가게 정보', async () => {
+    mockApi({ 'GET /users/:id/profile': ok(profile()) });
+    const { router } = renderRoute('/users/5');
+
+    expect(await screen.findByRole('link', { name: '지도로 보기 ›' })).toHaveAttribute(
+      'href',
+      '/users/5/picks',
+    );
+    fireEvent.click(screen.getByRole('link', { name: 'PICK 1곳 지도에서 보기' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/users/5/picks'));
+
+    expect(await screen.findByRole('heading', { name: '동네미식가의 PICK' })).toBeInTheDocument();
+    const map = screen.getByRole('group', { name: 'PICK 지도' });
+    fireEvent.click(within(map).getByRole('button', { name: '1. 옛날손칼국수 (정복 완료)' }));
+    const info = screen.getByRole('region', { name: '옛날손칼국수 정보' });
+    expect(info).toHaveTextContent('방문 인증 6회');
+    expect(within(info).getByRole('link', { name: '음식점 상세 보기' })).toHaveAttribute(
+      'href',
+      '/restaurants/7',
+    );
+    fireEvent.click(within(info).getByRole('button', { name: '닫기' }));
+    expect(screen.queryByRole('region', { name: '옛날손칼국수 정보' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^1옛날손칼국수/ }));
+    expect(screen.getByRole('region', { name: '옛날손칼국수 정보' })).toBeInTheDocument();
+  });
+
   it('다녀온 가게 탭: 이번 시즌 정복한 가게와 맛 별점, 시즌·구를 고르면 다시 부른다', async () => {
     const server = mockApi({
       'GET /seasons': ok({
