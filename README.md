@@ -257,6 +257,11 @@ pnpm add -D -w some-tool            # 루트(모노레포 공통) 개발 의존�
 `0 19 * * * cd ~/foonquer && /usr/bin/docker compose exec -T app node dist/src/jobs/run.js all >> ~/job.log 2>&1`
 (`docker`는 cron 기본 PATH인 `/usr/bin`에 있다. 작업 하나라도 실패하면 나머지는 계속 돌고 종료 코드가 1이 되니 `~/job.log`를 확인한다.)
 
+#### 운영자 계정 (관리자 API)
+
+`/api/v1/admin/...`(신고 처리, 리뷰 블라인드, 마패, 문의 답변, 공지·FAQ, 약관, 회원 이용 정지)은 `member.role = 'A'`인 회원만 쓸 수 있다. 화면이 없으니 운영자는 DB에서 직접 지정한다.
+`UPDATE member SET role = 'A' WHERE id = ?;` (되돌리기: `role = 'U'`)
+
 ### 웹 명령어 (`pnpm -C web ...`)
 
 | 명령어 | 하는 일 |
