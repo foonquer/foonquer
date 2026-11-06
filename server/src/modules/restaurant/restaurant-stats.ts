@@ -57,6 +57,8 @@ export function detailStatsOf(stat: Stat) {
     service: stat ? average(stat.serviceSum, detail) : null,
     price: stat ? average(stat.priceSum, detail) : null,
     revisitIntentRate: stat ? percent(stat.revisitIntentCount, stat.reviewCount) : null,
+    /** 리뷰 "재방문 의사 있음" 필터 칩의 수 */
+    revisitIntentCount: stat?.revisitIntentCount ?? 0,
     localVisitRate: localVisitRateOf(stat),
     revisitRate: revisitRateOf(stat),
     textReviewCount: stat?.textReviewCount ?? 0,

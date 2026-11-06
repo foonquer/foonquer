@@ -4,9 +4,17 @@ import { toPageResult } from '../../common/pagination';
 import type { Prisma } from '../../generated/prisma/client';
 import { prisma } from '../../lib/prisma';
 import { deleteObjectQuietly } from '../../lib/storage';
-import { checkAchievements, type UnlockedAchievement } from '../achievement/achievement.service';
+import {
+  checkAchievements,
+  nextConquestReward,
+  type UnlockedAchievement,
+} from '../achievement/achievement.service';
 import { applyConquest } from '../conquest/conquest.service';
-import { refreshReviewWeight, refreshRestaurantStat } from '../restaurant/restaurant-stat-calc';
+import {
+  refreshReviewWeight,
+  refreshRestaurantStat,
+  REVISIT_INTENT_MIN_SCORE,
+} from '../restaurant/restaurant-stat-calc';
 import { RestaurantError } from '../restaurant/restaurant.errors';
 import { grantReward, type RewardResult, sumRewards } from '../reward/reward.service';
 import { assertUploadedImages } from '../upload/uploaded-image';
@@ -93,6 +101,7 @@ export async function rateVisit(
   );
 
   const { review, restaurant, conquest } = result;
+  const nextReward = await nextConquestReward(prisma, userId, now);
   return {
     reviewId: review.id,
     visitId: review.visitId,
@@ -106,9 +115,11 @@ export async function rateVisit(
       ...(conquest.stat ?? {
         conquestCount: null,
         rank: null,
+        previousRank: null,
         topPercent: null,
         tier: null,
         tierTitle: null,
+        nextTier: null,
       }),
     },
     rewards: { point: conquest.rewards.point, levelUp: conquest.rewards.levelUp },
@@ -117,6 +128,7 @@ export async function rateVisit(
       backgroundUnlocked: conquest.backgroundUnlocked,
       achievements: conquest.achievements,
     },
+    nextReward,
   };
 }
 
@@ -302,6 +314,7 @@ export async function listRestaurantReviews(
     userId: blocked.length ? { notIn: blocked } : undefined,
     imageCount: query.photoOnly ? { gt: 0 } : undefined,
     visit: query.localOnly ? { isLocal: true } : undefined,
+    overallScore: query.revisitOnly ? { gte: REVISIT_INTENT_MIN_SCORE } : undefined,
   };
   const orderBy: Prisma.ReviewOrderByWithRelationInput[] = {
     LATEST: [{ regDate: 'desc' as const }],

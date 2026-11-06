@@ -102,6 +102,8 @@ export const restaurantReviewQuery = z.object({
     .default('LATEST'),
   photoOnly: booleanQuery,
   localOnly: booleanQuery,
+  /** 재방문 의사 있음 = 맛 별점 3.0 이상 */
+  revisitOnly: booleanQuery,
 });
 export type RestaurantReviewQuery = z.infer<typeof restaurantReviewQuery>;
 
