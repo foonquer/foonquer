@@ -27,7 +27,11 @@ const SCHEMA = {
 
 const answerSchema = z.object({
   adSuspected: z.boolean(),
-  adEvidence: z.string().max(300).nullable(),
+  // 근거 문장이 길어도 버리지 않고 잘라서 둔다 (버리면 협찬 글이 운영자 확인 목록에서 빠진다)
+  adEvidence: z
+    .string()
+    .nullable()
+    .transform((v) => v?.slice(0, 300) ?? null),
   aiLikeTone: z.boolean(),
 });
 
@@ -90,9 +94,10 @@ export async function analyzeReview(input: {
       console.error(`Gemini 리뷰 분석 실패: ${res.status}`);
       return null;
     }
-    const body = (await res.json()) as GenerateResponse;
+    // 본문을 읽다 끊기면(네트워크) 아래 catch로 가서 다시 하고, 읽었는데 JSON이 아니면 UNREADABLE
+    const body = parseJson(await res.text()) as GenerateResponse | null;
     const answer = answerSchema.safeParse(
-      parseJson(body.candidates?.[0]?.content?.parts?.[0]?.text),
+      parseJson(body?.candidates?.[0]?.content?.parts?.[0]?.text),
     );
     if (!answer.success) {
       console.error('Gemini 리뷰 분석 응답을 읽지 못했어요');
