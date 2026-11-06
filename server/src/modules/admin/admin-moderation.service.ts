@@ -152,9 +152,16 @@ async function setReviewStatus(tx: Tx, reviewId: bigint, status: 'A' | 'H' | 'F'
 }
 
 /** 이용 정지 (활성 → 정지). 이미 정지면 그대로. 정지하면 모든 API가 403 MEMBER_SUSPENDED */
-async function suspendMember(tx: Tx, userId: bigint) {
-  const member = await tx.member.findUnique({ where: { id: userId }, select: { status: true } });
+/** 회원 행을 잠그고 상태를 읽는다 — 탈퇴(SET-04)와 겹쳐도 탈퇴한 회원(D)을 정지·활성으로 덮어쓰지 않게 */
+async function lockMemberStatus(tx: Tx, userId: bigint) {
+  const [member] = await tx.$queryRaw<{ status: string }[]>`
+    SELECT status FROM member WHERE id = ${userId} FOR UPDATE`;
   if (!member) throw new AppError(UserError.MEMBER_NOT_FOUND);
+  return member;
+}
+
+async function suspendMember(tx: Tx, userId: bigint) {
+  const member = await lockMemberStatus(tx, userId);
   if (member.status === MemberStatus.SUSPENDED) return;
   if (member.status !== MemberStatus.ACTIVE) throw new AppError(AdminError.INVALID_MEMBER_STATUS);
   await tx.member.update({ where: { id: userId }, data: { status: MemberStatus.SUSPENDED } });
@@ -408,8 +415,7 @@ export async function changeMemberStatus(adminId: bigint, userId: number, body: 
     throw new AppError(AdminError.CANNOT_SUSPEND_SELF);
   await prisma.$transaction(async (tx) => {
     if (body.status === 'SUSPENDED') return suspendMember(tx, id);
-    const member = await tx.member.findUnique({ where: { id }, select: { status: true } });
-    if (!member) throw new AppError(UserError.MEMBER_NOT_FOUND);
+    const member = await lockMemberStatus(tx, id);
     if (member.status === MemberStatus.ACTIVE) return;
     if (member.status !== MemberStatus.SUSPENDED)
       throw new AppError(AdminError.INVALID_MEMBER_STATUS);

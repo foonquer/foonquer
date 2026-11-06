@@ -2,7 +2,7 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it, onTestFinished } from 'vitest';
 import { createApp } from '../../src/app';
 import { prisma } from '../../src/lib/prisma';
-import { resetDb } from '../helpers/db';
+import { resetDb, waitForRunningQueries } from '../helpers/db';
 import {
   bearer,
   createActiveSeason,
@@ -123,9 +123,21 @@ describe('ADMIN 관리자 API', () => {
         }),
       ),
     );
-    const results = await Promise.all(
-      reports.map((r) => as(admin.id).patch(`/admin/reports/${r.id}`, { action: 'HIDE_REVIEW' })),
+    // 신고 행을 잠가 두고 두 처리를 보낸 뒤, 둘 다 같은 대상 신고를 잠그려는 것을 확인하고 풀어서 경합시킨다
+    let processing: Promise<request.Response[]> = Promise.resolve([]);
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM report WHERE target_id = ${review.id} FOR UPDATE`;
+        processing = Promise.all(
+          reports.map(async (r) =>
+            as(admin.id).patch(`/admin/reports/${r.id}`, { action: 'HIDE_REVIEW' }),
+          ),
+        );
+        await waitForRunningQueries('SELECT id, status FROM report WHERE target_type', 2);
+      },
+      { timeout: 10_000 },
     );
+    const results = await processing;
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
     expect(await trustOf(author.id)).toBe(47);
     expect(await prisma.report.count({ where: { status: 'A' } })).toBe(2);
@@ -372,5 +384,84 @@ describe('ADMIN 관리자 API', () => {
       (await as(admin.id).post('/admin/policy-documents', { ...doc, effectiveDate: '2026-02-30' }))
         .status,
     ).toBe(400);
+  });
+
+  it('없는 대상·잘못된 처리·다른 가게 리뷰는 거절하고, 일반 회원의 쓰기 요청은 403이며 DB는 그대로', async () => {
+    await createActiveSeason(3);
+    const admin = await createAdmin();
+    const [user, author] = await Promise.all([createMember(), createMember()]);
+    const [shop, other] = await Promise.all([createRestaurant(), createRestaurant()]);
+    const review = await createReview(author.id, other.id);
+    const report = await prisma.report.create({
+      data: { reporterId: user.id, targetType: 'R', targetId: review.id, reason: 'SPAM' },
+    });
+
+    const cases: [Promise<request.Response>, number, string][] = [
+      [as(admin.id).patch('/admin/reports/999999', { action: 'REJECT' }), 404, 'REPORT_NOT_FOUND'],
+      [
+        as(admin.id).patch(`/admin/reports/${report.id}`, { action: 'DELETE' }),
+        400,
+        'INVALID_REPORT_ACTION',
+      ],
+      [
+        as(admin.id).patch('/admin/mapae/999999/release', { releaseReason: '종료' }),
+        404,
+        'MAPAE_NOT_FOUND',
+      ],
+      [as(admin.id).patch('/admin/faqs/999999', { question: '없음' }), 404, 'FAQ_NOT_FOUND'],
+      [
+        as(admin.id).post('/admin/mapae', {
+          restaurantId: Number(shop.id),
+          reason: 'AD',
+          reviewId: Number(review.id),
+        }),
+        404,
+        'REVIEW_NOT_FOUND',
+      ],
+      [as(user.id).post('/admin/notices', { title: '공지', content: '내용' }), 403, 'FORBIDDEN'],
+      [
+        as(user.id).patch(`/admin/reports/${report.id}`, { action: 'HIDE_REVIEW' }),
+        403,
+        'FORBIDDEN',
+      ],
+      [
+        as(user.id).patch(`/admin/members/${author.id}/status`, { status: 'SUSPENDED' }),
+        403,
+        'FORBIDDEN',
+      ],
+    ];
+    for (const [call, status, code] of cases) {
+      const res = await call;
+      expect([res.status, res.body.code]).toEqual([status, code]);
+    }
+    expect(await prisma.restaurantMapae.count()).toBe(0);
+    expect((await prisma.restaurant.findUniqueOrThrow({ where: { id: shop.id } })).hasMapae).toBe(
+      false,
+    );
+    expect(await prisma.notice.count()).toBe(0);
+    expect((await prisma.report.findUniqueOrThrow({ where: { id: report.id } })).status).toBe('P');
+    expect((await prisma.review.findUniqueOrThrow({ where: { id: review.id } })).status).toBe('A');
+    expect((await prisma.member.findUniqueOrThrow({ where: { id: author.id } })).status).toBe('A');
+  });
+
+  it('이용 정지와 탈퇴가 겹쳐도 탈퇴한 회원을 정지로 덮어쓰지 않는다 (회원 행을 잠그고 읽는다)', async () => {
+    const admin = await createAdmin();
+    const target = await createMember();
+    // 탈퇴 트랜잭션처럼 회원 행을 잠근 채 정지 요청을 보내고, 정지가 회원 행 잠금을 기다리는 것을 확인한 뒤 탈퇴로 바꾼다
+    let suspending: Promise<request.Response> = Promise.resolve({} as request.Response);
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM member WHERE id = ${target.id} FOR UPDATE`;
+        suspending = Promise.resolve(
+          as(admin.id).patch(`/admin/members/${target.id}/status`, { status: 'SUSPENDED' }),
+        );
+        await waitForRunningQueries('SELECT status FROM member WHERE id');
+        await tx.member.update({ where: { id: target.id }, data: { status: 'D' } });
+      },
+      { timeout: 10_000 },
+    );
+    const res = await suspending;
+    expect([res.status, res.body.code]).toEqual([409, 'INVALID_MEMBER_STATUS']);
+    expect((await prisma.member.findUniqueOrThrow({ where: { id: target.id } })).status).toBe('D');
   });
 });
