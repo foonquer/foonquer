@@ -83,6 +83,7 @@ model Member {
   actedTrustTempLogs      TrustTempLog[]            @relation("trust_temp_log_actor_id")
   activityLogs            MemberActivityLog[]
   picks                   MemberPick[]
+  itemBoxes               MemberItemBox[]
 
   @@map("member")
 }
@@ -828,7 +829,7 @@ model LevelPolicy {
 
 /// 보상 수치를 코드가 아니라 표에 두어서 배포 없이 조정한다
 model RewardPolicy {
-  /// VISIT_VERIFIED / REVIEW_TEXT / REVIEW_PHOTO / HELPFUL_RECEIVED / REVIEW_VOTE / FIRST_CONQUEST / LEVEL_UP / TIER_UP / SEASON_REWARD
+  /// VISIT_VERIFIED / REVIEW_TEXT / REVIEW_PHOTO / HELPFUL_RECEIVED / REVIEW_VOTE / FIRST_CONQUEST / LEVEL_UP / TIER_UP / SEASON_REWARD / ITEM_BOX(상자에서 줄 아이템이 없을 때)
   reason      String  @id @db.VarChar(30)
   /// 초안: 방문 인증 +50 / 글 리뷰 +30 / 사진 리뷰 +20 / 도움돼요 받기 +5 / 리뷰 평가 참여(도움돼요·안 돼요 누르기) +5 / 새 가게 첫 정복 +100 / 레벨업 +200 / 티어 상승 +100 / 시즌 보상 +300(티어별로 다르게 가능)
   point       Int     @default(0)
@@ -848,11 +849,11 @@ model PointHistory {
   /// 적립은 +, 사용은 -
   amount       Int
   balanceAfter Int      @map("balance_after")
-  /// reward_policy.reason + PURCHASE / ACHIEVEMENT / ADMIN
+  /// reward_policy.reason(ITEM_BOX 포함) + PURCHASE / ACHIEVEMENT / ADMIN
   reason       String   @db.VarChar(30)
   /// 먹포인트 내역 화면에 보일 문구 (예: 새맛집 방문 인증, 리뷰 평가 참여, 딸기 모자 구매) — 가게·아이템 이름이 바뀌어도 그대로 남게 저장
   title        String   @db.VarChar(60)
-  /// VISIT / REVIEW / REVIEW_REACTION / CONQUEST / ITEM / ACHIEVEMENT / LEVEL / SEASON_RESULT / SEASON_REGION_STAT
+  /// VISIT / REVIEW / REVIEW_REACTION / CONQUEST / ITEM / ITEM_SET / ITEM_BOX / ACHIEVEMENT / LEVEL / SEASON_RESULT / SEASON_REGION_STAT
   refType      String?  @map("ref_type") @db.VarChar(20)
   refId        BigInt?  @map("ref_id")
   regDate      DateTime @default(now()) @map("reg_date")
@@ -890,11 +891,13 @@ model Item {
   description             String?            @db.VarChar(255)
   /// 먹포인트 가격 · 모자·얼굴·소품만 판매 · null이면 판매하지 않음
   price                   Int?
-  /// D 기본 지급 / P 포인트 구매(모자·얼굴·소품) / S 시즌 보상(방망이 1~4단계, 왕관, 밤하늘) / M 합성(전설의 방망이) / A 업적 / E 이벤트
+  /// D 기본 지급 / P 포인트 구매(모자·얼굴·소품) / S 시즌 보상(방망이 1~4단계) / M 합성(전설의 방망이) / A 업적 보상(왕관·밤하늘, v1.3) / E 이벤트
   unlockType              String             @default("P") @map("unlock_type") @db.Char(1)
+  /// 등급 (v1.3, 피그마 에셋 보드) — N 일반 / R 레어 / E 에픽 / L 전설 / H 명예(업적·시즌으로만). 아이템 상자는 레어가 20%
+  rarity                  String             @default("N") @db.Char(1)
   /// 방망이 단계 — 1 나무 / 2 청동 / 3 은 / 4 황금(먹짱도 황금) / 5 전설(황금 3개를 합쳐서 만든다)
   clubTier                Int?               @map("club_tier") @db.TinyInt
-  /// unlock_type = A일 때 필요한 업적
+  /// 이 업적을 달성하면 준다 (v1.3: 왕관·밤하늘은 unlock_type A, 황금 방망이는 시즌 보상이면서 업적 보상이라 S)
   requiredAchievementId   Int?               @map("required_achievement_id")
   /// NEW / HOT — 상점 배지
   badge                   String?            @db.VarChar(10)
@@ -915,6 +918,8 @@ model Item {
   itemRecipe              ItemRecipe?        @relation("item_recipe_result_item_id")
   materialItemItemRecipes ItemRecipe[]       @relation("item_recipe_material_item_id")
   memberItems             MemberItem[]
+  itemBoxResults          MemberItemBox[]
+  itemSetItems            ItemSetItem[]
 
   @@index([category, status, sortOrder], map: "item_category_idx")
   @@map("item")
@@ -941,7 +946,7 @@ model MemberItem {
   itemId       Int       @map("item_id")
   /// 가진 개수 — 방망이만 2개 이상이 될 수 있다 (시즌마다 받으면 +1, 합성하면 황금 -3). 모자·얼굴·소품·밤하늘은 항상 1
   quantity     Int       @default(1)
-  /// D 기본 지급 / P 구매 / A 업적 보상 / S 시즌 보상 / M 합성 / E 이벤트
+  /// D 기본 지급 / P 구매 / A 업적 보상 / S 시즌 보상 / M 합성 / B 아이템 상자(v1.3) / E 이벤트
   acquiredType String    @map("acquired_type") @db.Char(1)
   /// acquired_type = S일 때 처음 받은 시즌
   seasonId     Int?      @map("season_id")
@@ -955,6 +960,62 @@ model MemberItem {
   @@unique([userId, itemId], map: "member_item_uk")
   @@index([userId, seenAt], map: "member_item_new_idx")
   @@map("member_item")
+}
+
+/// 아이템 상자 (v1.3, 피그마 "LV.10 성장 보상 · 아이템 상자를 열어 볼까요?"). 성장 단계가 바뀌는 레벨(3·10·20)에 1개씩.
+/// 열면 아직 없는 모자·얼굴·소품 중 하나(레어 20%), 모두 가졌으면 먹포인트
+model MemberItemBox {
+  id           BigInt    @id @default(autoincrement())
+  userId       BigInt    @map("user_id")
+  /// LEVEL_UP 성장 보상
+  source       String    @db.VarChar(20)
+  /// LEVEL_UP이면 그 레벨
+  sourceRef    Int       @map("source_ref")
+  /// U 안 엶 / O 엶
+  status       String    @default("U") @db.Char(1)
+  resultItemId Int?      @map("result_item_id")
+  /// 줄 아이템이 없어서 대신 준 먹포인트
+  resultPoint  Int?      @map("result_point")
+  openedAt     DateTime? @map("opened_at")
+  regDate      DateTime  @default(now()) @map("reg_date")
+  user         Member    @relation(fields: [userId], references: [id])
+  resultItem   Item?     @relation(fields: [resultItemId], references: [id])
+
+  @@unique([userId, source, sourceRef], map: "member_item_box_once_uk")
+  @@index([userId, status], map: "member_item_box_user_idx")
+  @@map("member_item_box")
+}
+
+/// 아이템 세트 (v1.3, 피그마 상점 배너 "딸기 모자 세트 · 딸기 모자 + 하트 풍선을 함께!"). 세트 아이템을 하나도 안 가졌을 때만 산다
+model ItemSet {
+  id          Int           @id @default(autoincrement())
+  code        String        @unique @db.VarChar(40)
+  name        String        @db.VarChar(30)
+  description String?       @db.VarChar(255)
+  /// 세트 가격 (따로 사면 각 아이템 가격의 합)
+  price       Int
+  /// NEW / HOT
+  badge       String?       @db.VarChar(10)
+  sortOrder   Int           @default(0) @map("sort_order")
+  saleStart   DateTime?     @map("sale_start")
+  saleEnd     DateTime?     @map("sale_end")
+  /// A 판매 / H 숨김
+  status      String        @default("A") @db.Char(1)
+  regDate     DateTime      @default(now()) @map("reg_date")
+  items       ItemSetItem[]
+
+  @@map("item_set")
+}
+
+model ItemSetItem {
+  setId  Int     @map("set_id")
+  itemId Int     @map("item_id")
+  set    ItemSet @relation(fields: [setId], references: [id])
+  item   Item    @relation(fields: [itemId], references: [id])
+
+  @@id([setId, itemId])
+  @@index([itemId], map: "item_set_item_item_idx")
+  @@map("item_set_item")
 }
 
 /// 알림함은 30일 동안 보관 — 지난 알림은 배치로 지운다. 홈·내 정보의 종 아이콘 빨간 점 = 안 읽은 알림 있음

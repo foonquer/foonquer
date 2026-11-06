@@ -44,4 +44,25 @@ export const MukkaebiError = defineErrors({
     message: '이미 가진 아이템이에요.',
   },
   NO_FIELDS_TO_UPDATE: { status: 400, code: 'NO_FIELDS_TO_UPDATE', message: '바꿀 항목이 없어요.' },
+  ITEM_BOX_NOT_FOUND: {
+    status: 404,
+    code: 'ITEM_BOX_NOT_FOUND',
+    message: '아이템 상자를 찾을 수 없어요.',
+  },
+  ITEM_BOX_ALREADY_OPENED: {
+    status: 409,
+    code: 'ITEM_BOX_ALREADY_OPENED',
+    message: '이미 연 상자예요.',
+  },
+  SET_NOT_FOUND: { status: 404, code: 'SET_NOT_FOUND', message: '세트를 찾을 수 없어요.' },
+  SET_NOT_FOR_SALE: {
+    status: 400,
+    code: 'SET_NOT_FOR_SALE',
+    message: '지금은 판매하지 않는 세트예요.',
+  },
+  SET_ITEM_OWNED: {
+    status: 409,
+    code: 'SET_ITEM_OWNED',
+    message: '세트에 이미 가진 아이템이 있어요. 아이템을 하나씩 사 주세요.',
+  },
 });

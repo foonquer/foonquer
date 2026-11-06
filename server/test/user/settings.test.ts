@@ -296,6 +296,9 @@ describe('SET-04 DELETE /users/me', () => {
       data: { visitId: visit.id, userId: me.id, restaurantId: restaurant.id, overallScore: 4.5 },
     });
     await prisma.mukkaebi.create({ data: { userId: me.id } });
+    await prisma.memberItemBox.create({
+      data: { userId: me.id, source: 'LEVEL_UP', sourceRef: 3 },
+    });
     await prisma.savedRestaurant.create({ data: { userId: me.id, restaurantId: restaurant.id } });
     await prisma.memberPick.create({
       data: { userId: me.id, restaurantId: restaurant.id, sortOrder: 0 },
@@ -333,6 +336,7 @@ describe('SET-04 DELETE /users/me', () => {
 
     expect(await prisma.conquest.count({ where: { userId: me.id } })).toBe(0);
     expect(await prisma.mukkaebi.count({ where: { userId: me.id } })).toBe(0);
+    expect(await prisma.memberItemBox.count({ where: { userId: me.id } })).toBe(0);
     expect(await prisma.memberLocalRegion.count({ where: { userId: me.id } })).toBe(0);
     expect(await prisma.savedRestaurant.count({ where: { userId: me.id } })).toBe(0);
     expect(await prisma.memberPick.count({ where: { userId: me.id } })).toBe(0);

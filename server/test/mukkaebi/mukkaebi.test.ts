@@ -1,9 +1,12 @@
 import request from 'supertest';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished } from 'vitest';
 import { createApp } from '../../src/app';
 import { prisma } from '../../src/lib/prisma';
-import { addPoint } from '../../src/modules/reward/reward.service';
-import { resetDb } from '../helpers/db';
+import { grantSeasonRankAchievements } from '../../src/modules/achievement/achievement.service';
+import { openItemBox } from '../../src/modules/mukkaebi/mukkaebi.service';
+import { addExp, addPoint } from '../../src/modules/reward/reward.service';
+import { requiredExpOf } from '../../prisma/seed-data';
+import { resetDb, waitForRunningQueries } from '../helpers/db';
 import { bearer, createActiveSeason, createMember } from '../helpers/fixtures';
 import { conquerMany, itemId } from '../helpers/game';
 
@@ -230,5 +233,276 @@ describe('CHAR 먹깨비', () => {
     expect((await api(me.id).post(`/characters/me/items/${gold}/craft`)).body.code).toBe(
       'RECIPE_NOT_FOUND',
     );
+  });
+});
+
+async function owns(userId: bigint, codes: string[]) {
+  const items = await prisma.item.findMany({
+    where: { code: { in: codes } },
+    select: { id: true },
+  });
+  await prisma.memberItem.createMany({
+    data: items.map((i) => ({ userId, itemId: i.id, acquiredType: 'P' })),
+  });
+}
+
+describe('v1.3 아이템 상자 · 세트 · 업적 보상 아이템', () => {
+  it('성장 단계가 바뀌는 LV.3·10에 상자를 1개씩 받고, 열면 아직 없는 모자·얼굴·소품이 나온다', async () => {
+    const me = await createMember();
+    const other = await createMember();
+    const up = await prisma.$transaction((tx) =>
+      addExp(tx, me.id, requiredExpOf(10), 'ADMIN', { type: 'ADMIN', id: 1 }),
+    );
+    expect(up.levelUp).toEqual({ from: 1, to: 10, itemBoxCount: 2 });
+
+    const celebrations = await api(me.id).get('/users/me/celebrations');
+    expect(
+      celebrations.body.data.items.find((i: { type: string }) => i.type === 'LEVEL_UP').data,
+    ).toMatchObject({ fromLevel: 1, toLevel: 10, itemBoxCount: 2 });
+    expect((await api(me.id).get('/characters/me')).body.data.unopenedBoxCount).toBe(2);
+
+    const boxes = await api(me.id).get('/characters/me/item-boxes');
+    expect(boxes.body.data.unopenedCount).toBe(2);
+    expect(boxes.body.data.items.map((b: { title: string }) => b.title)).toEqual([
+      'LV.10 성장 보상',
+      'LV.3 성장 보상',
+    ]);
+    const [first, second] = boxes.body.data.items as { boxId: string }[];
+
+    expect((await api(other.id).post(`/characters/me/item-boxes/${first.boxId}/open`)).status).toBe(
+      404,
+    );
+    const opened = await api(me.id).post(`/characters/me/item-boxes/${first.boxId}/open`);
+    expect(opened.status).toBe(200);
+    expect(opened.body.message).toMatch(/얻었어요!$/);
+    expect(opened.body.data).toMatchObject({ point: null, unopenedCount: 1 });
+    expect(['HAT', 'FACE', 'PROP']).toContain(opened.body.data.item.category);
+    expect(opened.body.data.item.price).toBeGreaterThan(0);
+    expect(
+      await prisma.memberItem.findUnique({
+        where: { userId_itemId: { userId: me.id, itemId: opened.body.data.item.itemId } },
+      }),
+    ).toMatchObject({ quantity: 1, acquiredType: 'B', seenAt: null });
+    const again = await api(me.id).post(`/characters/me/item-boxes/${first.boxId}/open`);
+    expect(again.status).toBe(409);
+    expect(again.body.code).toBe('ITEM_BOX_ALREADY_OPENED');
+
+    // 레어 20%: 0.1이면 레어, 레어를 다 가졌으면 0.1이어도 일반
+    const rare = await openItemBox(me.id, BigInt(second.boxId), new Date(), () => 0.1);
+    expect(rare.item?.rarity).toBe('R');
+    expect(rare.unopenedCount).toBe(0);
+  });
+
+  it('같은 상자를 동시에 열어도 한 번만 열리고 아이템도 하나만 준다', async () => {
+    const me = await createMember();
+    await prisma.$transaction((tx) =>
+      addExp(tx, me.id, requiredExpOf(3), 'ADMIN', { type: 'ADMIN', id: 1 }),
+    );
+    const box = await prisma.memberItemBox.findFirstOrThrow({ where: { userId: me.id } });
+    // 테스트가 상자 행을 먼저 잠가 두고 두 요청을 보낸다. 두 요청이 모두 상자 조회 쿼리에 도착한 것을
+    // 확인한 뒤 잠금을 풀면 경합한다. 상자 잠금(FOR UPDATE)이 없으면 두 요청 모두 "안 엶"을 읽어서 둘 다 200이 된다
+    let opening: Promise<request.Response[]> = Promise.resolve([]);
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM member_item_box WHERE id = ${box.id} FOR UPDATE`;
+        opening = Promise.all(
+          [1, 2].map(async () => api(me.id).post(`/characters/me/item-boxes/${box.id}/open`)),
+        );
+        await waitForRunningQueries('SELECT user_id, status FROM member_item_box', 2);
+      },
+      { timeout: 10_000 },
+    );
+    const results = await opening;
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    const given = await prisma.memberItem.findMany({ where: { userId: me.id, acquiredType: 'B' } });
+    expect(given).toHaveLength(1);
+    expect(
+      (await prisma.memberItemBox.findUniqueOrThrow({ where: { id: box.id } })).resultItemId,
+    ).toBe(given[0].itemId);
+  });
+
+  it('레어를 다 가졌으면 일반, 모자·얼굴·소품을 다 가졌으면 먹포인트를 준다', async () => {
+    const me = await createMember();
+    await prisma.$transaction((tx) =>
+      addExp(tx, me.id, requiredExpOf(20), 'ADMIN', { type: 'ADMIN', id: 1 }),
+    );
+    const boxes = await prisma.memberItemBox.findMany({
+      where: { userId: me.id },
+      orderBy: { sourceRef: 'asc' },
+    });
+    expect(boxes.map((b) => b.sourceRef)).toEqual([3, 10, 20]);
+
+    const rareCodes = (
+      await prisma.item.findMany({
+        where: { unlockType: 'P', rarity: 'R' },
+        select: { code: true },
+      })
+    ).map((i) => i.code);
+    await owns(me.id, rareCodes);
+    const normal = await openItemBox(me.id, boxes[0].id, new Date(), () => 0.1);
+    expect(normal.item?.rarity).toBe('N');
+
+    const rest = (
+      await prisma.item.findMany({
+        where: { unlockType: 'P', memberItems: { none: { userId: me.id } } },
+        select: { code: true },
+      })
+    ).map((i) => i.code);
+    await owns(me.id, rest);
+    const point = await api(me.id).post(`/characters/me/item-boxes/${boxes[1].id}/open`);
+    expect(point.body.data).toMatchObject({ item: null, point: 100 });
+    expect(point.body.message).toBe('먹포인트 100P를 받았어요!');
+    expect(
+      await prisma.pointHistory.findFirst({ where: { userId: me.id, reason: 'ITEM_BOX' } }),
+    ).toMatchObject({ amount: 100, refType: 'ITEM_BOX', refId: boxes[1].id });
+    expect(
+      await prisma.memberItemBox.findUniqueOrThrow({ where: { id: boxes[1].id } }),
+    ).toMatchObject({ status: 'O', resultItemId: null, resultPoint: 100 });
+  });
+
+  it('업적 보상 아이템을 이미 가졌으면(지난 시즌 왕관 등) 개수를 늘리지 않고 알림도 보내지 않는다', async () => {
+    const season = await createActiveSeason(3);
+    const me = await createMember();
+    await owns(me.id, ['HAT_CROWN']);
+    const unlocked = await prisma.$transaction((tx) =>
+      grantSeasonRankAchievements(tx, me.id, season.id, 1),
+    );
+    expect(unlocked.flatMap((a) => a.rewardItems.map((i) => i.code))).toEqual(['SKIN_NIGHTSKY']);
+    const crown = await prisma.memberItem.findFirstOrThrow({
+      where: { userId: me.id, item: { code: 'HAT_CROWN' } },
+    });
+    expect(crown.quantity).toBe(1);
+    const titles = (
+      await prisma.notification.findMany({ where: { userId: me.id, type: 'NEW_ITEM' } })
+    ).map((n) => n.title);
+    expect(titles).toEqual(['밤하늘 먹깨비를 얻었어요!']);
+  });
+
+  it('세트 배너 → 세트 구매(포인트 450, 두 아이템 지급·착용), 하나라도 가졌으면 409', async () => {
+    const me = await createMember();
+    await give(me.id, 1000);
+    const shop = await api(me.id).get('/shop/items?category=HAT');
+    expect(shop.body.data.sets).toEqual([
+      expect.objectContaining({
+        code: 'SET_STRAWBERRY',
+        name: '딸기 모자 세트',
+        price: 450,
+        originalPrice: 550,
+        badge: 'NEW',
+        purchasable: true,
+        canBuy: true,
+      }),
+    ]);
+    expect(shop.body.data.items.find((i: { code: string }) => i.code === 'HAT_BEAR')).toMatchObject(
+      { rarity: 'R', badge: 'HOT' },
+    );
+    const set = shop.body.data.sets[0];
+    expect(set.items.map((i: { code: string }) => i.code)).toEqual([
+      'HAT_STRAWBERRY',
+      'PROP_HEART_BALLOON',
+    ]);
+
+    const bought = await api(me.id).post('/shop/set-purchases', {
+      setId: set.setId,
+      equipNow: true,
+    });
+    expect(bought.status).toBe(200);
+    expect(bought.body.message).toBe('딸기 모자 세트를 샀어요!');
+    expect(bought.body.data).toMatchObject({ pointBalance: 550, equipped: true });
+    const ownedAfter = await prisma.memberItem.findMany({
+      where: { userId: me.id },
+      include: { item: { select: { code: true } } },
+      orderBy: { itemId: 'asc' },
+    });
+    expect(ownedAfter.map((m) => [m.item.code, m.quantity, m.acquiredType])).toEqual([
+      ['HAT_STRAWBERRY', 1, 'P'],
+      ['PROP_HEART_BALLOON', 1, 'P'],
+    ]);
+    const mukkaebi = await prisma.mukkaebi.findUniqueOrThrow({ where: { userId: me.id } });
+    expect(mukkaebi).toMatchObject({
+      hatItemId: await itemId('HAT_STRAWBERRY'),
+      propItemId: await itemId('PROP_HEART_BALLOON'),
+    });
+    expect(
+      await prisma.pointHistory.findFirst({ where: { userId: me.id, reason: 'PURCHASE' } }),
+    ).toMatchObject({ amount: -450, title: '딸기 모자 세트 구매', refType: 'ITEM_SET' });
+
+    const again = await api(me.id).post('/shop/set-purchases', { setId: set.setId });
+    expect(again.status).toBe(409);
+    expect(again.body.code).toBe('SET_ITEM_OWNED');
+    expect((await api(me.id).get('/shop/items?category=HAT')).body.data.sets[0]).toMatchObject({
+      purchasable: false,
+      canBuy: false,
+    });
+    expect((await api(me.id).post('/shop/set-purchases', { setId: 999 })).status).toBe(404);
+
+    const poor = await createMember();
+    const short = await api(poor.id).post('/shop/set-purchases', { setId: set.setId });
+    expect(short.status).toBe(409);
+    expect(short.body.code).toBe('POINT_NOT_ENOUGH');
+    // 실패하면 아무것도 바뀌지 않는다
+    expect((await prisma.member.findUniqueOrThrow({ where: { id: poor.id } })).pointBalance).toBe(
+      0,
+    );
+    expect(await prisma.pointHistory.count({ where: { userId: poor.id } })).toBe(0);
+    expect(await prisma.memberItem.count({ where: { userId: poor.id } })).toBe(0);
+  });
+
+  it('판매 기간이 지난 세트는 400 SET_NOT_FOR_SALE, 숨긴 세트는 404 SET_NOT_FOUND, 실패하면 DB는 그대로', async () => {
+    const me = await createMember();
+    await give(me.id, 1000);
+    // item_set은 resetDb가 비우지 않는 기본 데이터라 테스트용 세트는 끝나고 지운다
+    const ids = [await itemId('HAT_SNAPBACK'), await itemId('FACE_MUSTACHE')];
+    const ended = await prisma.itemSet.create({
+      data: {
+        code: 'TEST_SET_ENDED',
+        name: '지난 세트',
+        price: 100,
+        saleEnd: new Date(Date.now() - 60_000),
+        items: { create: ids.map((itemId) => ({ itemId })) },
+      },
+    });
+    const hidden = await prisma.itemSet.create({
+      data: {
+        code: 'TEST_SET_HIDDEN',
+        name: '숨긴 세트',
+        price: 100,
+        status: 'H',
+        items: { create: ids.map((itemId) => ({ itemId })) },
+      },
+    });
+    onTestFinished(async () => {
+      await prisma.itemSetItem.deleteMany({ where: { setId: { in: [ended.id, hidden.id] } } });
+      await prisma.itemSet.deleteMany({ where: { id: { in: [ended.id, hidden.id] } } });
+    });
+
+    const shop = await api(me.id).get('/shop/items?category=HAT');
+    expect(shop.body.data.sets.map((s: { code: string }) => s.code)).toEqual(['SET_STRAWBERRY']);
+    const late = await api(me.id).post('/shop/set-purchases', { setId: ended.id });
+    expect([late.status, late.body.code]).toEqual([400, 'SET_NOT_FOR_SALE']);
+    const gone = await api(me.id).post('/shop/set-purchases', { setId: hidden.id });
+    expect([gone.status, gone.body.code]).toEqual([404, 'SET_NOT_FOUND']);
+    expect((await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).pointBalance).toBe(
+      1000,
+    );
+    expect(await prisma.memberItem.count({ where: { userId: me.id } })).toBe(0);
+    expect(await prisma.pointHistory.count({ where: { userId: me.id, reason: 'PURCHASE' } })).toBe(
+      0,
+    );
+  });
+
+  it('명예 아이템은 업적 보상: 상점 명예 탭에 필요한 업적을 보여 주고, 업적을 달성하면 받는다', async () => {
+    const me = await createMember();
+    const honor = await api(me.id).get('/shop/items?category=HONOR');
+    const codes = honor.body.data.items.map((i: { code: string }) => i.code);
+    expect(codes).toEqual(expect.arrayContaining(['HAT_CROWN', 'SKIN_NIGHTSKY', 'CLUB_GOLD']));
+    expect(
+      honor.body.data.items.find((i: { code: string }) => i.code === 'HAT_CROWN'),
+    ).toMatchObject({
+      rarity: 'H',
+      purchasable: false,
+      requiredAchievement: { name: '구의 먹짱' },
+      unlockCondition: '구의 먹짱 업적을 달성하면 받아요.',
+    });
   });
 });

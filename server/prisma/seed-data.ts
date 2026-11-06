@@ -209,6 +209,13 @@ const rewardPolicies = [
   { reason: 'LEVEL_UP', point: 200, exp: 0, dailyLimit: null, description: '레벨업' },
   { reason: 'TIER_UP', point: 100, exp: 0, dailyLimit: null, description: '티어 상승' },
   { reason: 'SEASON_REWARD', point: 300, exp: 0, dailyLimit: null, description: '시즌 보상' },
+  {
+    reason: 'ITEM_BOX',
+    point: 100,
+    exp: 0,
+    dailyLimit: null,
+    description: '아이템 상자 (줄 아이템이 없을 때)',
+  },
 ];
 
 async function seedRewardPolicies(prisma: PrismaClient) {
@@ -228,9 +235,14 @@ type ItemSeed = {
   category: 'HAT' | 'FACE' | 'PROP' | 'SKIN' | 'CLUB';
   name: string;
   price?: number;
-  unlockType?: 'P' | 'S' | 'M';
+  unlockType?: 'P' | 'S' | 'M' | 'A';
   clubTier?: number;
   description: string;
+  /** N 일반(기본) / R 레어 / L 전설 / H 명예 — 피그마 에셋 보드 (v1.3) */
+  rarity?: 'N' | 'R' | 'L' | 'H';
+  badge?: 'NEW' | 'HOT';
+  /** 이 업적을 달성하면 받는다 (v1.3 업적 보상) */
+  achievementCode?: string;
 };
 const items: ItemSeed[] = [
   {
@@ -246,6 +258,7 @@ const items: ItemSeed[] = [
     name: '딸기 모자',
     price: 300,
     description: '새콤달콤한 딸기 모자예요.',
+    badge: 'NEW',
   },
   {
     code: 'HAT_SNAPBACK',
@@ -260,6 +273,8 @@ const items: ItemSeed[] = [
     name: '곰돌이 모자',
     price: 400,
     description: '복슬복슬 곰돌이 귀가 달렸어요.',
+    rarity: 'R',
+    badge: 'HOT',
   },
   {
     code: 'HAT_CHICK',
@@ -279,8 +294,10 @@ const items: ItemSeed[] = [
     code: 'HAT_CROWN',
     category: 'HAT',
     name: '왕관',
-    unlockType: 'S',
-    description: '구의 먹짱(시즌 1위)만 쓸 수 있어요.',
+    unlockType: 'A',
+    rarity: 'H',
+    achievementCode: 'MUKJJANG',
+    description: '구의 먹짱 업적을 달성하면 받아요.',
   },
   {
     code: 'FACE_STAR_STICKER',
@@ -309,6 +326,7 @@ const items: ItemSeed[] = [
     name: '하트 선글라스',
     price: 500,
     description: '하트 모양 선글라스예요.',
+    rarity: 'R',
   },
   {
     code: 'FACE_MONOCLE',
@@ -316,6 +334,7 @@ const items: ItemSeed[] = [
     name: '외알 안경',
     price: 600,
     description: '미식가의 품격, 외알 안경.',
+    rarity: 'R',
   },
   {
     code: 'FACE_STAR_SUNGLASSES',
@@ -323,6 +342,7 @@ const items: ItemSeed[] = [
     name: '별 선글라스',
     price: 700,
     description: '별 모양 선글라스예요.',
+    rarity: 'R',
   },
   {
     code: 'PROP_ICE_CREAM',
@@ -358,6 +378,7 @@ const items: ItemSeed[] = [
     name: '정복 깃발',
     price: 400,
     description: '정복한 곳에 꽂는 깃발이에요.',
+    rarity: 'R',
   },
   {
     code: 'PROP_MIC',
@@ -365,13 +386,16 @@ const items: ItemSeed[] = [
     name: '마이크',
     price: 450,
     description: '맛집 리뷰는 마이크를 들고.',
+    rarity: 'R',
   },
   {
     code: 'SKIN_NIGHTSKY',
     category: 'SKIN',
     name: '밤하늘 먹깨비',
-    unlockType: 'S',
-    description: '시즌 상위 10% 명예 먹깨비예요.',
+    unlockType: 'A',
+    rarity: 'H',
+    achievementCode: 'SEASON_TOP10',
+    description: '시즌 TOP 10 업적을 달성하면 받아요.',
   },
   {
     code: 'CLUB_WOOD',
@@ -380,6 +404,7 @@ const items: ItemSeed[] = [
     unlockType: 'S',
     clubTier: 1,
     description: '시즌에 정복 기록을 남기면 받아요.',
+    rarity: 'H',
   },
   {
     code: 'CLUB_BRONZE',
@@ -388,6 +413,7 @@ const items: ItemSeed[] = [
     unlockType: 'S',
     clubTier: 2,
     description: '시즌 상위 50% 보상이에요.',
+    rarity: 'H',
   },
   {
     code: 'CLUB_SILVER',
@@ -396,6 +422,7 @@ const items: ItemSeed[] = [
     unlockType: 'S',
     clubTier: 3,
     description: '시즌 상위 30% 보상이에요.',
+    rarity: 'H',
   },
   {
     code: 'CLUB_GOLD',
@@ -404,6 +431,8 @@ const items: ItemSeed[] = [
     unlockType: 'S',
     clubTier: 4,
     description: '시즌 상위 10% 보상이에요. 3개를 모으면 전설의 방망이로 합칠 수 있어요.',
+    rarity: 'H',
+    achievementCode: 'SEASON_CONQUEST_30',
   },
   {
     code: 'CLUB_LEGEND',
@@ -412,6 +441,7 @@ const items: ItemSeed[] = [
     unlockType: 'M',
     clubTier: 5,
     description: '황금 방망이 3개를 합쳐 만들어요.',
+    rarity: 'L',
   },
 ];
 
@@ -427,6 +457,8 @@ async function seedItems(prisma: PrismaClient) {
         description: item.description,
         price: item.price ?? null,
         unlockType: item.unlockType ?? 'P',
+        rarity: item.rarity ?? 'N',
+        badge: item.badge ?? null,
         clubTier: item.clubTier ?? null,
         sortOrder: index + 1,
       },
@@ -443,14 +475,12 @@ async function seedItems(prisma: PrismaClient) {
     create: { resultItemId: legend, materialItemId: gold, materialCount: 3 },
   });
 
-  // 시즌 보상표 (ERD season_reward_rule 초안): 방망이는 걸린 것 중 가장 좋은 1개, 명예 아이템은 모두
+  // 시즌 보상표: 방망이 4단계만, 걸린 것 중 가장 좋은 1개 (v1.3 — 왕관·밤하늘은 업적 보상으로 옮김, 피그마 "시즌 보상 — 도깨비 방망이")
   const rules = [
     { ruleType: 'P', threshold: 10, code: 'CLUB_GOLD' },
-    { ruleType: 'P', threshold: 10, code: 'SKIN_NIGHTSKY' },
     { ruleType: 'P', threshold: 30, code: 'CLUB_SILVER' },
     { ruleType: 'P', threshold: 50, code: 'CLUB_BRONZE' },
     { ruleType: 'P', threshold: 100, code: 'CLUB_WOOD' },
-    { ruleType: 'R', threshold: 1, code: 'HAT_CROWN' },
   ];
   for (const rule of rules) {
     const itemId = await id(rule.code);
@@ -573,7 +603,49 @@ async function seedAchievements(prisma: PrismaClient) {
       create: { ...a, iconKey: `ACH_${a.code}`, sortOrder: index + 1 },
     });
   }
+  // 업적 보상 아이템 (v1.3): 업적을 달성하면 그 업적이 걸린 아이템을 준다. 이미 연결된 아이템은 건드리지 않는다
+  for (const item of items.filter((i) => i.achievementCode)) {
+    const achievement = await prisma.achievement.findUniqueOrThrow({
+      where: { code: item.achievementCode },
+      select: { id: true },
+    });
+    await prisma.item.updateMany({
+      where: { code: item.code, requiredAchievementId: null },
+      data: { requiredAchievementId: achievement.id },
+    });
+  }
   return achievements.length;
+}
+
+// 아이템 세트 (v1.3, 피그마 상점 배너)
+const itemSets = [
+  {
+    code: 'SET_STRAWBERRY',
+    name: '딸기 모자 세트',
+    description: '딸기 모자 + 하트 풍선을 함께!',
+    price: 450,
+    badge: 'NEW',
+    itemCodes: ['HAT_STRAWBERRY', 'PROP_HEART_BALLOON'],
+  },
+];
+
+async function seedItemSets(prisma: PrismaClient) {
+  for (const [index, { itemCodes, ...set }] of itemSets.entries()) {
+    const existing = await prisma.itemSet.findUnique({ where: { code: set.code } });
+    if (existing) continue;
+    const itemIds = await prisma.item.findMany({
+      where: { code: { in: itemCodes } },
+      select: { id: true },
+    });
+    await prisma.itemSet.create({
+      data: {
+        ...set,
+        sortOrder: index + 1,
+        items: { create: itemIds.map((i) => ({ itemId: i.id })) },
+      },
+    });
+  }
+  return itemSets.length;
 }
 
 // 좋았던 점·아쉬웠던 점 칩 (2026-11-04 초안, 문구는 팀 확정 전)
@@ -630,6 +702,7 @@ export async function seedBaseData(prisma: PrismaClient) {
   const rewardPolicyCount = await seedRewardPolicies(prisma);
   const itemCount = await seedItems(prisma);
   const achievementCount = await seedAchievements(prisma);
+  const itemSetCount = await seedItemSets(prisma);
   const reviewAspectCount = await seedReviewAspects(prisma);
   return {
     categoryCount,
@@ -640,6 +713,7 @@ export async function seedBaseData(prisma: PrismaClient) {
     rewardPolicyCount,
     itemCount,
     achievementCount,
+    itemSetCount,
     reviewAspectCount,
   };
 }

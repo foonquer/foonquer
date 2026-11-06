@@ -1,4 +1,5 @@
 import type { Db, Tx } from '../../common/db';
+import { objectParticle, withObjectParticle } from '../../common/josa';
 import { notify } from '../notification/notify';
 import { addPoint } from '../reward/reward.service';
 
@@ -112,6 +113,8 @@ export interface UnlockedAchievement {
   code: string;
   name: string;
   rewardPoint: number;
+  /** 업적 보상으로 받은 아이템 (왕관·밤하늘 먹깨비·황금 방망이) */
+  rewardItems: { itemId: number; code: string; name: string }[];
 }
 
 async function unlock(
@@ -141,7 +144,7 @@ async function unlock(
     {
       category: 'MUKKAEBI',
       type: 'ACHIEVEMENT',
-      title: `업적 '${achievement.name}'을 달성했어요!`,
+      title: `업적 '${achievement.name}'${objectParticle(achievement.name)} 달성했어요!`,
       content:
         achievement.rewardPoint > 0
           ? `보상 +${achievement.rewardPoint}P를 받았어요`
@@ -151,12 +154,53 @@ async function unlock(
     },
     now,
   );
+  const rewardItems = await giveAchievementItems(tx, userId, achievement.id, now);
   return {
     achievementId: achievement.id,
     code: achievement.code,
     name: achievement.name,
     rewardPoint: achievement.rewardPoint,
+    rewardItems,
   };
+}
+
+/**
+ * 업적 보상 아이템 (v1.3): item.required_achievement_id가 이 업적인 아이템을 준다.
+ * 방망이는 개수 +1, 나머지(왕관·밤하늘)는 이미 가졌으면 그대로 둔다(개수는 항상 1)
+ */
+async function giveAchievementItems(tx: Tx, userId: bigint, achievementId: number, now: Date) {
+  const candidates = await tx.item.findMany({
+    where: { requiredAchievementId: achievementId, status: 'A' },
+    select: { id: true, code: true, name: true, category: true },
+  });
+  const items: typeof candidates = [];
+  for (const item of candidates) {
+    const owned = await tx.memberItem.findUnique({
+      where: { userId_itemId: { userId, itemId: item.id } },
+      select: { quantity: true },
+    });
+    if (owned && owned.quantity > 0 && item.category !== 'CLUB') continue;
+    await tx.memberItem.upsert({
+      where: { userId_itemId: { userId, itemId: item.id } },
+      update: { quantity: { increment: 1 }, seenAt: null },
+      create: { userId, itemId: item.id, acquiredType: 'A', acquiredAt: now },
+    });
+    items.push(item);
+    await notify(
+      tx,
+      userId,
+      {
+        category: 'MUKKAEBI',
+        type: 'NEW_ITEM',
+        title: `${withObjectParticle(item.name)} 얻었어요!`,
+        content: '업적 보상이에요. 꾸미기에서 착용해 보세요',
+        refType: 'ITEM',
+        refId: item.id,
+      },
+      now,
+    );
+  }
+  return items.map((i) => ({ itemId: i.id, code: i.code, name: i.name }));
 }
 
 /**

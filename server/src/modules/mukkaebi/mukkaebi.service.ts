@@ -1,3 +1,4 @@
+import { lockMember } from '../../common/db';
 import { AppError } from '../../common/errors/app-error';
 import { withObjectParticle } from '../../common/josa';
 import { findCurrentSeason } from '../../common/season';
@@ -5,6 +6,7 @@ import { toKstIso } from '../../common/time';
 import type { Prisma } from '../../generated/prisma/client';
 import { prisma } from '../../lib/prisma';
 import { notify } from '../notification/notify';
+import { addPoint } from '../reward/reward.service';
 import { TIER_API, TIER_ORDER, type TierCode, tierTitle } from '../ranking/tier';
 import { loadMukkaebi, STAGE_API, STAGE_NAME } from './mukkaebi-view';
 import type { AppearanceBody, ItemCategoryQuery } from './mukkaebi.schema';
@@ -24,13 +26,19 @@ const SLOT_OF_CATEGORY = Object.fromEntries(
 
 /** CHAR-01 내 먹깨비 */
 export async function getMyMukkaebi(userId: bigint) {
-  const [view, member, newItems] = await Promise.all([
+  const [view, member, newItems, unopenedBoxes] = await Promise.all([
     loadMukkaebi(userId),
     prisma.member.findUniqueOrThrow({ where: { id: userId }, select: { pointBalance: true } }),
     prisma.memberItem.count({ where: { userId, seenAt: null, quantity: { gt: 0 } } }),
+    prisma.memberItemBox.count({ where: { userId, status: 'U' } }),
   ]);
   const { celebratedLevel: _celebrated, ...rest } = view;
-  return { ...rest, pointBalance: member.pointBalance, newItemCount: newItems };
+  return {
+    ...rest,
+    pointBalance: member.pointBalance,
+    newItemCount: newItems,
+    unopenedBoxCount: unopenedBoxes,
+  };
 }
 
 /** CHAR-02 보유 아이템 (탭별). 조회하면 그 탭의 "새로 얻음" 표시는 꺼진다 */
@@ -77,6 +85,7 @@ export async function getMyItems(userId: bigint, query: ItemCategoryQuery, now =
       code: m.item.code,
       name: m.item.name,
       category: m.item.category,
+      rarity: m.item.rarity,
       quantity: m.quantity,
       isNew: m.seenAt === null,
       isEquipped: equipped.has(m.item.id),
@@ -174,6 +183,7 @@ export async function getCollection(userId: bigint) {
       code: i.code,
       name: i.name,
       category: i.category,
+      rarity: i.rarity,
       owned: ownedIds.has(i.id),
       // 모으지 않은 것은 실루엣으로 보여 주므로 이름과 얻는 방법만
       howToGet: i.unlockType === 'P' ? `${i.price ?? 0}P로 구매` : (i.description ?? null),
@@ -229,7 +239,16 @@ export async function listCelebrations(userId: bigint) {
     data: Record<string, unknown>;
   }[] = [];
   if (mukkaebi && mukkaebi.level > mukkaebi.celebratedLevel) {
-    const view = await loadMukkaebi(userId);
+    const [view, itemBoxCount] = await Promise.all([
+      loadMukkaebi(userId),
+      prisma.memberItemBox.count({
+        where: {
+          userId,
+          source: 'LEVEL_UP',
+          sourceRef: { gt: mukkaebi.celebratedLevel, lte: mukkaebi.level },
+        },
+      }),
+    ]);
     items.push({
       celebrationId: `LEVEL_UP:${mukkaebi.level}`,
       type: 'LEVEL_UP',
@@ -239,6 +258,8 @@ export async function listCelebrations(userId: bigint) {
         toLevel: mukkaebi.level,
         stage: view.stage,
         stageName: view.stageName,
+        // 성장 단계가 바뀌면 "아이템 상자 1개" (CHAR-05·06)
+        itemBoxCount,
       },
     });
   }
@@ -411,5 +432,127 @@ export async function craftItem(userId: bigint, itemId: number, now = new Date()
       name: recipe.materialItem.name,
       quantity: result.materialLeft,
     },
+  };
+}
+
+/** 아이템 상자 제목 (피그마 "LV.10 성장 보상") */
+function itemBoxTitle(box: { source: string; sourceRef: number }) {
+  return box.source === 'LEVEL_UP' ? `LV.${box.sourceRef} 성장 보상` : '아이템 상자';
+}
+
+/** CHAR-05 내 아이템 상자 (안 연 것 먼저, 최신순) */
+export async function listItemBoxes(userId: bigint) {
+  const boxes = await prisma.memberItemBox.findMany({
+    where: { userId },
+    orderBy: [{ status: 'desc' }, { id: 'desc' }],
+    include: {
+      resultItem: { select: { id: true, code: true, name: true, category: true, rarity: true } },
+    },
+  });
+  return {
+    unopenedCount: boxes.filter((b) => b.status === 'U').length,
+    items: boxes.map((b) => ({
+      boxId: b.id,
+      title: itemBoxTitle(b),
+      opened: b.status === 'O',
+      receivedAt: toKstIso(b.regDate),
+      openedAt: b.openedAt ? toKstIso(b.openedAt) : null,
+      resultItem: b.resultItem
+        ? {
+            itemId: b.resultItem.id,
+            code: b.resultItem.code,
+            name: b.resultItem.name,
+            category: b.resultItem.category,
+            rarity: b.resultItem.rarity,
+          }
+        : null,
+      resultPoint: b.resultPoint,
+    })),
+  };
+}
+
+/** 아이템 상자에서 레어(R 이상)가 나올 확률 (피그마 "레어 등장 20%") */
+export const ITEM_BOX_RARE_RATE = 0.2;
+const BOX_CATEGORIES = ['HAT', 'FACE', 'PROP'];
+
+/**
+ * CHAR-06 아이템 상자 열기 — 아직 없는 모자·얼굴·소품(상점 아이템) 중 하나. 레어는 20%.
+ * 다 가졌으면 reward_policy ITEM_BOX만큼 먹포인트. random은 테스트에서 바꿔 끼운다
+ */
+export async function openItemBox(
+  userId: bigint,
+  boxId: bigint,
+  now = new Date(),
+  random: () => number = Math.random,
+) {
+  const result = await prisma.$transaction(async (tx) => {
+    const [box] = await tx.$queryRaw<{ user_id: bigint; status: string }[]>`
+      SELECT user_id, status FROM member_item_box WHERE id = ${boxId} FOR UPDATE`;
+    if (!box || box.user_id !== userId) throw new AppError(MukkaebiError.ITEM_BOX_NOT_FOUND);
+    if (box.status !== 'U') throw new AppError(MukkaebiError.ITEM_BOX_ALREADY_OPENED);
+    // 상점 구매와 동시에 같은 아이템을 받지 않게 회원 행도 잠근다 (구매도 같은 순서로 잠근다)
+    await lockMember(tx, userId);
+    const owned = await tx.memberItem.findMany({
+      where: { userId, quantity: { gt: 0 } },
+      select: { itemId: true },
+    });
+    const candidates = await tx.item.findMany({
+      where: {
+        status: 'A',
+        unlockType: 'P',
+        category: { in: BOX_CATEGORIES },
+        id: { notIn: owned.map((o) => o.itemId) },
+      },
+      orderBy: { id: 'asc' },
+    });
+    const rare = candidates.filter((i) => i.rarity !== 'N');
+    const normal = candidates.filter((i) => i.rarity === 'N');
+    const pool =
+      rare.length > 0 && (normal.length === 0 || random() < ITEM_BOX_RARE_RATE) ? rare : normal;
+    const item = pool.length > 0 ? pool[Math.floor(random() * pool.length)] : null;
+
+    let point: number | null = null;
+    if (item) {
+      await tx.memberItem.upsert({
+        where: { userId_itemId: { userId, itemId: item.id } },
+        update: { quantity: 1, acquiredType: 'B', acquiredAt: now, seenAt: null },
+        create: { userId, itemId: item.id, acquiredType: 'B', acquiredAt: now },
+      });
+    } else {
+      const policy = await tx.rewardPolicy.findUnique({ where: { reason: 'ITEM_BOX' } });
+      point = policy?.point ?? 0;
+      await addPoint(
+        tx,
+        userId,
+        point,
+        'ITEM_BOX',
+        '아이템 상자',
+        { type: 'ITEM_BOX', id: boxId },
+        now,
+      );
+    }
+    await tx.memberItemBox.update({
+      where: { id: boxId },
+      data: { status: 'O', resultItemId: item?.id ?? null, resultPoint: point, openedAt: now },
+    });
+    return { item, point };
+  });
+  const unopenedCount = await prisma.memberItemBox.count({ where: { userId, status: 'U' } });
+  const { item, point } = result;
+  return {
+    boxId,
+    item: item
+      ? {
+          itemId: item.id,
+          code: item.code,
+          name: item.name,
+          category: item.category,
+          rarity: item.rarity,
+          // "상점에서 400P인 아이템이에요"
+          price: item.price,
+        }
+      : null,
+    point,
+    unopenedCount,
   };
 }

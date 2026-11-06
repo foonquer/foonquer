@@ -9,9 +9,14 @@ function hasFinalConsonant(word: string): boolean {
   return false;
 }
 
+/** 을/를만. 예) 리뷰 10개 → 를 (따옴표로 감쌀 때) */
+export function objectParticle(word: string) {
+  return hasFinalConsonant(word) ? '을' : '를';
+}
+
 /** 을/를 붙이기. 예) 가양동 → 가양동을, 종로1가 → 종로1가를 */
 export function withObjectParticle(word: string) {
-  return `${word}${hasFinalConsonant(word) ? '을' : '를'}`;
+  return `${word}${objectParticle(word)}`;
 }
 
 /** 이/가 붙이기. 예) 시즌 3 → 시즌 3이, 시즌 2 → 시즌 2가 */
