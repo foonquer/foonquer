@@ -9,7 +9,7 @@
 # GHCR_ACTOR / GHCR_TOKEN / BUNDLE 자리(앞뒤 밑줄 두 개)는 워크플로에서 sed로 실제 값을 채워 넣는
 # 플레이스홀더다 (GitHub Actions ${{ }} 치환은 이 파일엔 안 먹히므로).
 #
-# 저장소가 비공개라 VM에서 clone하지 않는다. 워크플로가 실행에 필요한 파일(docker-compose.yml,
+# VM은 저장소를 clone하지 않는다. 워크플로가 실행에 필요한 파일(docker-compose.yml,
 # deploy/Caddyfile, scripts/backup-db.sh)만 묶어 BUNDLE 자리(tar.gz base64)에 넣어 보내고,
 # ~/foonquer에 풀어 .env와 같이 둔다. 서버 이미지는 GitHub Actions에서 server/Dockerfile로 빌드해
 # GHCR에 올리고, VM은 이미지를 pull만 한다.

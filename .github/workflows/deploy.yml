@@ -84,7 +84,7 @@ jobs:
           GHCR_ACTOR: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # VM에 둘 파일(저장소가 비공개라 VM은 clone하지 않는다)을 묶는다
+          # VM에 둘 파일을 묶는다 (VM은 저장소를 clone하지 않는다)
           BUNDLE=$(tar czf - docker-compose.yml deploy scripts/backup-db.sh | base64 -w0)
           # deploy-remote.sh의 플레이스홀더에 이번 실행의 GHCR 로그인 값과 파일 묶음을 채운다 (GITHUB_TOKEN은 이 실행이 끝나면 무효)
           sed -e "s|__GHCR_ACTOR__|${GHCR_ACTOR}|g" -e "s|__GHCR_TOKEN__|${GHCR_TOKEN}|g" \
