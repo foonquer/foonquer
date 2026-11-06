@@ -1,0 +1,12 @@
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 8px var(--mk-side) 24px;
+}
+
+/* PageTitle의 좌우 여백은 이미 content가 준다 */
+.title {
+  padding-right: 0;
+  padding-left: 0;
+}

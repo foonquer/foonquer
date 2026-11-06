@@ -211,9 +211,18 @@ describe('음식점 상세 (REST-01)', () => {
         businessHours: null,
         businessStatus: null,
         rating: { score: 4.2, reviewCount: 86 },
+        myOverall: {
+          score: 4.3,
+          items: [
+            { key: 'taste', average: 4.2, weightPercent: 30 },
+            { key: 'cleanliness', average: 4.3, weightPercent: 30 },
+            { key: 'portion', average: null, weightPercent: null },
+            { key: 'service', average: 4.5, weightPercent: 20 },
+            { key: 'price', average: 4.2, weightPercent: 20 },
+          ],
+        },
         hasMapae: true,
         stats: {
-          taste: 4.6,
           cleanliness: 4.3,
           portion: null,
           service: 4.5,
@@ -241,7 +250,11 @@ describe('음식점 상세 (REST-01)', () => {
 
     expect(await screen.findByRole('heading', { name: '이가네떡볶이' })).toBeInTheDocument();
     expect(screen.getByText('강서구 가양동 · 서울 강서구 가양로 12')).toBeInTheDocument();
-    expect(screen.getByText('신뢰도 반영')).toBeInTheDocument();
+    expect(screen.getByText('맛 별점')).toBeInTheDocument();
+    // 맛 기준표: 4.2 → 4.0점대 "다른 사람에게 추천할 수 있는 맛"
+    expect(
+      screen.getByRole('button', { name: /4.0점대.*다른 사람에게 추천할 수 있는 맛/ }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('region', { name: '마패' })).toHaveTextContent(
       '리뷰 이벤트를 하는 가게입니다',
     );
@@ -250,6 +263,13 @@ describe('음식점 상세 (REST-01)', () => {
     expect(screen.getByText('내 평가 ★ 4.8')).toBeInTheDocument();
     expect(screen.getByText('81%')).toBeInTheDocument();
     expect(screen.getByText('–')).toBeInTheDocument(); // 양 평가 없음
+    expect(screen.getByText('내 종합').previousSibling).toHaveTextContent('4.3');
+
+    // 계산 보기: 항목 평균 × 내 비중
+    fireEvent.click(screen.getByRole('button', { name: '계산 보기 ›' }));
+    const sheet = await screen.findByRole('dialog', { name: '내 종합 별점' });
+    expect(sheet).toHaveTextContent('4.2×0.3 + 4.3×0.3 + 4.5×0.2 + 4.2×0.2 = 4.3');
+    fireEvent.click(within(sheet).getByRole('button', { name: '확인했어요' }));
 
     fireEvent.click(screen.getByRole('button', { name: '내 리뷰 보기' }));
     expect(router.state.location.pathname).toBe('/reviews/9');

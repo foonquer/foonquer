@@ -74,9 +74,9 @@ function Preview({ p }: { p: RestaurantPreview }) {
           <p className={styles.rating}>
             {score ? (
               <>
-                <span className={styles.star}>★</span> {score}{' '}
-                <span className={styles.trustNote}>신뢰도 반영</span> · 인증 평가{' '}
-                {p.rating.reviewCount}
+                <span className={styles.star}>★</span> {score} 맛
+                {p.myOverallScore !== null && ` · 내 종합 ${formatScore(p.myOverallScore)}`} · 인증
+                평가 {p.rating.reviewCount}
               </>
             ) : (
               '아직 별점이 없어요'

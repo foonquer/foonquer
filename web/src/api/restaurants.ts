@@ -4,8 +4,16 @@ import { api } from '../lib/api';
 
 export type ConquestState = 'CONQUERED' | 'MOVING' | 'NOT_CONQUERED';
 
-/** score: 신뢰도 가중 별점 R (리뷰가 없거나 아직 계산 전이면 null → "아직 별점이 없어요") */
+/** score: 맛 별점 — 신뢰도 가중 별점 R (리뷰가 없거나 아직 계산 전이면 null → "아직 별점이 없어요") */
 export type Rating = { score: number | null; reviewCount: number };
+
+export type TasteKey = 'taste' | 'cleanliness' | 'portion' | 'service' | 'price';
+
+/** 내 종합 별점 = 항목 평균 × 내 취향 비중 (맛 별점이 없으면 score null) */
+export type MyOverall = {
+  score: number | null;
+  items: { key: TasteKey; average: number | null; weightPercent: number | null }[];
+};
 
 export type BusinessStatus = {
   isOpen: boolean;
@@ -48,6 +56,8 @@ export type RestaurantPreview = {
   dongName: string | null;
   distanceM: number | null;
   rating: Rating;
+  /** 내 종합 별점 ("★ 4.2 맛 · 내 종합 4.0") */
+  myOverallScore: number | null;
   /** 마패: 뒷광고·리뷰 이벤트가 확인된 가게 */
   hasMapae: boolean;
   businessStatus: BusinessStatus | null;
@@ -90,10 +100,11 @@ export type RestaurantDetail = {
   businessHours: Record<string, { open: string; close: string }[]> | null;
   businessStatus: BusinessStatus | null;
   rating: Rating;
+  /** 항목별 평균의 "내 종합"과 계산 보기 시트 */
+  myOverall: MyOverall;
   /** 마패: 뒷광고·리뷰 이벤트가 확인된 가게 → "리뷰 이벤트를 하는 가게입니다" */
   hasMapae: boolean;
   stats: {
-    taste: number | null;
     cleanliness: number | null;
     portion: number | null;
     service: number | null;
@@ -137,6 +148,8 @@ export type RestaurantCardItem = {
   categoryName: string | null;
   distanceM: number | null;
   rating: Rating;
+  /** 내 종합 별점 ("★ 4.6 맛 · 내 종합 4.4") */
+  myOverallScore: number | null;
   hasMapae: boolean;
   revisitRate: number | null;
   localVisitRate: number | null;

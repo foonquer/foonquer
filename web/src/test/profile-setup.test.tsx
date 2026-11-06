@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { fail, mockApi, ok } from './http';
@@ -61,7 +61,7 @@ function profileApi(extra = {}) {
   });
 }
 
-/** S-04 닉네임 → S-05 성별·나이대까지 채우고 S-06으로 */
+/** S-04 닉네임 → S-05 성별·나이대 → S-05-1 좋아하는 음식 → S-05-2 중요하게 보는 것까지 채우고 S-06으로 */
 async function goToRegionStep() {
   fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '아기깨비' } });
   await screen.findByText(/사용할 수 있는/, {}, { timeout: 2000 });
@@ -74,6 +74,17 @@ async function goToRegionStep() {
   expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
   fireEvent.click(screen.getByRole('checkbox', { name: '고깃집' }));
   fireEvent.click(screen.getByRole('checkbox', { name: '한식' }));
+  fireEvent.click(screen.getByRole('button', { name: '다음' }));
+  // S-05-2 중요하게 보는 것: 고르지 않으면 모두 보통
+  await screen.findByText('2/3 · 중요하게 보는 것');
+  fireEvent.click(
+    within(screen.getByRole('radiogroup', { name: '맛 중요도' })).getByRole('radio', {
+      name: '아주 중요',
+    }),
+  );
+  expect(
+    screen.getByText('맛 43% · 청결 15% · 양 14% · 서비스 14% · 가격 14%'),
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '다음' }));
   await screen.findByText('3/3 · 내 동네');
 }
@@ -109,6 +120,13 @@ describe('프로필 설정 (S-04 ~ S-07)', () => {
       ageGroup: 20,
       localRegionIds: [11],
       preferredCategoryIds: [1, 6], // 칩 순서대로
+      tasteWeights: {
+        taste: 'VERY',
+        cleanliness: 'NORMAL',
+        portion: 'NORMAL',
+        service: 'NORMAL',
+        price: 'NORMAL',
+      },
     });
 
     fireEvent.click(screen.getByRole('button', { name: '첫 맛집 찾으러 가기' }));

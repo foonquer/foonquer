@@ -1,0 +1,407 @@
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px var(--mk-side) 24px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--mk-white);
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.cardHint {
+  margin-top: -4px;
+  font-size: 11px;
+  color: var(--mk-muted);
+}
+
+.scoreRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 36px;
+}
+
+.scoreLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mk-ink);
+}
+
+.scoreNote {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -4px;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--mk-muted);
+}
+
+.linkButton {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mk-forest);
+  text-decoration: underline;
+}
+
+.aspects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.aspect {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--mk-line);
+  border-radius: 16px;
+  background: var(--mk-white);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mk-ink);
+}
+
+.aspect[data-polarity='G'] {
+  border-color: var(--mk-green);
+  background: var(--mk-green-50);
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.aspect[data-polarity='B'] {
+  border-color: var(--mk-coral);
+  background: var(--mk-coral-50);
+  font-weight: 700;
+  color: var(--mk-coral-text);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 72px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: #f4f6f2;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.contentFoot {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--mk-green);
+}
+
+.contentFoot span:last-child {
+  color: var(--mk-muted);
+}
+
+.photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.photo {
+  position: relative;
+  width: 64px;
+  height: 64px;
+}
+
+.photo img {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.photo button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(36, 40, 36, 0.8);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--mk-white);
+}
+
+.addPhoto {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border: 1px dashed var(--mk-line-strong);
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--mk-muted);
+}
+
+.addPhoto span:first-child {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.sheetTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.sheetNote {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+}
+
+.detailCriteria {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 0 18px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--mk-ink);
+}
+
+.detailCriteriaHead {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.star {
+  color: var(--mk-star);
+}
+
+.emptyStar {
+  color: #dfe3da;
+}
+
+.detailCriteriaExample {
+  color: var(--mk-muted);
+}
+
+/* 맛 별점 화면 */
+.rating {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px var(--mk-side);
+  text-align: center;
+}
+
+.chip {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: var(--mk-green-100);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.ratingTitle {
+  margin-top: 10px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.ratingSub {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--mk-muted);
+}
+
+.stars {
+  margin-top: 26px;
+}
+
+.scoreText {
+  min-height: 24px;
+  margin-top: 18px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.scoreText[data-empty='true'] {
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.criteriaLink {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-forest);
+  text-decoration: underline;
+}
+
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: var(--mk-green-100);
+}
+
+.hero img {
+  width: 112px;
+}
+
+.heroSmall {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--mk-green-100);
+}
+
+.heroSmall img {
+  width: 56px;
+}
+
+.headCenter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.headTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.headSub {
+  font-size: 13px;
+  color: var(--mk-muted);
+}
+
+.hint {
+  font-size: 12px;
+  text-align: center;
+  color: var(--mk-coral-text);
+}
+
+/* 리뷰 목록 */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.count {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.select {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--mk-line);
+  border-radius: 10px;
+  background: var(--mk-white);
+  font: inherit;
+  font-size: 12px;
+  color: var(--mk-ink);
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.summaryScore {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.summaryText {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+}
+
+.more {
+  align-self: center;
+}
+
+.restaurantCard {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--mk-white);
+}
+
+.restaurantName {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.restaurantMeta {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.notice {
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--mk-muted);
+}

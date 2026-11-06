@@ -67,13 +67,6 @@
   color: var(--mk-star);
 }
 
-/* 신뢰도 가중 별점이라는 안내 (계산식 문서 5. 운영 규칙) */
-.trustNote {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--mk-subtle);
-}
-
 .meta {
   margin-top: 6px;
   font-size: 12px;

@@ -22,3 +22,8 @@ export function euro(word: string) {
 export function eulReul(word: string) {
   return `${word}${finalConsonant(word) === 0 ? '를' : '을'}`;
 }
+
+/** 은/는 (새맛집은, 마포숯불갈비는) */
+export function eunNeun(word: string) {
+  return `${word}${finalConsonant(word) === 0 ? '는' : '은'}`;
+}

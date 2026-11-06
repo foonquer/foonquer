@@ -1,14 +1,22 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import type { Dong } from '../../api/regions';
-import { completeProfile, type AgeGroup, type Gender, type Welcome } from '../../api/users';
+import {
+  completeProfile,
+  type AgeGroup,
+  type Gender,
+  type TasteWeights,
+  type Welcome,
+} from '../../api/users';
 import { useToast } from '../../components/Toast';
 import { ApiError, errorMessage } from '../../lib/api';
 import { getSession, setNextAction, subscribeSession } from '../../lib/session';
+import { DEFAULT_TASTE_WEIGHTS } from '../../lib/taste';
 import { FoodStep } from './FoodStep';
 import { InfoStep } from './InfoStep';
 import { NicknameStep } from './NicknameStep';
 import { RegionStep } from './RegionStep';
+import { TasteStep } from './TasteStep';
 import { WelcomeStep } from './WelcomeStep';
 
 export type ProfileDraft = {
@@ -17,10 +25,12 @@ export type ProfileDraft = {
   ageGroup: AgeGroup | null;
   /** S-05-1 좋아하는 음식 (카테고리 id) */
   foods: number[];
+  /** S-05-2 중요하게 보는 것 (기본: 모두 보통) */
+  taste: TasteWeights;
   regions: Dong[];
 };
 
-const STEPS = ['nickname', 'info', 'food', 'region'] as const;
+const STEPS = ['nickname', 'info', 'food', 'taste', 'region'] as const;
 type Step = (typeof STEPS)[number];
 
 type Completed = { welcome: Welcome; draft: ProfileDraft };
@@ -36,7 +46,8 @@ subscribeSession(() => {
 });
 
 /**
- * 프로필 설정 S-04 닉네임 → S-05 성별·나이대 → S-05-1 좋아하는 음식 → S-06 내 동네 → (USER-03 저장) → S-07 가입 완료.
+ * 프로필 설정 S-04 닉네임 → S-05 성별·나이대 → S-05-1 좋아하는 음식 → S-05-2 중요하게 보는 것 → S-06 내 동네
+ * → (USER-03 저장) → S-07 가입 완료.
  * 단계는 주소(?step=)에 남겨 브라우저 뒤로 가기로 이전 단계로 갈 수 있게 한다.
  */
 export function ProfileSetupPage() {
@@ -48,6 +59,7 @@ export function ProfileSetupPage() {
     gender: null,
     ageGroup: null,
     foods: [],
+    taste: DEFAULT_TASTE_WEIGHTS,
     regions: [],
   });
   const [welcome, setWelcome] = useState<Completed | null>(() => completed);
@@ -61,7 +73,7 @@ export function ProfileSetupPage() {
     s === 'nickname' ||
     (s === 'info' && !!draft.nickname) ||
     (s === 'food' && !!draft.nickname && !!draft.gender && !!draft.ageGroup) ||
-    (s === 'region' &&
+    ((s === 'taste' || s === 'region') &&
       !!draft.nickname &&
       !!draft.gender &&
       !!draft.ageGroup &&
@@ -79,6 +91,7 @@ export function ProfileSetupPage() {
         ageGroup: draft.ageGroup,
         localRegionIds: draft.regions.map((r) => r.regionId),
         preferredCategoryIds: draft.foods,
+        tasteWeights: draft.taste,
       });
       // 아직 nextAction을 HOME으로 바꾸지 않는다 (바꾸면 라우트 가드가 바로 홈으로 보낸다).
       // S-07에서 "첫 맛집 찾으러 가기"를 누를 때 바꾼다.
@@ -124,6 +137,14 @@ export function ProfileSetupPage() {
         <FoodStep
           categoryIds={draft.foods}
           onChange={(foods) => update({ foods })}
+          onNext={() => goTo('taste')}
+        />
+      );
+    case 'taste':
+      return (
+        <TasteStep
+          weights={draft.taste}
+          onChange={(taste) => update({ taste })}
           onNext={() => goTo('region')}
         />
       );

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { logout } from '../../api/auth';
-import { getMe } from '../../api/users';
+import { getMe, getTasteWeights, type TasteWeights } from '../../api/users';
 import { AppHeader } from '../../components/AppHeader';
 import { Dialog } from '../../components/Dialog';
 import { MenuList, MenuSection } from '../../components/MenuList';
@@ -9,6 +9,7 @@ import { useToast } from '../../components/Toast';
 import { errorMessage } from '../../lib/api';
 import { getCurrentCoords } from '../../lib/geolocation';
 import { signOut } from '../../lib/session';
+import { weightBrief } from '../../lib/taste';
 import { useAsync } from '../../lib/useAsync';
 import styles from './SettingsPage.module.css';
 
@@ -48,10 +49,11 @@ function useLocationPermission() {
   return [state, setState] as const;
 }
 
-/** 설정 /me/settings: 위치 권한·내 동네·연결된 계정(카카오)·로그아웃(AUTH-11) */
+/** 설정 /me/settings: 내 취향·위치 권한·내 동네·연결된 계정(카카오)·로그아웃(AUTH-11) */
 export function SettingsPage() {
   const toast = useToast();
   const me = useAsync(getMe, []);
+  const taste = useAsync(getTasteWeights, []);
   const [permission, setPermission] = useLocationPermission();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -96,6 +98,29 @@ export function SettingsPage() {
     <Screen>
       <AppHeader title="설정" />
       <div className={styles.content}>
+        <MenuSection title="추천 · 별점">
+          <MenuList
+            items={[
+              {
+                label: (
+                  <>
+                    내 취향 설정
+                    <span className={styles.sub}>내 종합 별점 계산에 쓰여요</span>
+                  </>
+                ),
+                value: taste.data
+                  ? weightBrief(
+                      Object.fromEntries(
+                        taste.data.items.map((i) => [i.key, i.level]),
+                      ) as TasteWeights,
+                    )
+                  : '',
+                to: '/me/taste',
+              },
+            ]}
+          />
+        </MenuSection>
+
         <MenuSection title="위치">
           <MenuList
             items={[

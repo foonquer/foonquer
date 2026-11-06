@@ -52,8 +52,8 @@
   width: 12px;
 }
 
-/* 신뢰도 가중 별점이라는 안내 (계산식 문서 5. 운영 규칙) */
-.trustNote {
+/* "인증 평가 128" */
+.reviewCount {
   font-size: 11px;
   font-weight: 500;
   color: var(--mk-subtle);
@@ -194,6 +194,7 @@
   font-size: 10px;
   font-weight: 500;
   color: var(--mk-muted);
+  white-space: nowrap;
 }
 
 .score[data-highlight='true'] {
@@ -246,4 +247,75 @@
 .footer > button:last-child {
   flex: 1;
   width: auto;
+}
+
+/* 피그마 3-2: 항목별 평균의 맛 자리에 "내 종합" (크림 바탕) */
+.score[data-tone='mine'] {
+  background: var(--mk-cream);
+}
+
+.score[data-tone='mine'] .value {
+  color: #b66a10;
+}
+
+.overallNote {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--mk-muted);
+}
+
+.overallNote button {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.overallNote button:disabled {
+  color: var(--mk-disabled-text);
+}
+
+.tasteLabel {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.criteria {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--mk-cream);
+  font-size: 12px;
+  text-align: left;
+  color: var(--mk-ink);
+}
+
+.band {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: #b66a10;
+}
+
+.criteriaLink {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-weight: 700;
+  color: #b66a10;
+}
+
+.reviews {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
 }

@@ -1,0 +1,166 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--mk-white);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.author {
+  flex: 1;
+  min-width: 0;
+}
+
+.nickname {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.authorMeta {
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--mk-muted);
+}
+
+.restaurant {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.date {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--mk-subtle);
+  white-space: nowrap;
+}
+
+.scores {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 12px;
+}
+
+.taste {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.star {
+  color: var(--mk-star);
+}
+
+.details {
+  color: var(--mk-muted);
+}
+
+.chips,
+.aspects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chips span,
+.aspects span {
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: #f1f4ee;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.chips span[data-tone='green'],
+.aspects span[data-polarity='G'] {
+  background: var(--mk-green-50);
+  color: var(--mk-forest);
+}
+
+.aspects span[data-polarity='B'] {
+  background: var(--mk-coral-50);
+  color: var(--mk-coral-text);
+}
+
+.content {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--mk-ink);
+  white-space: pre-wrap;
+  word-break: keep-all;
+}
+
+.empty {
+  font-size: 12px;
+  color: var(--mk-subtle);
+}
+
+.photos {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.photos img {
+  flex-shrink: 0;
+  width: 88px;
+  height: 88px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.reaction {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--mk-line);
+  border-radius: 15px;
+  background: var(--mk-white);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.reaction[aria-pressed='true'] {
+  border-color: var(--mk-green);
+  background: var(--mk-green-50);
+  color: var(--mk-forest);
+  font-weight: 700;
+}
+
+.helpfulCount {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.more {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mk-green);
+}

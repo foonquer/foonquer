@@ -11,14 +11,28 @@ import { HomePage } from './pages/home/HomePage';
 import { AddLocalRegionPage } from './pages/me/AddLocalRegionPage';
 import { LocalRegionsPage } from './pages/me/LocalRegionsPage';
 import { MyPage } from './pages/me/MyPage';
+import { MyReviewsPage } from './pages/me/MyReviewsPage';
 import { ProfileEditPage } from './pages/me/ProfileEditPage';
 import { SettingsPage } from './pages/me/SettingsPage';
+import { TasteWeightsPage } from './pages/me/TasteWeightsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ProfileSetupPage } from './pages/profile-setup/ProfileSetupPage';
 import { RecommendationListPage } from './pages/recommendations/RecommendationListPage';
 import { RecommendationsPage } from './pages/recommendations/RecommendationsPage';
 import { RestaurantDetailPage } from './pages/restaurant/RestaurantDetailPage';
+import { ConqueredPage } from './pages/review/ConqueredPage';
+import { RatingPage } from './pages/review/RatingPage';
+import { RestaurantReviewsPage } from './pages/review/RestaurantReviewsPage';
+import { ReviewDetailPage } from './pages/review/ReviewDetailPage';
+import { ReviewEditPage } from './pages/review/ReviewEditPage';
+import { ReviewWritePage } from './pages/review/ReviewWritePage';
+import { RewardPage } from './pages/review/RewardPage';
 import { SearchPage } from './pages/search/SearchPage';
+import { FollowPage } from './pages/visit/FollowPage';
+import { OnSitePage } from './pages/visit/OnSitePage';
+import { ReceiptPage } from './pages/visit/ReceiptPage';
+import { VerificationPage } from './pages/visit/VerificationPage';
+import { VisitNewPage } from './pages/visit/VisitNewPage';
 
 /**
  * 다른 사람이 맡은 화면 자리 (준비 중). 화면을 만들면 element만 바꾼다.
@@ -26,16 +40,8 @@ import { SearchPage } from './pages/search/SearchPage';
  */
 const placeholders: RouteObject[] = [
   { path: '/notifications', element: <ComingSoonPage title="알림" /> },
-  { path: '/visits/new', element: <ComingSoonPage title="방문 인증" /> }, // ?restaurantId=
-  { path: '/visits/:visitId/follow', element: <ComingSoonPage title="먹깨비 따라가기" /> },
-  { path: '/reviews/:reviewId', element: <ComingSoonPage title="내 리뷰" /> },
-  {
-    path: '/restaurants/:restaurantId/reviews',
-    element: <ComingSoonPage title="방문 인증 리뷰" />,
-  },
   { path: '/me/mukkaebi', element: <ComingSoonPage title="내 먹깨비 꾸미기" /> },
   { path: '/me/conquests', element: <ComingSoonPage title="정복 기록" /> },
-  { path: '/me/reviews', element: <ComingSoonPage title="내 리뷰" /> },
   { path: '/me/seasons', element: <ComingSoonPage title="시즌 기록 · 칭호" /> },
   { path: '/me/pick', element: <ComingSoonPage title="내 PICK" /> },
   { path: '/me/withdraw', element: <ComingSoonPage title="회원 탈퇴" /> },
@@ -94,6 +100,22 @@ export const routes: RouteObject[] = [
           { path: '/me/settings', element: <SettingsPage /> },
           { path: '/me/regions', element: <LocalRegionsPage /> },
           { path: '/me/regions/add', element: <AddLocalRegionPage /> },
+          { path: '/me/taste', element: <TasteWeightsPage /> },
+          { path: '/me/reviews', element: <MyReviewsPage /> },
+
+          // 방문 인증 → 별점 → 정복 → 세부평가 → 적립
+          { path: '/visits/new', element: <VisitNewPage /> }, // ?restaurantId= (없으면 홈 영수증)
+          { path: '/visits/new/on-site', element: <OnSitePage /> }, // ?restaurantId=
+          { path: '/visits/new/receipt', element: <ReceiptPage /> }, // ?restaurantId=
+          { path: '/visits/:visitId', element: <VerificationPage /> },
+          { path: '/visits/:visitId/follow', element: <FollowPage /> },
+          { path: '/visits/:visitId/rating', element: <RatingPage /> },
+          { path: '/visits/:visitId/conquered', element: <ConqueredPage /> },
+          { path: '/visits/:visitId/review', element: <ReviewWritePage /> },
+          { path: '/visits/:visitId/reward', element: <RewardPage /> },
+          { path: '/restaurants/:restaurantId/reviews', element: <RestaurantReviewsPage /> },
+          { path: '/reviews/:reviewId', element: <ReviewDetailPage /> },
+          { path: '/reviews/:reviewId/edit', element: <ReviewEditPage /> },
           ...placeholders,
         ],
       },
