@@ -13,7 +13,7 @@ const mukkaebi = (patch: Partial<MyMukkaebi> = {}): MyMukkaebi => ({
   stageName: '아기',
   sizePercent: 60,
   equipped: {
-    hat: { itemId: 2, code: 'HAT_STRAWBERRY', name: '딸기 모자' },
+    hat: { itemId: 2, code: 'HAT_STRAWBERRY', name: '딸기 모자', rarity: 'N' },
     face: null,
     prop: null,
     skin: null,
@@ -121,6 +121,36 @@ describe('상점', () => {
     expect(server.calls('PUT /characters/me/appearance')[0].body).toEqual({ hatItemId: 3 });
   });
 
+  it('탭을 바꾸는 동안에도 탭 줄과 세트 배너는 그대로 있다', async () => {
+    mockApi({
+      'GET /shop/items': ({ query }) =>
+        ok({
+          category: query.get('category'),
+          pointBalance: 1280,
+          sets: [
+            {
+              setId: 1,
+              code: 'SET_STRAWBERRY',
+              name: '딸기 세트',
+              description: '모자와 소품',
+              badge: null,
+              price: 800,
+              originalPrice: 1000,
+              purchasable: true,
+              items: [],
+            },
+          ],
+          items: [shopItem({})],
+        }),
+    });
+    renderRoute('/me/mukkaebi/shop');
+    await screen.findByRole('button', { name: /병아리 모자/ });
+    fireEvent.click(screen.getByRole('tab', { name: '얼굴' }));
+    expect(screen.getByRole('tab', { name: '얼굴' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('button', { name: /딸기 세트/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /병아리 모자/ })).toBeInTheDocument();
+  });
+
   it('먹포인트가 모자라면 부족한 만큼 알려 준다', async () => {
     mockApi({
       'GET /shop/items': ok({
@@ -191,6 +221,18 @@ describe('아이템 상자·축하·먹포인트', () => {
             occurredAt: '2026-09-25T12:00:00+09:00',
             data: { fromLevel: 9, toLevel: 10, stage: 'KID', stageName: '어린이', itemBoxCount: 1 },
           },
+          {
+            celebrationId: 'LEVEL_UP:11',
+            type: 'LEVEL_UP',
+            occurredAt: '2026-09-26T12:00:00+09:00',
+            data: {
+              fromLevel: 10,
+              toLevel: 11,
+              stage: 'KID',
+              stageName: '어린이',
+              itemBoxCount: 0,
+            },
+          },
         ],
       }),
       'PATCH /users/me/celebrations/:id/seen': ok({ seen: true }),
@@ -206,6 +248,14 @@ describe('아이템 상자·축하·먹포인트', () => {
     expect(server.calls('PATCH /users/me/celebrations/:id/seen')[0].path).toBe(
       '/users/me/celebrations/LEVEL_UP%3A10/seen',
     );
+
+    // 다음 축하는 Escape로도 닫는다
+    const next = await screen.findByRole('dialog', { name: 'LV.10 → LV.11' });
+    fireEvent.keyDown(within(next).getByRole('button', { name: '나중에 할게요' }), {
+      key: 'Escape',
+    });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(server.calls('PATCH /users/me/celebrations/:id/seen')).toHaveLength(2);
   });
 
   it('먹포인트 내역을 날짜별로 묶고 모은/쓴 내역으로 거른다', async () => {
