@@ -586,7 +586,7 @@ develop push → GitHub Actions(deploy.yml) → Docker 이미지 빌드 → GHCR
 1. `server/`·`docker-compose.yml`·`deploy/` 등 서버 관련 파일이 바뀐 커밋이 develop에 올라오면 GitHub Actions가 돈다 (`web/`·`docs/`만 바뀌면 돌지 않는다). Actions 화면에서 직접 돌릴 수도 있다(workflow_dispatch).
 2. `server/Dockerfile`로 이미지를 빌드해 `ghcr.io/foonquer/foonquer-server`에 `latest`와 커밋 SHA 태그로 올린다.
 3. VM의 22번 포트는 IAP 대역(`35.235.240.0/20`)에만 열고, `gcloud compute ssh --tunnel-through-iap`로 `deploy-remote.sh`를 실행한다.
-4. VM에서: 워크플로가 보낸 파일(`docker-compose.yml`·`deploy/`·`scripts/backup-db.sh`)을 `~/foonquer`에 풀기 → Secret Manager로 `.env` 생성 → 이미지 pull → DB 컨테이너를 띄우고 기다림 → `prisma migrate deploy` → seed → 컨테이너 재시작. 저장소가 비공개라 VM은 저장소를 clone하지 않는다.
+4. VM에서: 워크플로가 보낸 파일(`docker-compose.yml`·`deploy/`·`scripts/backup-db.sh`)을 `~/foonquer`에 풀기 → Secret Manager로 `.env` 생성 → 이미지 pull → DB 컨테이너를 띄우고 기다림 → `prisma migrate deploy` → seed → 컨테이너 재시작. VM은 저장소를 clone하지 않고, 워크플로가 보낸 이번 커밋의 파일만 쓴다.
 5. 끝나면 `https://{API_DOMAIN}/api/v1/health`로 확인한다.
 
 VM 안 컨테이너 (`docker-compose.yml`):
