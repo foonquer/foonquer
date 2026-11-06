@@ -1,0 +1,85 @@
+.stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #ffe9ef 0%, #fff4f6 100%);
+  overflow: hidden;
+}
+
+.stage[data-bg='true'] {
+  background: linear-gradient(180deg, #dceee0 0%, #f1f7ee 100%);
+}
+
+.badge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: var(--mk-forest);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-white);
+}
+
+.bgName {
+  position: absolute;
+  bottom: 12px;
+  left: 14px;
+  padding: 3px 9px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.body {
+  max-height: 72%;
+}
+
+.spot {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.spot[data-spot='HAT'] {
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.spot[data-spot='FACE'] {
+  top: 44%;
+  left: 14%;
+}
+
+.spot[data-spot='PROP'] {
+  top: 44%;
+  right: 14%;
+}
+
+.spot[data-spot='CLUB'] {
+  bottom: 16px;
+  right: 14%;
+}
+
+.spot[data-spot='SKIN'] {
+  bottom: 16px;
+  left: 14%;
+}
+
+.spotName {
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--mk-ink);
+  white-space: nowrap;
+}

@@ -1,0 +1,38 @@
+.icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: #eef2ea;
+  color: #8aa58f;
+}
+
+.icon svg {
+  fill: currentColor;
+}
+
+.icon[data-rarity='R'] {
+  background: #e4eefb;
+  color: #4f7fc9;
+}
+
+.icon[data-rarity='E'] {
+  background: #f0e6fa;
+  color: #8b5cc8;
+}
+
+.icon[data-rarity='L'] {
+  background: #fff0d6;
+  color: #d9902a;
+}
+
+.icon[data-rarity='H'] {
+  background: #fff4c7;
+  color: #c9a227;
+}
+
+.icon[data-owned='false'] {
+  background: #eceeea;
+  color: #c9cec5;
+}
