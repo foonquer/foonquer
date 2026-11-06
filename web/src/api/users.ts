@@ -38,6 +38,8 @@ export type MyProfile = {
   gender: Gender | null;
   ageGroup: AgeGroup | null;
   status: 'P' | 'A' | 'S';
+  /** 운영자면 내 정보에 운영 관리 메뉴 */
+  isAdmin: boolean;
   localRegions: LocalRegion[];
   regDate: string;
 };
