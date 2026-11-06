@@ -600,12 +600,12 @@ GCP에서 준비할 것:
 
 | 항목 | 내용 |
 | --- | --- |
-| VM | `foonquer-api`, e2-small, Ubuntu 24.04, 디스크 20GB, 고정 외부 IP. 액세스 범위(scope) `cloud-platform`으로 생성(기본 범위로는 Secret Manager를 부를 수 없다), Docker 설치, 배포용 사용자 `deploy`(docker 그룹). SSH 사용자가 암호 없이 `deploy`로 전환할 수 있어야 한다(`gcloud compute ssh` 사용자는 기본으로 된다) |
+| VM | `foonquer-api`, e2-small, Ubuntu 24.04, 디스크 20GB, 고정 외부 IP, 메타데이터 `enable-guest-attributes=TRUE`(배포 SSH가 VM 호스트 키를 확인한다). 액세스 범위(scope) `cloud-platform`으로 생성(기본 범위로는 Secret Manager를 부를 수 없다), Docker 설치, 배포용 사용자 `deploy`(docker 그룹). SSH 사용자가 암호 없이 `deploy`로 전환할 수 있어야 한다(`gcloud compute ssh` 사용자는 기본으로 된다) |
 | 방화벽 | 80·443은 모두에게, 22는 IAP 대역(`35.235.240.0/20`)에만 |
-| VM 서비스 계정 | `roles/secretmanager.secretAccessor`, 사진 두 버킷의 `roles/storage.objectAdmin`과 서명 권한 `roles/iam.serviceAccountTokenCreator`(자기 자신에게, 업로드 signed URL), 백업 버킷의 `roles/storage.objectCreator` |
+| VM 서비스 계정 | `foonquer-vm`. `roles/secretmanager.secretAccessor`, 사진 두 버킷의 `roles/storage.objectAdmin`과 서명 권한 `roles/iam.serviceAccountTokenCreator`(자기 자신에게, 업로드 signed URL), 백업 버킷의 `roles/storage.objectCreator`·`roles/storage.objectViewer`(복구할 때 읽기) |
 | Secret Manager | `foonquer-prod-env` — 운영 `.env` 내용 (아래 표) |
 | Cloud Storage | 공개 사진 버킷(`GCS_BUCKET`, 프로필 `profile/{회원 id}/`·리뷰 사진)은 `allUsers` 읽기 허용, 영수증·현장·문의 사진은 공개하지 않는 별도 버킷에 둔다(`GCS_PRIVATE_BUCKET`, `receipt/`·`site/`·`inquiry/` 폴더). 브라우저에서 signed URL로 바로 올리므로(USER-02, UPLOAD-01) 두 버킷 모두 버킷 CORS에 웹 주소, `PUT`, 요청 헤더 `Content-Type`·`x-goog-content-length-range`·`x-goog-if-generation-match` 허용. DB 백업 버킷은 비공개, 30일 지나면 지우는 수명 주기 |
-| 배포용 서비스 계정 | `foonquer-deploy`. GitHub Actions가 VM에 IAP로 SSH할 권한만 준다 (`roles/compute.instanceAdmin.v1`, `roles/iap.tunnelResourceAccessor`, `roles/iam.serviceAccountUser`). 키 파일은 만들지 않고 Workload Identity Federation으로 이 저장소(`foonquer/foonquer`)의 Actions만 이 계정을 쓸 수 있게 한다 (풀 `github`, 공급자 `foonquer`, 조건 `assertion.repository=='foonquer/foonquer'`) |
+| 배포용 서비스 계정 | `foonquer-deploy`. GitHub Actions가 VM에 IAP로 SSH할 권한만 준다 (`roles/compute.instanceAdmin.v1`, `roles/iap.tunnelResourceAccessor`, `roles/iam.serviceAccountUser`). 키 파일은 만들지 않고 Workload Identity Federation으로 이 저장소(`foonquer/foonquer`)의 Actions만 이 계정을 쓸 수 있게 한다: 풀 `github`, 공급자 `foonquer`(발급자 `https://token.actions.githubusercontent.com`, 조건 `assertion.repository=='foonquer/foonquer'`), 그리고 `foonquer-deploy`에 연합 주체 `principalSet://iam.googleapis.com/projects/<프로젝트 번호>/locations/global/workloadIdentityPools/github/attribute.repository/foonquer/foonquer`의 `roles/iam.workloadIdentityUser`. VM이 한 대뿐인 프로젝트라 `instanceAdmin.v1`은 프로젝트 단위로 준다(`gcloud compute ssh`가 프로젝트 메타데이터도 읽는다). VM을 늘리면 그 VM으로 좁힌다 |
 
 운영 `.env`(Secret Manager `foonquer-prod-env`)에 넣는 값 — 값은 로컬 `.env`와 같은 뜻이고, 운영에서 다른 것만 적었다:
 
@@ -613,7 +613,7 @@ GCP에서 준비할 것:
 | --- | --- |
 | `NODE_ENV` | `production` |
 | `API_DOMAIN` | `api.foonquer.me` (caddy 인증서 도메인) |
-| `DATABASE_URL` | `mysql://foonquer:<MYSQL_PASSWORD>@db:3306/foonquer` |
+| `DATABASE_URL` | `mysql://foonquer:<MYSQL_PASSWORD>@db:3306/foonquer` (비밀번호에 `@ : / ? # %` 같은 문자가 있으면 이 자리에는 percent-encode한 값. 지금 값은 16진수라 그대로) |
 | `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD` | 각각 임의의 긴 문자열 (db 컨테이너가 처음 뜰 때 계정을 만든다. 나중에 바꾸려면 DB 안에서도 바꿔야 한다) |
 | `CORS_ORIGINS`, `FRONTEND_URL` | `https://foonquer.me` |
 | `API_BASE_URL` | `https://api.foonquer.me` |
