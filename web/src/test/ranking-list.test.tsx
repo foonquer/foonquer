@@ -454,6 +454,15 @@ describe('내 기록', () => {
     fireEvent.click(screen.getByRole('radio', { name: '크림' }));
     expect(screen.getByRole('radio', { name: '크림' })).toHaveAttribute('aria-checked', 'true');
     expect(decodeURIComponent((card as HTMLImageElement).src)).toContain('#fdf1d6');
+    // 라디오 묶음: 고른 테마만 탭 순서에 있고, 화살표로 옮긴다
+    expect(screen.getAllByRole('radio').map((r) => r.getAttribute('tabindex'))).toEqual([
+      '-1',
+      '0',
+      '-1',
+    ]);
+    fireEvent.keyDown(screen.getByRole('radio', { name: '크림' }), { key: 'ArrowRight' });
+    expect(screen.getByRole('radio', { name: '크림' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getAllByRole('radio')[2]).toHaveAttribute('aria-checked', 'true');
 
     fireEvent.click(screen.getByRole('button', { name: '링크 복사' }));
     expect(await screen.findByText('내 PICK 링크를 복사했어요')).toBeInTheDocument();

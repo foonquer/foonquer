@@ -1,5 +1,6 @@
 import { MemberStatus } from '../common/auth/member-status';
 import { addDays } from '../common/time';
+import { env } from '../config/env';
 import { prisma } from '../lib/prisma';
 import { type BucketKind, deleteObjectQuietly, listObjects } from '../lib/storage';
 import { KEEP_DAYS } from '../modules/notification/notification.service';
@@ -268,7 +269,9 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 /**
  * review-ai: 아직 분석하지 않은 공개 리뷰 글을 Gemini로 분석해 ai_result·ai_checked_at·ad_suspected를 채운다.
  * 키가 없으면 건너뛴다. 호출 한도(429)에 걸리면 멈추고 다음 실행에서 이어서 한다.
- * 리뷰 하나가 실패하면 ai_checked_at을 비워 둔 채 다음 실행에서 다시 한다
+ * 일시적으로 실패한 리뷰는 ai_checked_at을 비워 둔 채 다음 실행에서 다시 한다.
+ * 200인데 답을 읽을 수 없는 리뷰는 다시 해도 같아서 ai_result에 unreadable을 남기고 대기열에서 뺀다
+ * (그대로 두면 그런 글이 50개 쌓였을 때 뒤의 리뷰를 영영 분석하지 못한다)
  */
 export async function runReviewAiJob(now = new Date(), wait = sleep) {
   if (!reviewAiEnabled()) return { skipped: 'GEMINI_API_KEY가 없어 분석하지 않았어요' };
@@ -281,6 +284,7 @@ export async function runReviewAiJob(now = new Date(), wait = sleep) {
   let analyzed = 0;
   let adSuspected = 0;
   let errors = 0;
+  let unreadable = 0;
   let rateLimited = false;
   for (const [i, review] of reviews.entries()) {
     if (i > 0) await wait(REVIEW_AI_INTERVAL_MS);
@@ -297,15 +301,28 @@ export async function runReviewAiJob(now = new Date(), wait = sleep) {
       continue;
     }
     // 분석하는 사이에 글을 고쳤으면 저장하지 않는다 (고친 글은 다음 실행에서 다시 분석)
+    const where = { id: review.id, content: review.content, aiCheckedAt: null };
+    if (result === 'UNREADABLE') {
+      const marked = await prisma.review.updateMany({
+        where,
+        data: {
+          aiResult: { unreadable: true, model: env.GEMINI_MODEL },
+          aiCheckedAt: now,
+          adSuspected: false,
+        },
+      });
+      unreadable += marked.count;
+      continue;
+    }
     const saved = await prisma.review.updateMany({
-      where: { id: review.id, content: review.content, aiCheckedAt: null },
+      where,
       data: { aiResult: result, aiCheckedAt: now, adSuspected: result.adSuspected },
     });
     if (saved.count === 0) continue;
     analyzed += 1;
     if (result.adSuspected) adSuspected += 1;
   }
-  return { checked: reviews.length, analyzed, adSuspected, errors, rateLimited };
+  return { checked: reviews.length, analyzed, adSuspected, errors, unreadable, rateLimited };
 }
 
 export const JOBS = {

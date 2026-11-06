@@ -38,10 +38,22 @@ export type ReviewAiResult = z.infer<typeof answerSchema> & {
   imageCount: number;
 };
 
-/** 분석 결과. RATE_LIMITED면 호출 한도에 걸린 것(이번 작업은 멈춘다), null이면 이 리뷰만 실패 */
-export type ReviewAiOutcome = ReviewAiResult | 'RATE_LIMITED' | null;
+/**
+ * 분석 결과. RATE_LIMITED면 호출 한도에 걸린 것(이번 작업은 멈춘다),
+ * UNREADABLE이면 200인데 답을 읽을 수 없는 것(안전 필터로 답이 비었거나 스키마와 다름 — 다시 해도 같아서 대기열에서 뺀다),
+ * null이면 일시적 실패(5xx·시간 초과·네트워크 — 다음 실행에서 다시)
+ */
+export type ReviewAiOutcome = ReviewAiResult | 'RATE_LIMITED' | 'UNREADABLE' | null;
 
 type GenerateResponse = { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+
+const parseJson = (text: string | undefined): unknown => {
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    return null;
+  }
+};
 
 /** 키가 없으면 분석하지 않는다 (score_weight·ad_suspected는 그대로) */
 export const reviewAiEnabled = () => Boolean(env.GEMINI_API_KEY);
@@ -68,7 +80,7 @@ export async function analyzeReview(input: {
         generationConfig: {
           responseMimeType: 'application/json',
           responseSchema: SCHEMA,
-          temperature: 0,
+          // temperature·top_p·top_k는 3.5 Flash-Lite부터 쓰지 않는 값이라 넣지 않는다 (다음 세대는 400)
         },
       }),
       signal: AbortSignal.timeout(20_000),
@@ -79,11 +91,12 @@ export async function analyzeReview(input: {
       return null;
     }
     const body = (await res.json()) as GenerateResponse;
-    const text = body.candidates?.[0]?.content?.parts?.[0]?.text;
-    const answer = answerSchema.safeParse(text ? JSON.parse(text) : null);
+    const answer = answerSchema.safeParse(
+      parseJson(body.candidates?.[0]?.content?.parts?.[0]?.text),
+    );
     if (!answer.success) {
       console.error('Gemini 리뷰 분석 응답을 읽지 못했어요');
-      return null;
+      return 'UNREADABLE';
     }
     return {
       ...answer.data,

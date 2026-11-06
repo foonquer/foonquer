@@ -75,13 +75,22 @@ function copyOf(c: Celebration): Copy {
   }
 }
 
+/**
+ * 닫은 축하. 탭을 옮겨 새로 부른 목록이 확인 기록보다 먼저 와도 다시 띄우지 않는다.
+ * 확인 기록이 실패하면 빼서 다음에 부를 때 다시 띄운다
+ */
+const closedIds = new Set<string>();
+
 /** 아직 보지 않은 축하(레벨 업·티어 상승·배경·업적·시즌 결과)를 하나씩 띄운다 (CHAR-08·09) */
 export function CelebrationLayer() {
   const navigate = useNavigate();
   const { data } = useAsync(getCelebrations, []);
-  const [index, setIndex] = useState(0);
+  // 이 화면에서 닫은 것 (확인 기록이 실패해도 이 화면에서는 다시 띄우지 않는다)
+  const [skipped, setSkipped] = useState<string[]>([]);
   const box = useRef<HTMLElement>(null);
-  const current = data?.items[index];
+  const current = data?.items.find(
+    (c) => !skipped.includes(c.celebrationId) && !closedIds.has(c.celebrationId),
+  );
   useModalFocus(Boolean(current), box);
 
   if (!current) return null;
@@ -89,9 +98,11 @@ export function CelebrationLayer() {
   // 배경을 얻었으면 먹깨비 대신 그 구 배경 그림
   const bgArt = current.type === 'BACKGROUND' ? backgroundArt(current.data.bgKey) : undefined;
   const close = (to?: string) => {
+    const id = current.celebrationId;
     // 확인 기록이 실패해도 화면은 넘긴다 (다음에 다시 뜬다)
-    void markCelebrationSeen(current.celebrationId).catch(() => undefined);
-    setIndex((i) => i + 1);
+    closedIds.add(id);
+    void markCelebrationSeen(id).catch(() => closedIds.delete(id));
+    setSkipped((s) => [...s, id]);
     if (to) navigate(to);
   };
 

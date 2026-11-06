@@ -89,6 +89,7 @@ describe('review-ai 주기 작업 (Gemini 리뷰 분석)', () => {
       analyzed: 2,
       adSuspected: 1,
       errors: 0,
+      unreadable: 0,
       rateLimited: false,
     });
     const [url, init] = fetch.mock.calls[0];
@@ -96,9 +97,10 @@ describe('review-ai 주기 작업 (Gemini 리뷰 분석)', () => {
       `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent`,
     );
     expect(new Headers(init.headers).get('x-goog-api-key')).toBe('test-key');
-    expect(JSON.parse(init.body as string).generationConfig).toMatchObject({
-      responseMimeType: 'application/json',
-    });
+    const config = JSON.parse(init.body as string).generationConfig;
+    expect(config).toMatchObject({ responseMimeType: 'application/json' });
+    // 3.5 Flash-Lite부터 쓰지 않는 샘플링 값은 보내지 않는다
+    expect(config).not.toHaveProperty('temperature');
 
     const saved = await prisma.review.findUniqueOrThrow({ where: { id: ad.id } });
     expect(saved).toMatchObject({ adSuspected: true, aiCheckedAt: now });
@@ -138,6 +140,7 @@ describe('review-ai 주기 작업 (Gemini 리뷰 분석)', () => {
       analyzed: 0,
       adSuspected: 0,
       errors: 1,
+      unreadable: 0,
       rateLimited: true,
     });
     expect(fetch).toHaveBeenCalledTimes(2);
@@ -146,6 +149,62 @@ describe('review-ai 주기 작업 (Gemini 리뷰 분석)', () => {
       select: { aiCheckedAt: true },
     });
     expect(rows.every((r) => r.aiCheckedAt === null)).toBe(true);
+  });
+
+  it('200인데 답을 읽을 수 없으면 대기열에서 빼고(unreadable), 다음 실행에서 다시 부르지 않는다', async () => {
+    const review = await textReview('맛있어요');
+    const fetch = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '모름' }] } }] })),
+      ),
+    );
+    vi.stubGlobal('fetch', fetch);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const now = new Date('2026-11-06T03:00:00Z');
+
+    expect(await runReviewAiJob(now, noWait)).toMatchObject({
+      checked: 1,
+      analyzed: 0,
+      errors: 0,
+      unreadable: 1,
+    });
+    expect(await prisma.review.findUniqueOrThrow({ where: { id: review.id } })).toMatchObject({
+      aiCheckedAt: now,
+      adSuspected: false,
+      aiResult: { unreadable: true, model: env.GEMINI_MODEL },
+    });
+    expect(await runReviewAiJob(now, noWait)).toMatchObject({ checked: 0 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('분석하는 사이에 글을 고치면 결과를 저장하지 않고, 고친 글은 다음 실행에서 다시 분석한다', async () => {
+    const review = await textReview('사장님께 서비스 받고 작성');
+    let edit = true;
+    const fetch = vi.fn(async () => {
+      if (edit) {
+        edit = false;
+        await prisma.review.update({
+          where: { id: review.id },
+          data: { content: '내 돈 내고 먹었어요' },
+        });
+        return answer({ adSuspected: true, adEvidence: '서비스 받고 작성', aiLikeTone: false });
+      }
+      return answer({ adSuspected: false, adEvidence: null, aiLikeTone: false });
+    });
+    vi.stubGlobal('fetch', fetch);
+
+    expect(await runReviewAiJob(new Date(), noWait)).toMatchObject({ checked: 1, analyzed: 0 });
+    expect(await prisma.review.findUniqueOrThrow({ where: { id: review.id } })).toMatchObject({
+      aiResult: null,
+      aiCheckedAt: null,
+      adSuspected: false,
+    });
+
+    expect(await runReviewAiJob(new Date(), noWait)).toMatchObject({ checked: 1, analyzed: 1 });
+    const body = JSON.parse(
+      (fetch.mock.calls[1] as unknown as [string, RequestInit])[1].body as string,
+    );
+    expect(body.contents[0].parts[0].text).toContain('내 돈 내고 먹었어요');
   });
 
   it('리뷰 글을 고치면 분석 결과를 지우고 다시 분석한다', async () => {

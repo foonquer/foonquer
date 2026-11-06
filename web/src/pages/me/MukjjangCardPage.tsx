@@ -7,6 +7,7 @@ import { AppHeader } from '../../components/AppHeader';
 import { Screen } from '../../components/Screen';
 import { EmptyState, Loading } from '../../components/StateViews';
 import { useToast } from '../../components/Toast';
+import { radioGroupKeyDown, radioTabIndex } from '../../lib/a11y';
 import { errorMessage } from '../../lib/api';
 import {
   CARD_THEMES,
@@ -18,6 +19,8 @@ import {
 } from '../../lib/mukjjangCard';
 import { useAsync } from '../../lib/useAsync';
 import styles from './MukjjangCard.module.css';
+
+const THEMES = Object.keys(CARD_THEMES) as CardTheme[];
 
 /** 이번 시즌에 먹짱이면 이번 시즌, 아니면 가장 최근에 먹짱이었던 지난 시즌 (먹짱이었던 적이 없으면 null) */
 async function loadCard(): Promise<{ card: CardData; userId: number } | null> {
@@ -142,14 +145,20 @@ export function MukjjangCardPage() {
           src={svgDataUrl(svg)}
           alt={`시즌 ${card.seasonNo} ${card.sigunguName} 먹짱 ${card.nickname} 카드`}
         />
-        <div className={styles.themes} role="radiogroup" aria-label="테마">
+        <div
+          className={styles.themes}
+          role="radiogroup"
+          aria-label="테마"
+          onKeyDown={(e) => radioGroupKeyDown(e, THEMES, theme, setTheme)}
+        >
           <span aria-hidden="true">테마</span>
-          {(Object.keys(CARD_THEMES) as CardTheme[]).map((t) => (
+          {THEMES.map((t) => (
             <button
               key={t}
               type="button"
               role="radio"
               aria-checked={t === theme}
+              tabIndex={radioTabIndex(t, theme, THEMES[0])}
               aria-label={CARD_THEMES[t].name}
               className={styles.swatch}
               style={{ background: CARD_THEMES[t].bg }}
