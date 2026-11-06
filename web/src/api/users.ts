@@ -161,3 +161,42 @@ export type MySummary = {
   pickCount: number;
 };
 export const getMySummary = () => api.get<MySummary>('/users/me/summary');
+
+export type NotificationSettings = {
+  conquestAlarm: boolean;
+  rankAlarm: boolean;
+  marketingAlarm: boolean;
+  marketingConsentChangedAt: string | null;
+};
+
+/** SET-01 설정 (알림 3종·내 동네·연결된 계정) */
+export const getSettings = () =>
+  api.get<{
+    notification: NotificationSettings;
+    localRegions: LocalRegion[];
+    account: { provider: 'KAKAO'; joinedAt: string };
+  }>('/users/me/settings');
+
+/** SET-02 알림 설정 (보낸 항목만) */
+export const updateNotificationSettings = (
+  body: Partial<Pick<NotificationSettings, 'conquestAlarm' | 'rankAlarm' | 'marketingAlarm'>>,
+) => api.call<NotificationSettings>('PATCH', '/users/me/notification-settings', { body });
+
+/** SET-03 탈퇴 전 안내 */
+export const getWithdrawalSummary = () =>
+  api.get<{
+    nickname: string | null;
+    conquest: { restaurantCount: number; sigunguCount: number };
+    pointBalance: number;
+    mukkaebi: { level: number; itemCount: number };
+    titleCount: number;
+    reviewCount: number;
+    reasonOptions: { code: string; label: string }[];
+  }>('/users/me/withdrawal-summary');
+
+/** SET-04 회원 탈퇴 (refreshToken 쿠키도 지운다) */
+export const withdraw = (body: {
+  confirmed: true;
+  reasonCode?: string | null;
+  reasonDetail?: string | null;
+}) => api.delete<{ withdrawnAt: string }>('/users/me', body);

@@ -6,7 +6,6 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { OAuthCallbackPage } from './pages/auth/OAuthCallbackPage';
 import { OnboardingPage } from './pages/auth/OnboardingPage';
 import { TermsPage } from './pages/auth/TermsPage';
-import { ComingSoonPage } from './pages/ComingSoonPage';
 import { HomePage } from './pages/home/HomePage';
 import { ListAddPage } from './pages/list/ListAddPage';
 import { ListPage } from './pages/list/ListPage';
@@ -17,6 +16,7 @@ import { MyPage } from './pages/me/MyPage';
 import { MyReviewsPage } from './pages/me/MyReviewsPage';
 import { PickEditPage } from './pages/me/PickEditPage';
 import { ProfileEditPage } from './pages/me/ProfileEditPage';
+import { WithdrawPage } from './pages/me/WithdrawPage';
 import { CollectionPage } from './pages/mukkaebi/CollectionPage';
 import { DecoratePage } from './pages/mukkaebi/DecoratePage';
 import { ItemBoxesPage } from './pages/mukkaebi/ItemBoxesPage';
@@ -42,22 +42,15 @@ import { ReviewEditPage } from './pages/review/ReviewEditPage';
 import { ReviewWritePage } from './pages/review/ReviewWritePage';
 import { RewardPage } from './pages/review/RewardPage';
 import { SearchPage } from './pages/search/SearchPage';
+import { NoticesPage } from './pages/support/NoticesPage';
+import { NotificationsPage } from './pages/support/NotificationsPage';
+import { SupportPage } from './pages/support/SupportPage';
+import { TermsViewPage } from './pages/support/TermsViewPage';
 import { FollowPage } from './pages/visit/FollowPage';
 import { OnSitePage } from './pages/visit/OnSitePage';
 import { ReceiptPage } from './pages/visit/ReceiptPage';
 import { VerificationPage } from './pages/visit/VerificationPage';
 import { VisitNewPage } from './pages/visit/VisitNewPage';
-
-/**
- * 다른 사람이 맡은 화면 자리 (준비 중). 화면을 만들면 element만 바꾼다.
- * 경로는 내 화면에서 이 화면으로 가는 버튼이 쓰고 있으니 바꾸면 같이 바꿔 주세요.
- */
-const placeholders: RouteObject[] = [
-  { path: '/notifications', element: <ComingSoonPage title="알림" /> },
-  { path: '/me/withdraw', element: <ComingSoonPage title="회원 탈퇴" /> },
-  { path: '/notices', element: <ComingSoonPage title="공지사항" /> },
-  { path: '/support', element: <ComingSoonPage title="고객센터" /> },
-];
 
 export const routes: RouteObject[] = [
   {
@@ -74,8 +67,8 @@ export const routes: RouteObject[] = [
 
       // 로그인 여부와 상관없이 (서버가 보내는 주소: 카카오 로그인 콜백)
       { path: '/oauth/callback', element: <OAuthCallbackPage /> }, // ?code= | ?error=
-      // 약관 전문은 가입 화면에서도 연다 (다른 사람 담당, 준비 중)
-      { path: '/terms', element: <ComingSoonPage title="이용약관 · 개인정보 처리방침" /> }, // ?type=
+      // 약관 전문은 가입 화면에서도 연다 (CS-07은 로그인 없이)
+      { path: '/terms', element: <TermsViewPage /> }, // ?type=&version=
 
       // 카카오로 처음 가입해 약관 동의가 남은 회원
       {
@@ -121,6 +114,10 @@ export const routes: RouteObject[] = [
           { path: '/me/mukkaebi/collection', element: <CollectionPage /> },
           { path: '/me/mukkaebi/boxes', element: <ItemBoxesPage /> },
           { path: '/me/points', element: <PointsPage /> },
+          { path: '/me/withdraw', element: <WithdrawPage /> },
+          { path: '/notifications', element: <NotificationsPage /> },
+          { path: '/notices', element: <NoticesPage /> }, // ?noticeId=
+          { path: '/support', element: <SupportPage /> }, // ?inquiryId=
           { path: '/list/add', element: <ListAddPage /> },
           { path: '/ranking/sigungus/:sigunguId', element: <SigunguRankingPage /> }, // ?seasonId=
           { path: '/ranking/sigungus/:sigunguId/status', element: <SigunguStatusPage /> },
@@ -138,7 +135,6 @@ export const routes: RouteObject[] = [
           { path: '/restaurants/:restaurantId/reviews', element: <RestaurantReviewsPage /> },
           { path: '/reviews/:reviewId', element: <ReviewDetailPage /> },
           { path: '/reviews/:reviewId/edit', element: <ReviewEditPage /> },
-          ...placeholders,
         ],
       },
 
