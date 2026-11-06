@@ -138,7 +138,7 @@ describe('CHAR 먹깨비', () => {
       faceItemId: face,
     });
     expect(saved.body.data.equipped).toMatchObject({
-      hat: { code: 'HAT_SPROUT' },
+      hat: { code: 'HAT_SPROUT', rarity: 'N' },
       face: { code: 'FACE_MUSTACHE' },
     });
     const notOwned = await api(me.id).put('/characters/me/appearance', {
