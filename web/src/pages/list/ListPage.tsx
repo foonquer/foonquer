@@ -202,7 +202,7 @@ export function ListPage() {
                   </span>
                   <span className={styles.rowDate}>
                     {tab === 'CONQUERED'
-                      ? `${formatKoreanDate(r.conqueredAt)} 정복`
+                      ? joinDot([formatKoreanDate(r.conqueredAt), '정복'])
                       : r.savedDaysAgo === 0
                         ? '오늘 저장'
                         : `${r.savedDaysAgo}일 전 저장`}
