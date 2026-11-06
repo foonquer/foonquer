@@ -3,9 +3,21 @@
 
 export type KakaoLatLng = { getLat(): number; getLng(): number };
 
+export type KakaoLatLngBounds = { extend(latlng: KakaoLatLng): void };
+
 export type KakaoMap = {
   setCenter(latlng: KakaoLatLng): void;
   getBounds(): { getSouthWest(): KakaoLatLng; getNorthEast(): KakaoLatLng };
+  /** 범위가 모두 보이게 (여백 위·오른쪽·아래·왼쪽 px) */
+  setBounds(
+    bounds: KakaoLatLngBounds,
+    paddingTop?: number,
+    paddingRight?: number,
+    paddingBottom?: number,
+    paddingLeft?: number,
+  ): void;
+  getLevel(): number;
+  setLevel(level: number, options?: { animate?: boolean }): void;
   relayout(): void;
 };
 
@@ -13,6 +25,7 @@ export type KakaoOverlay = { setMap(map: KakaoMap | null): void };
 
 export type KakaoMaps = {
   LatLng: new (lat: number, lng: number) => KakaoLatLng;
+  LatLngBounds: new () => KakaoLatLngBounds;
   Map: new (container: HTMLElement, options: { center: KakaoLatLng; level: number }) => KakaoMap;
   CustomOverlay: new (options: {
     position: KakaoLatLng;

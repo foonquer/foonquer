@@ -23,6 +23,7 @@ import { ItemBoxesPage } from './pages/mukkaebi/ItemBoxesPage';
 import { MukkaebiPage } from './pages/mukkaebi/MukkaebiPage';
 import { PointsPage } from './pages/mukkaebi/PointsPage';
 import { ShopPage } from './pages/mukkaebi/ShopPage';
+import { MukjjangCardPage } from './pages/me/MukjjangCardPage';
 import { SeasonsPage } from './pages/me/SeasonsPage';
 import { SettingsPage } from './pages/me/SettingsPage';
 import { TasteWeightsPage } from './pages/me/TasteWeightsPage';
@@ -52,6 +53,7 @@ import { ReceiptPage } from './pages/visit/ReceiptPage';
 import { VerificationPage } from './pages/visit/VerificationPage';
 import { VisitNewPage } from './pages/visit/VisitNewPage';
 import { ExplorerProfilePage } from './pages/explorer/ExplorerProfilePage';
+import { PickMapPage } from './pages/explorer/PickMapPage';
 import { ReportPage } from './pages/explorer/ReportPage';
 
 export const routes: RouteObject[] = [
@@ -109,6 +111,7 @@ export const routes: RouteObject[] = [
           { path: '/me/reviews', element: <MyReviewsPage /> },
           { path: '/me/conquests', element: <ConquestsPage /> }, // ?seasonId=
           { path: '/me/seasons', element: <SeasonsPage /> },
+          { path: '/me/mukjjang-card', element: <MukjjangCardPage /> },
           { path: '/me/pick', element: <PickEditPage /> },
           { path: '/me/mukkaebi', element: <MukkaebiPage /> },
           { path: '/me/mukkaebi/decorate', element: <DecoratePage /> }, // ?tab=
@@ -118,6 +121,7 @@ export const routes: RouteObject[] = [
           { path: '/me/points', element: <PointsPage /> },
           { path: '/me/withdraw', element: <WithdrawPage /> },
           { path: '/users/:userId', element: <ExplorerProfilePage /> }, // ?tab=pick|visited|reviews
+          { path: '/users/:userId/picks', element: <PickMapPage /> },
           { path: '/users/:userId/report', element: <ReportPage /> },
           { path: '/notifications', element: <NotificationsPage /> },
           { path: '/notices', element: <NoticesPage /> }, // ?noticeId=

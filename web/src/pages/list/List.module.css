@@ -44,47 +44,32 @@
 
 .board {
   position: relative;
-  height: 280px;
+  height: 330px;
   border-radius: 22px;
-  background:
-    radial-gradient(circle at 30% 40%, #dfeadb 0 22%, transparent 23%),
-    radial-gradient(circle at 70% 65%, #dfeadb 0 26%, transparent 27%), #e9f0e6;
   overflow: hidden;
 }
 
-.pin {
+/* 지도 위 칩 "전국 · 저장 5" */
+.mapChip {
   position: absolute;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: 3px 8px;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  padding: 5px 10px;
   border-radius: 10px;
   background: var(--mk-white);
   font-size: 11px;
   font-weight: 700;
-  color: var(--mk-ink);
-  white-space: nowrap;
-  box-shadow: 0 1px 4px rgba(36, 40, 36, 0.15);
-  transform: translate(-50%, -50%);
-}
-
-.pin span {
-  color: var(--mk-coral);
-}
-
-.pin[data-conquered='true'] span {
-  color: var(--mk-green);
-}
-
-.pin[aria-pressed='true'] {
-  background: var(--mk-forest);
-  color: var(--mk-white);
+  color: var(--mk-forest);
+  pointer-events: none;
 }
 
 .legend {
   position: absolute;
   bottom: 10px;
   left: 10px;
+  z-index: 2;
+  pointer-events: none;
   display: flex;
   flex-direction: column;
   gap: 2px;
