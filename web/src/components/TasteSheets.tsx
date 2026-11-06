@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useNavigate } from 'react-router';
 import type { MyOverall } from '../api/restaurants';
 import { formatScore } from '../lib/format';
@@ -57,10 +58,11 @@ export function MyOverallSheet({ open, onClose, tasteScore, myOverall }: Overall
   const labelOf = (key: string) => TASTE_ITEMS.find((t) => t.key === key)?.label ?? key;
   // 막대는 가장 큰 비중을 끝까지 채운다
   const maxPercent = Math.max(1, ...myOverall.items.map((i) => i.weightPercent ?? 0));
+  const titleId = useId();
 
   return (
     <BottomSheet open={open} onClose={onClose} label="내 종합 별점">
-      <h2 className={styles.title}>
+      <h2 className={styles.title} id={titleId}>
         내 종합 별점{' '}
         {myOverall.score !== null && (
           <span className={styles.big}>
@@ -71,7 +73,7 @@ export function MyOverallSheet({ open, onClose, tasteScore, myOverall }: Overall
       <p className={styles.note}>
         단순 평균이 아니라, 내가 중요하게 보는 항목에 더 큰 비중을 둬서 계산해요.
       </p>
-      <table className={styles.table}>
+      <table className={styles.table} aria-labelledby={titleId}>
         <thead>
           <tr>
             <th scope="col">항목</th>
