@@ -11,8 +11,6 @@ import type { RestaurantLocationQuery } from './restaurant.schema';
 import { REVISIT_INTENT_MIN_SCORE } from './restaurant-stat-calc';
 import { detailStatsOf, myOverallOf, ratingOf } from './restaurant-stats';
 
-/** 종합 별점이 이 값 이상이면 "다시 갈 의향"으로 본다 (별점 기준) */
-
 /** 숨김(H) 가게는 없는 것처럼 404. 폐업(C)은 기록 확인을 위해 보여 준다 */
 async function findVisibleRestaurant(restaurantId: bigint) {
   const restaurant = await prisma.restaurant.findUnique({
