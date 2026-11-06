@@ -1,7 +1,7 @@
 import type { Tx } from '../../common/db';
 import { AppError } from '../../common/errors/app-error';
 import { toPageResult } from '../../common/pagination';
-import type { Prisma } from '../../generated/prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 import { prisma } from '../../lib/prisma';
 import { deleteObjectQuietly } from '../../lib/storage';
 import {
@@ -162,6 +162,8 @@ async function writeDetail(
     const content = input.content?.trim() || null;
     data.content = content;
     data.contentRegDate = content ? now : null;
+    // 글이 바뀌면 AI 분석(review-ai)을 처음부터 다시 한다
+    Object.assign(data, { aiResult: Prisma.DbNull, aiCheckedAt: null, adSuspected: false });
   }
   if (input.aspects !== undefined) {
     await tx.reviewAspectMark.deleteMany({ where: { reviewId } });

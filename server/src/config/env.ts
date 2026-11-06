@@ -51,6 +51,10 @@ const envSchema = z
     CLOVA_OCR_URL: blankAsUndefined(z.url().optional()),
     /** CLOVA OCR Secret Key (X-OCR-SECRET 헤더) */
     CLOVA_OCR_SECRET: blankAsUndefined(z.string().optional()),
+    /** Gemini API 키 (리뷰 글 AI 분석, 주기 작업 review-ai). 비우면 분석하지 않는다 */
+    GEMINI_API_KEY: blankAsUndefined(z.string().optional()),
+    /** 리뷰 분석에 쓰는 Gemini 모델 (https://ai.google.dev/gemini-api/docs/models) */
+    GEMINI_MODEL: blankAsUndefined(z.string().default('gemini-3.5-flash-lite')),
     /** 프로필·리뷰 사진 공개 주소. 예) https://storage.googleapis.com/버킷 또는 Cloud CDN 도메인 — 비우면 사진 URL을 null로 준다 */
     IMAGE_BASE_URL: blankAsUndefined(
       z
