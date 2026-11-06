@@ -4,7 +4,7 @@ import { AppError } from '../../common/errors/app-error';
 import { toKstIso } from '../../common/time';
 import { Prisma } from '../../generated/prisma/client';
 import { prisma } from '../../lib/prisma';
-import { deleteObjectQuietly } from '../../lib/storage';
+import { purgeMemberFiles } from './member-files';
 import { UserError } from './user.errors';
 import { WITHDRAWAL_REASONS, type WithdrawalBody } from './user.schema';
 
@@ -42,13 +42,14 @@ export async function getWithdrawalSummary(userId: bigint) {
   };
 }
 
-/** 탈퇴할 때 회원의 행을 지우는 테이블 (리뷰·방문·신고·문의·운영 기록은 남긴다) */
+/** 탈퇴할 때 회원의 행을 지우는 테이블 (리뷰·방문·신고·운영 기록은 남긴다. 방문은 개인정보만 지운다) */
 async function deletePersonalRows(tx: Prisma.TransactionClient, userId: bigint) {
   const where = { userId };
   await tx.refreshToken.deleteMany({ where });
   await tx.memberLocalRegion.deleteMany({ where });
   await tx.memberPreferredCategory.deleteMany({ where });
   await tx.savedRestaurant.deleteMany({ where });
+  await tx.memberPick.deleteMany({ where });
   await tx.pushSubscription.deleteMany({ where });
   await tx.searchHistory.deleteMany({ where });
   await tx.memberActivityLog.deleteMany({ where });
@@ -75,11 +76,13 @@ export async function withdrawMember(userId: bigint, body: WithdrawalBody, now =
   const reasonCode = body.reasonCode ?? null;
   const reasonDetail = reasonCode === 'ETC' ? body.reasonDetail?.trim() || null : null;
 
-  const profileImageKey = await prisma.$transaction(
+  await prisma.$transaction(
     async (tx) => {
+      // 잠금 순서는 다른 곳과 같게 방문 → 회원. 영수증 처리(processReceipt)·별점 등록은 방문 행을 잠근 뒤 회원 행을 잠근다
+      await tx.$queryRaw`SELECT id FROM visit WHERE user_id = ${userId} FOR UPDATE`;
       // 동시에 두 번 눌러도 한 번만 처리되도록 회원 행을 잠근다.
-      const [locked] = await tx.$queryRaw<{ status: string; profile_image_key: string | null }[]>`
-        SELECT status, profile_image_key FROM member WHERE id = ${userId} FOR UPDATE`;
+      const [locked] = await tx.$queryRaw<{ status: string }[]>`
+        SELECT status FROM member WHERE id = ${userId} FOR UPDATE`;
       if (!locked || locked.status === MemberStatus.WITHDRAWN) {
         throw new AppError(UserError.MEMBER_ALREADY_WITHDRAWN);
       }
@@ -117,12 +120,34 @@ export async function withdrawMember(userId: bigint, body: WithdrawalBody, now =
       }
       await tx.conquest.deleteMany({ where: { userId } });
 
-      // 방문 행은 리뷰가 참조해서 남기고 영수증 원문·사진 좌표만 지운다.
-      // 영수증·현장 사진 key와 체크인 좌표는 visit CHECK 제약(인증 방식별 필수)이 있어 남긴다 (명세서 SET-04 비고).
+      // 방문 기록의 개인정보는 바로 지운다(보관 안 함, 2026-11-06). 방문 행은 리뷰가 참조해서 남기고 purged_at을 채운다(ERD v1.3).
+      // 방문 행은 맨 처음에 잠갔다: OCR 처리(processReceipt)가 진행 중이면 그 트랜잭션이 끝난 뒤 지우고,
+      // 그 뒤에 시작하는 처리는 purged_at을 보고 아무것도 쓰지 않는다. 메뉴 줄은 잠근 뒤에 지워야 새로 들어온 줄까지 지운다
       await tx.visit.updateMany({
-        where: { userId },
-        data: { ocrRaw: Prisma.DbNull, photoLat: null, photoLng: null },
+        where: { userId, purgedAt: null },
+        data: {
+          purgedAt: now,
+          receiptImageKey: null,
+          ocrRaw: Prisma.DbNull,
+          ocrStoreName: null,
+          ocrBusinessNo: null,
+          ocrApprovalNo: null,
+          paidAt: null,
+          totalAmount: null,
+          receiptHash: null,
+          checkinLat: null,
+          checkinLng: null,
+          checkinAccuracy: null,
+          checkinDistanceM: null,
+          sitePhotoKey: null,
+          photoTakenAt: null,
+          photoLat: null,
+          photoLng: null,
+        },
       });
+      await tx.visitReceiptItem.deleteMany({ where: { visit: { userId } } });
+      // 1:1 문의도 내용·사진째 지운다 (사진 파일은 트랜잭션 뒤 폴더째)
+      await tx.inquiry.deleteMany({ where: { userId } });
 
       await deletePersonalRows(tx, userId);
 
@@ -139,11 +164,15 @@ export async function withdrawMember(userId: bigint, body: WithdrawalBody, now =
           pointBalance: 0,
         },
       });
-      return locked.profile_image_key;
     },
     { timeout: 15_000 },
   );
 
-  await deleteObjectQuietly(profileImageKey);
+  // DB는 이미 지웠으니 파일 삭제가 실패해도 탈퇴는 성공으로 돌려주고, files_purged_at이 빈 채로 남아 cleanup 작업이 다시 지운다
+  try {
+    await purgeMemberFiles(userId, now);
+  } catch (err) {
+    console.error(`탈퇴 회원 사진 삭제 실패 member=${userId.toString()}`, err);
+  }
   return { withdrawnAt: toKstIso(now) };
 }

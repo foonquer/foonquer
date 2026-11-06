@@ -59,7 +59,7 @@ describe('NOTI 알림함·푸시 구독', () => {
       .get('/api/v1/notifications?category=RANK')
       .set('Authorization', bearer(me.id));
     expect(rankOnly.body.data.items).toHaveLength(1);
-    expect(rankOnly.body.data.items[0].deepLink).toBe('/status/sigungus/15');
+    expect(rankOnly.body.data.items[0].deepLink).toBe('/ranking?sigunguId=15');
 
     const count = await request(app)
       .get('/api/v1/notifications/unread-count')

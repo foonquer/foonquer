@@ -125,3 +125,19 @@ export async function deleteObjectQuietly(
     console.error(`스토리지 파일 삭제 실패: ${key}`, err);
   }
 }
+
+/**
+ * prefix 아래 파일을 모두 지운다 (탈퇴 회원 파일 재삭제용, 여러 번 돌려도 된다).
+ * @returns 지웠거나 버킷이 없으면 true, 실패하면 false
+ */
+export async function deletePrefixQuietly(prefix: string, kind: BucketKind): Promise<boolean> {
+  const bucket = bucketName(kind);
+  if (!bucket) return true;
+  try {
+    await gcs().bucket(bucket).deleteFiles({ prefix, force: true });
+    return true;
+  } catch (err) {
+    console.error(`스토리지 폴더 삭제 실패: ${prefix}`, err);
+    return false;
+  }
+}
