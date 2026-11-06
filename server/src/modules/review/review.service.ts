@@ -101,7 +101,11 @@ export async function rateVisit(
   );
 
   const { review, restaurant, conquest } = result;
-  const nextReward = await nextConquestReward(prisma, userId, now);
+  // 정복·보상은 이미 커밋됐다. 보조 정보라 실패해도 null로 응답한다 (다시 보내면 ALREADY_RATED가 되므로)
+  const nextReward = await nextConquestReward(prisma, userId, now).catch((err: unknown) => {
+    console.error('다음 정복 보상 조회 실패', err);
+    return null;
+  });
   return {
     reviewId: review.id,
     visitId: review.visitId,
