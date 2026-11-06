@@ -605,7 +605,7 @@ GCP에서 준비할 것:
 | VM 서비스 계정 | `roles/secretmanager.secretAccessor`, 사진 두 버킷의 `roles/storage.objectAdmin`과 서명 권한 `roles/iam.serviceAccountTokenCreator`(자기 자신에게, 업로드 signed URL), 백업 버킷의 `roles/storage.objectCreator` |
 | Secret Manager | `foonquer-prod-env` — 운영 `.env` 내용 (아래 표) |
 | Cloud Storage | 공개 사진 버킷(`GCS_BUCKET`, 프로필 `profile/{회원 id}/`·리뷰 사진)은 `allUsers` 읽기 허용, 영수증·현장·문의 사진은 공개하지 않는 별도 버킷에 둔다(`GCS_PRIVATE_BUCKET`, `receipt/`·`site/`·`inquiry/` 폴더). 브라우저에서 signed URL로 바로 올리므로(USER-02, UPLOAD-01) 두 버킷 모두 버킷 CORS에 웹 주소, `PUT`, 요청 헤더 `Content-Type`·`x-goog-content-length-range`·`x-goog-if-generation-match` 허용. DB 백업 버킷은 비공개, 30일 지나면 지우는 수명 주기 |
-| 배포용 서비스 계정 | GitHub Actions가 VM에 IAP로 SSH할 권한만 준다 (`roles/compute.instanceAdmin.v1`, `roles/iap.tunnelResourceAccessor`, `roles/iam.serviceAccountUser`). 키(JSON)를 GitHub Secret `GCP_SA_KEY`에 넣는다 |
+| 배포용 서비스 계정 | `foonquer-deploy`. GitHub Actions가 VM에 IAP로 SSH할 권한만 준다 (`roles/compute.instanceAdmin.v1`, `roles/iap.tunnelResourceAccessor`, `roles/iam.serviceAccountUser`). 키 파일은 만들지 않고 Workload Identity Federation으로 이 저장소(`foonquer/foonquer`)의 Actions만 이 계정을 쓸 수 있게 한다 (풀 `github`, 공급자 `foonquer`, 조건 `assertion.repository=='foonquer/foonquer'`) |
 
 운영 `.env`(Secret Manager `foonquer-prod-env`)에 넣는 값 — 값은 로컬 `.env`와 같은 뜻이고, 운영에서 다른 것만 적었다:
 
@@ -628,8 +628,9 @@ GitHub 저장소 설정(Settings → Secrets and variables → Actions)에 필�
 
 | 종류 | 이름 | 내용 |
 | --- | --- | --- |
-| Secret | `GCP_SA_KEY` | 배포용 서비스 계정 키(JSON) |
-| Variable | `GCP_PROJECT_ID`, `GCE_INSTANCE`, `GCE_ZONE` | `foonquer-prod`, `foonquer-api`, `asia-northeast3-a` |
+| Variable | `GCP_WIF_PROVIDER` | `projects/<프로젝트 번호>/locations/global/workloadIdentityPools/github/providers/foonquer` |
+| Variable | `GCP_DEPLOY_SA` | `foonquer-deploy@<프로젝트 ID>.iam.gserviceaccount.com` |
+| Variable | `GCP_PROJECT_ID`, `GCE_INSTANCE`, `GCE_ZONE` | 프로젝트 ID, `foonquer-api`, `asia-northeast3-a` |
 | Variable | `API_DOMAIN` | `api.foonquer.me` (배포 후 상태 확인) |
 
 `GCE_INSTANCE` 변수가 없으면 배포 워크플로는 돌지 않는다.
