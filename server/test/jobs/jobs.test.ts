@@ -7,7 +7,7 @@ import {
   runSavedReminderJob,
 } from '../../src/jobs/jobs';
 import { prisma } from '../../src/lib/prisma';
-import { deletePrefixQuietly } from '../../src/lib/storage';
+import { deleteObjectQuietly, deletePrefixQuietly, listObjects } from '../../src/lib/storage';
 import { notify } from '../../src/modules/notification/notify';
 import { resetDb } from '../helpers/db';
 import {
@@ -21,11 +21,15 @@ import {
 vi.mock('../../src/lib/storage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/lib/storage')>()),
   deletePrefixQuietly: vi.fn(() => Promise.resolve(true)),
+  listObjects: vi.fn(() => Promise.resolve([])),
+  deleteObjectQuietly: vi.fn(() => Promise.resolve()),
 }));
 
 beforeEach(async () => {
   await resetDb();
   vi.mocked(deletePrefixQuietly).mockClear();
+  vi.mocked(listObjects).mockReset().mockResolvedValue([]);
+  vi.mocked(deleteObjectQuietly).mockClear();
 });
 
 describe('주기 작업', () => {
@@ -102,6 +106,7 @@ describe('주기 작업', () => {
       refreshTokens: 2,
       temporaryTokens: 1,
       withdrawnFileMembers: 0,
+      orphanUploads: 0,
       failed: 0,
     });
     const left = await prisma.notification.findMany({ where: { userId: me.id } });
@@ -214,5 +219,57 @@ describe('주기 작업', () => {
     expect(await prisma.member.count({ where: { status: 'D', filesPurgedAt: null } })).toBe(
       FILE_SWEEP_BATCH,
     );
+  });
+});
+
+describe('cleanup: 쓰이지 않는 업로드', () => {
+  it('하루 지난 사진 중 어디에도 저장되지 않은 것만 지우고, 폴더 하나를 못 읽어도 나머지는 정리한다', async () => {
+    const now = new Date();
+    const old = addDays(now, -2);
+    const me = await createMember();
+    await prisma.member.update({
+      where: { id: me.id },
+      data: { profileImageKey: `profile/${me.id}/used.jpg` },
+    });
+    await prisma.inquiry.create({
+      data: {
+        userId: me.id,
+        category: 'ETC',
+        content: '문의',
+        imageKey: `inquiry/${me.id}/used.jpg`,
+      },
+    });
+    vi.mocked(listObjects).mockImplementation((prefix) => {
+      if (prefix === 'profile/') {
+        return Promise.resolve([
+          { key: `profile/${me.id}/used.jpg`, createdAt: old },
+          { key: `profile/${me.id}/orphan.jpg`, createdAt: old },
+          { key: `profile/${me.id}/fresh.jpg`, createdAt: now }, // 아직 저장 중일 수 있다
+        ]);
+      }
+      if (prefix === 'inquiry/') {
+        return Promise.resolve([
+          { key: `inquiry/${me.id}/used.jpg`, createdAt: old },
+          { key: `inquiry/${me.id}/orphan.png`, createdAt: old },
+        ]);
+      }
+      if (prefix === 'receipt/') return Promise.reject(new Error('목록을 못 읽음'));
+      return Promise.resolve([]);
+    });
+
+    const result = await runCleanupJob(now);
+
+    expect(vi.mocked(deleteObjectQuietly).mock.calls).toEqual([
+      [`profile/${me.id}/orphan.jpg`, 'public'],
+      [`inquiry/${me.id}/orphan.png`, 'private'],
+    ]);
+    expect(result).toMatchObject({ orphanUploads: 2, failed: 1 });
+    expect(vi.mocked(listObjects).mock.calls.map(([prefix, kind]) => `${kind}:${prefix}`)).toEqual([
+      'public:profile/',
+      'public:review/',
+      'private:receipt/',
+      'private:site/',
+      'private:inquiry/',
+    ]);
   });
 });

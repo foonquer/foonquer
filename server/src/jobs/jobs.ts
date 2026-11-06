@@ -1,6 +1,7 @@
 import { MemberStatus } from '../common/auth/member-status';
 import { addDays } from '../common/time';
 import { prisma } from '../lib/prisma';
+import { type BucketKind, deleteObjectQuietly, listObjects } from '../lib/storage';
 import { KEEP_DAYS } from '../modules/notification/notification.service';
 import { notify } from '../modules/notification/notify';
 import { runSeasonJob } from '../modules/ranking/season-job';
@@ -86,24 +87,127 @@ async function sweepWithdrawnFiles(now: Date) {
   return { withdrawnMembers: total, failed };
 }
 
-/** cleanup: 30일 지난 알림, 만료된 로그인 토큰·카카오 결과 교환 코드 삭제, 탈퇴 회원 파일 다시 지우기 */
+/** 올린 뒤 이만큼 지나도 어디에도 저장되지 않은 사진은 지운다 (업로드 URL은 5분이고, 리뷰를 쓰는 동안 여유를 둔다) */
+export const ORPHAN_UPLOAD_GRACE_DAYS = 1;
+/** 한 번에 DB에서 쓰이는지 확인하는 key 수 */
+const ORPHAN_CHECK_BATCH = 500;
+
+/**
+ * 사진 폴더별로 그 key를 저장하는 칸. 여기 없는 폴더(구 배경·아이콘 등)는 지우지 않는다.
+ * 새로 사진을 저장하는 칸을 만들면 반드시 여기에 더한다 (빠지면 쓰는 사진이 지워진다)
+ */
+const UPLOAD_FOLDERS: {
+  prefix: string;
+  kind: BucketKind;
+  used: (keys: string[]) => Promise<(string | null)[]>;
+}[] = [
+  {
+    prefix: 'profile/',
+    kind: 'public',
+    used: async (keys) =>
+      (
+        await prisma.member.findMany({
+          where: { profileImageKey: { in: keys } },
+          select: { profileImageKey: true },
+        })
+      ).map((r) => r.profileImageKey),
+  },
+  {
+    prefix: 'review/',
+    kind: 'public',
+    used: async (keys) =>
+      (
+        await prisma.reviewImage.findMany({
+          where: { imageKey: { in: keys } },
+          select: { imageKey: true },
+        })
+      ).map((r) => r.imageKey),
+  },
+  {
+    prefix: 'receipt/',
+    kind: 'private',
+    used: async (keys) =>
+      (
+        await prisma.visit.findMany({
+          where: { receiptImageKey: { in: keys } },
+          select: { receiptImageKey: true },
+        })
+      ).map((r) => r.receiptImageKey),
+  },
+  {
+    prefix: 'site/',
+    kind: 'private',
+    used: async (keys) =>
+      (
+        await prisma.visit.findMany({
+          where: { sitePhotoKey: { in: keys } },
+          select: { sitePhotoKey: true },
+        })
+      ).map((r) => r.sitePhotoKey),
+  },
+  {
+    prefix: 'inquiry/',
+    kind: 'private',
+    used: async (keys) =>
+      (
+        await prisma.inquiry.findMany({
+          where: { imageKey: { in: keys } },
+          select: { imageKey: true },
+        })
+      ).map((r) => r.imageKey),
+  },
+];
+
+/**
+ * 올렸지만 어디에도 저장되지 않은 사진(업로드 뒤 저장 API가 실패하거나 화면을 떠난 경우)을 지운다.
+ * 폴더 목록을 못 읽으면 그 폴더는 건너뛰고 failed로 센다
+ */
+async function sweepOrphanUploads(now: Date) {
+  const cutoff = addDays(now, -ORPHAN_UPLOAD_GRACE_DAYS);
+  let deleted = 0;
+  let failed = 0;
+  for (const folder of UPLOAD_FOLDERS) {
+    try {
+      const old = (await listObjects(folder.prefix, folder.kind))
+        .filter((o) => o.createdAt < cutoff)
+        .map((o) => o.key);
+      for (let i = 0; i < old.length; i += ORPHAN_CHECK_BATCH) {
+        const keys = old.slice(i, i + ORPHAN_CHECK_BATCH);
+        const used = new Set(await folder.used(keys));
+        for (const key of keys) {
+          if (used.has(key)) continue;
+          await deleteObjectQuietly(key, folder.kind);
+          deleted += 1;
+        }
+      }
+    } catch (err) {
+      console.error(`쓰이지 않는 업로드 정리 실패: ${folder.prefix}`, err);
+      failed += 1;
+    }
+  }
+  return { deleted, failed };
+}
+
+/** cleanup: 30일 지난 알림, 만료된 로그인 토큰·카카오 결과 교환 코드 삭제, 탈퇴 회원 파일 다시 지우기, 쓰이지 않는 업로드 지우기 */
 export async function runCleanupJob(now = new Date()) {
   const dayAgo = addDays(now, -1);
-  const [notifications, refreshTokens, tempTokens, files] = await Promise.all([
+  const [notifications, refreshTokens, tempTokens, files, orphans] = await Promise.all([
     prisma.notification.deleteMany({ where: { regDate: { lt: addDays(now, -KEEP_DAYS) } } }),
     prisma.refreshToken.deleteMany({
       where: { OR: [{ expiresAt: { lt: dayAgo } }, { revokedAt: { lt: dayAgo } }] },
     }),
     prisma.authTemporaryToken.deleteMany({ where: { expiresAt: { lt: dayAgo } } }),
     sweepWithdrawnFiles(now),
+    sweepOrphanUploads(now),
   ]);
   return {
     notifications: notifications.count,
     refreshTokens: refreshTokens.count,
     temporaryTokens: tempTokens.count,
     withdrawnFileMembers: files.withdrawnMembers,
+    orphanUploads: orphans.deleted,
     // run.ts가 failed > 0이면 종료 코드 1로 알린다
-    failed: files.failed,
+    failed: files.failed + orphans.failed,
   };
 }
 
