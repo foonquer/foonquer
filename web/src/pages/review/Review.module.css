@@ -405,3 +405,8 @@
   text-align: center;
   color: var(--mk-muted);
 }
+
+.reportLink {
+  font-size: 14px;
+  color: var(--mk-muted);
+}

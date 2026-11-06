@@ -47,7 +47,20 @@ export function ReviewDetailPage() {
         )
       }
     >
-      <AppHeader title={review.isMine ? '내 리뷰' : '리뷰'} />
+      <AppHeader
+        title={review.isMine ? '내 리뷰' : '리뷰'}
+        right={
+          !review.isMine && (
+            <Link
+              to={`/reviews/${review.reviewId}/report`}
+              state={{ name: review.author.nickname ?? '탐험가' }}
+              className={styles.reportLink}
+            >
+              신고
+            </Link>
+          )
+        }
+      />
       <div className={styles.content}>
         <Link
           to={`/restaurants/${review.restaurant.restaurantId}`}
