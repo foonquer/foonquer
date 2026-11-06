@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { getSeasons, type Season } from '../api/ranking';
+import { errorMessage } from '../lib/api';
 import { formatSeasonRange } from '../lib/format';
 import { useAsync } from '../lib/useAsync';
 import { BottomSheet } from './BottomSheet';
+import { EmptyState, Loading } from './StateViews';
 import styles from './SeasonSelect.module.css';
 
 type Props = {
@@ -14,7 +16,10 @@ type Props = {
 /** "시즌 3 ⌄" 버튼과 시즌 고르기 시트 (RANK-02) */
 export function SeasonSelect({ season, onChange }: Props) {
   const [open, setOpen] = useState(false);
-  const { data } = useAsync(() => (open ? getSeasons() : Promise.resolve(null)), [open]);
+  const { data, error, reload } = useAsync(
+    () => (open ? getSeasons() : Promise.resolve(null)),
+    [open],
+  );
 
   return (
     <>
@@ -23,6 +28,7 @@ export function SeasonSelect({ season, onChange }: Props) {
       </button>
       <BottomSheet open={open} onClose={() => setOpen(false)} label="시즌 선택" dim="light">
         <h2 className={styles.title}>시즌 선택</h2>
+        {error ? <EmptyState title={errorMessage(error)} onRetry={reload} /> : !data && <Loading />}
         <ul className={styles.list}>
           {data?.items.map((s) => (
             <li key={s.seasonId}>

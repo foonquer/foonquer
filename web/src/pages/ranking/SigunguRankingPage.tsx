@@ -36,7 +36,8 @@ export function SigunguRankingPage() {
     );
   }
 
-  const podium = [data.items[1], data.items[0], data.items[2]].filter(Boolean);
+  // 2위 · 1위 · 3위 순서로 놓는다 (차단한 사람은 목록에서 빠져서 배열 위치가 아니라 rank로 찾는다)
+  const podium = [2, 1, 3].flatMap((rank) => data.items.filter((i) => i.rank === rank));
   const me = data.items.find((i) => i.isMe);
   return (
     <Screen>

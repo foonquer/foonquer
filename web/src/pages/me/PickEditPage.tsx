@@ -64,6 +64,7 @@ function Editor({ initial, max }: { initial: Pick[]; max: number }) {
   };
   const move = (index: number, delta: -1 | 1) =>
     setPicks((list) => {
+      if (index + delta < 0 || index + delta >= list.length) return list;
       const next = [...list];
       const [item] = next.splice(index, 1);
       next.splice(index + delta, 0, item);
@@ -82,6 +83,7 @@ function Editor({ initial, max }: { initial: Pick[]; max: number }) {
       navigate(-1);
     } catch (err) {
       toast(errorMessage(err));
+    } finally {
       setSaving(false);
     }
   };
