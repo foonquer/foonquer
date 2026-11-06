@@ -303,6 +303,38 @@ describe('MAP-01 GET /map/restaurants — 조회·필터', () => {
     expect(await names('NOT_CONQUERED')).toEqual(['미정복', '이동중']);
   });
 
+  it('mineOnly=true면 내가 찜한 곳·정복한 곳(지난 시즌·이동 중 포함)만 주고 카카오는 부르지 않는다', async () => {
+    const fetchMock = stubKakao();
+    const season = await createActiveSeason(2);
+    const past = await createPastSeason(1);
+    const me = await createMember();
+    const other = await createMember();
+    const conquered = await createRestaurant({ name: '정복', lat: 37.5665, lng: 126.845 });
+    const moving = await createRestaurant({ name: '이동중', lat: 37.5666, lng: 126.845 });
+    const pastOnly = await createRestaurant({ name: '지난시즌', lat: 37.5667, lng: 126.845 });
+    const savedOne = await createRestaurant({ name: '저장', lat: 37.5668, lng: 126.845 });
+    const othersOne = await createRestaurant({ name: '남이찜', lat: 37.5669, lng: 126.845 });
+    await createRestaurant({ name: '아무도안감', lat: 37.567, lng: 126.845 });
+    await createConquest(me.id, conquered, season.id);
+    await createVisit(me.id, moving.id, { status: 'V' });
+    await createConquest(me.id, pastOnly, past.id);
+    await prisma.savedRestaurant.create({ data: { userId: me.id, restaurantId: savedOne.id } });
+    await prisma.savedRestaurant.create({ data: { userId: other.id, restaurantId: othersOne.id } });
+    await createConquest(other.id, othersOne, season.id);
+
+    const res = await getMap(me.id, { ...BOUNDS, mineOnly: 'true' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.items.map((i: { name: string }) => i.name).sort()).toEqual([
+      '이동중',
+      '저장',
+      '정복',
+      '지난시즌',
+    ]);
+    expect(res.body.data.kakaoSynced).toBe(true);
+    expect(kakaoCalls(fetchMock, '/v2/local/search/category.json')).toHaveLength(0);
+  });
+
   it('이번 시즌에 정복한 가게라도 별점 대기 방문이 있으면 이동 중이라 NOT_CONQUERED 쪽에 나온다', async () => {
     const season = await createActiveSeason();
     const me = await createMember();
@@ -373,6 +405,7 @@ describe('MAP-01 GET /map/restaurants — 입력 검증', () => {
     [{ ...BOUNDS, categoryId: '99' }, 'INVALID_CATEGORY', '없는 카테고리예요.'],
     [{ ...BOUNDS, categoryId: 'abc' }, 'INVALID_CATEGORY', undefined],
     [{ ...BOUNDS, conquestState: 'MOVING' }, 'VALIDATION_ERROR', undefined],
+    [{ ...BOUNDS, mineOnly: 'yes' }, 'VALIDATION_ERROR', undefined],
   ])('400 %j → %s', async (query, code, message) => {
     const me = await createMember();
     const clean = Object.fromEntries(

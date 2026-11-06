@@ -39,10 +39,11 @@ export type MapRestaurant = {
   isSaved: boolean;
 };
 
-export const getMapRestaurants = (bounds: Bounds, signal?: AbortSignal) =>
+/** mineOnly: 내가 찜한 곳·정복한 곳만 */
+export const getMapRestaurants = (query: Bounds & { mineOnly?: boolean }, signal?: AbortSignal) =>
   api.get<{ items: MapRestaurant[]; totalCount: number; truncated: boolean; kakaoSynced: boolean }>(
     '/map/restaurants',
-    bounds,
+    query,
     signal,
   );
 

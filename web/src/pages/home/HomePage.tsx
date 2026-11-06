@@ -47,9 +47,16 @@ export function HomePage() {
         const controller = new AbortController();
         request.current = controller;
         try {
-          const result = await getMapRestaurants(bounds, controller.signal);
+          // 홈 지도는 내가 찜한 곳·정복한 곳만 (다른 가게는 검색으로 찾는다)
+          const result = await getMapRestaurants({ ...bounds, mineOnly: true }, controller.signal);
           setPins(result.items);
-          setNotice(result.truncated ? '가게가 많아 일부만 보여요. 지도를 확대해 보세요' : null);
+          setNotice(
+            result.truncated
+              ? '가게가 많아 일부만 보여요. 지도를 확대해 보세요'
+              : result.items.length === 0
+                ? '찜하거나 정복한 가게가 지도에 표시돼요'
+                : null,
+          );
         } catch (err) {
           if (controller.signal.aborted) return;
           if (err instanceof ApiError && err.code === 'MAP_BOUNDS_TOO_LARGE') {
