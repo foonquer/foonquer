@@ -74,3 +74,30 @@ export function formatSeasonRange(season: { startDate: string; endDate: string }
   const ym = (d: string) => `${d.slice(0, 4)}.${Number(d.slice(5, 7))}`;
   return `${ym(season.startDate)} ~ ${ym(season.endDate)}`;
 }
+
+/** 알림 시각: "방금" / "12분 전" / "3시간 전" / "어제" / "2일 전" / "9월 1일" */
+export function formatAgo(iso: string, now = new Date()) {
+  const diff = now.getTime() - new Date(iso).getTime();
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return '방금';
+  if (minutes < 60) return `${minutes}분 전`;
+  const day = iso.slice(0, 10);
+  if (day === kstDay(now)) return `${Math.floor(minutes / 60)}시간 전`;
+  const days = Math.round(
+    (new Date(`${kstDay(now)}T00:00:00Z`).getTime() - new Date(`${day}T00:00:00Z`).getTime()) /
+      86_400_000,
+  );
+  if (days === 1) return '어제';
+  if (days < 7) return `${days}일 전`;
+  return formatKoreanDate(iso) ?? '';
+}
+
+/** 알림 묶음: 오늘 / 이번 주(7일 안) / 이전 */
+export function agoGroup(iso: string, now = new Date()) {
+  const day = iso.slice(0, 10);
+  if (day === kstDay(now)) return '오늘';
+  const days =
+    (new Date(`${kstDay(now)}T00:00:00Z`).getTime() - new Date(`${day}T00:00:00Z`).getTime()) /
+    86_400_000;
+  return days < 7 ? '이번 주' : '이전';
+}
