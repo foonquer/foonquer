@@ -52,6 +52,8 @@ model Member {
   updateDate              DateTime?                 @updatedAt @map("update_date")
   /// 탈퇴 시각 — 탈퇴하면 kakao_id·nickname을 비워 같은 카카오 계정으로 다시 가입하거나 다른 사람이 닉네임을 쓸 수 있게 한다
   deleteDate              DateTime?                 @map("delete_date")
+  /// 탈퇴한 회원의 스토리지 사진(영수증·현장·문의·프로필 폴더)을 다 지운 시각 (v1.3) — null이면 cleanup 작업이 하루 1번 다시 지운다
+  filesPurgedAt           DateTime?                 @map("files_purged_at")
   memberLocalRegions      MemberLocalRegion[]
   preferredCategories     MemberPreferredCategory[]
   memberWithdrawals       MemberWithdrawal[]
