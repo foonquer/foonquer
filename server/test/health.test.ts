@@ -12,30 +12,36 @@ describe('GET /api/v1/health', () => {
     expect(res.body).toEqual({
       success: true,
       data: { status: 'ok' },
-      message: '요청에 성공했습니다.',
+      message: '요청이 성공적으로 처리되었습니다.',
     });
   });
 });
 
 describe('공통 에러 응답', () => {
-  it('없는 경로는 COMMON_002', async () => {
+  it('없는 경로는 404 NOT_FOUND', async () => {
     const res = await request(app).get('/api/v1/nope');
 
     expect(res.status).toBe(404);
     expect(res.body).toEqual({
       success: false,
-      code: 'COMMON_002',
-      message: '요청한 경로를 찾을 수 없습니다.',
+      code: 'NOT_FOUND',
+      message: '요청한 경로를 찾을 수 없어요.',
+      data: null,
     });
   });
 
-  it('깨진 JSON은 COMMON_001', async () => {
+  it('깨진 JSON은 400 VALIDATION_ERROR', async () => {
     const res = await request(app)
       .post('/api/v1/health')
       .set('Content-Type', 'application/json')
       .send('{bad');
 
     expect(res.status).toBe(400);
-    expect(res.body).toMatchObject({ success: false, code: 'COMMON_001' });
+    expect(res.body).toEqual({
+      success: false,
+      code: 'VALIDATION_ERROR',
+      message: 'JSON 형식이 올바르지 않아요.',
+      data: null,
+    });
   });
 });

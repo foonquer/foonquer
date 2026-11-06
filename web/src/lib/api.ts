@@ -38,7 +38,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 /**
  * 예) const review = await api.post<Review>('/reviews', { taste: 5 });
- *     try { ... } catch (e) { if (e instanceof ApiError && e.code === 'AUTH_001') ... }
+ *     try { ... } catch (e) { if (e instanceof ApiError && e.code === 'TOKEN_EXPIRED') ... }
  */
 export const api = {
   get: <T>(path: string) => request<T>('GET', path),

@@ -56,17 +56,24 @@ foonquer/
 │   │   ├── lib/prisma.ts    # Prisma 클라이언트 (MariaDB 어댑터)
 │   │   ├── common/
 │   │   │   ├── response.ts  # 성공 응답 ok(), created()
-│   │   │   ├── errors/      # AppError, 공통 에러 코드
-│   │   │   └── middlewares/ # validate(), notFound, errorHandler
-│   │   ├── modules/         # 도메인별 router · service · errors
+│   │   │   ├── errors/      # AppError, defineErrors(), 공통 에러 코드
+│   │   │   ├── auth/        # requireAuth(), accessToken(JWT), 약관 동의 확인
+│   │   │   ├── middlewares/ # validate(), rateLimit(), notFound, errorHandler
+│   │   │   ├── time.ts      # KST 시각 변환
+│   │   │   └── pagination.ts
+│   │   ├── modules/         # 도메인별 router · service · schema · errors
 │   │   │   └── health/
+│   │   ├── types/           # Express Request 타입 확장 (req.auth)
 │   │   └── generated/       # Prisma가 만드는 코드 (커밋하지 않음)
 │   ├── prisma/
 │   │   ├── schema.prisma    # DB 스키마 (ERD와 같게 유지)
 │   │   ├── migrations/      # 마이그레이션 SQL (커밋한다)
 │   │   ├── check-constraints.sql
-│   │   └── seed.ts          # 기본 데이터 (카테고리 12개)
-│   ├── test/                # Vitest + supertest
+│   │   ├── seed-data.ts     # 기본 데이터 목록 (카테고리 12개 …)
+│   │   └── seed.ts          # 기본 데이터 넣기 (배포·로컬)
+│   ├── test/                # Vitest + supertest (실제 MySQL 테스트 DB)
+│   │   ├── global-setup.ts  # 테스트 DB 생성·마이그레이션·기본 데이터
+│   │   └── helpers/         # resetDb(), createMember(), bearer()
 │   └── Dockerfile
 ├── web/                     # 웹 (Vite + React + PWA)
 │   ├── src/
@@ -94,7 +101,7 @@ modules/review/
 ├── review.router.ts    # 라우트 정의 + validate()
 ├── review.service.ts   # 비즈니스 로직, Prisma 호출
 ├── review.schema.ts    # 요청 검증용 zod 스키마
-└── review.errors.ts    # REVIEW_001 같은 도메인 에러 코드
+└── review.errors.ts    # REVIEW_NOT_FOUND 같은 도메인 에러 코드 (명세서 이름 그대로)
 ```
 
 ```ts
@@ -243,6 +250,10 @@ pnpm -C server db:migrate                                       # 적용
 | `PORT` | 서버 포트 | `3000` |
 | `DATABASE_URL` | MySQL 접속 주소 | `mysql://root:password@localhost:3307/foonquer` |
 | `CORS_ORIGINS` | 허용할 웹 주소 (쉼표로 여러 개, 비우면 전체 허용) | `http://localhost:5173` |
+| `JWT_ACCESS_SECRET` | accessToken(JWT) 서명 키. 32자 이상 임의 문자열 | `.env.example` 값 그대로 |
+| `TRUST_PROXY` | 서버 앞 프록시(nginx·로드밸런서·Cloudflare) 단계 수. 요청 횟수 제한이 실제 사용자 IP를 보게 한다 | `0` |
+| `COOKIE_SECURE` | 쿠키 Secure 속성 (`true`/`false`) | `true` |
+| `TEST_DATABASE_URL` | 테스트 DB 주소. 이름이 `_test`로 끝나야 한다 | 비워 두면 `mysql://root:password@localhost:3307/foonquer_test` |
 
 운영 서버의 환경변수는 AWS SSM Parameter Store(`/foonquer/prod/*`)에 두고, 배포할 때 EC2에서 `.env`로 만든다.
 
@@ -260,16 +271,17 @@ Vite는 `VITE_`로 시작하는 변수만 화면 코드에 넣는다. **비밀�
 
 ## 📮 공통 응답 · 에러 코드
 
-모든 API는 `/api/v1` 아래에 있다.
+모든 API는 `/api/v1` 아래에 있다. 응답 형식과 에러 코드 이름은 **API 명세서(노션)의 공통 규칙**을 그대로 따른다.
 
 ### 응답 형식
 
 ```jsonc
 // 성공
-{ "success": true, "data": { ... }, "message": "요청에 성공했습니다." }
+{ "success": true, "data": { ... }, "message": "요청이 성공적으로 처리되었습니다." }
 
-// 실패
-{ "success": false, "code": "AUTH_001", "message": "로그인이 필요합니다." }
+// 실패 — data는 보통 null, 화면에 추가 정보가 필요한 에러만 객체
+{ "success": false, "code": "TOKEN_EXPIRED", "message": "로그인이 만료되었어요. 다시 로그인해 주세요.", "data": null }
+{ "success": false, "code": "LOGIN_INVALID_CREDENTIALS", "message": "이메일 또는 비밀번호가 맞지 않아요.", "data": { "failCount": 1, "maxFailCount": 5 } }
 ```
 
 ```ts
@@ -277,45 +289,112 @@ import { ok, created } from '../../common/response';
 import { AppError } from '../../common/errors/app-error';
 import { AuthError, CommonError } from '../../common/errors/error-codes';
 
-ok(res, review);                       // 200
+ok(res, review, '리뷰를 조회했어요.');      // 200 (메시지는 명세서 Response의 message)
 created(res, review, '리뷰를 등록했어요.'); // 201
-throw new AppError(AuthError.UNAUTHORIZED);              // 401 AUTH_001
-throw new AppError(CommonError.BAD_REQUEST, '닉네임은 2~10자입니다.'); // 메시지만 바꾸기
+ok(res, null, '로그아웃했어요.');           // 삭제·로그아웃도 200 + 바디 (204는 쓰지 않음)
+throw new AppError(AuthError.TOKEN_EXPIRED);                               // 401 TOKEN_EXPIRED
+throw new AppError(ReviewError.REVIEW_NOT_FOUND, '이미 지운 리뷰예요.');    // 메시지만 바꾸기
+throw new AppError(AuthError.LOGIN_LOCKED, undefined, { lockedUntil });   // data 넣기
 ```
 
 - 응답은 `res.json()`으로 직접 만들지 않고 항상 `ok()` / `created()` / `AppError`를 쓴다.
 - Express 5라서 `async` 핸들러에서 던진 에러도 에러 핸들러로 간다. try/catch로 감쌀 필요가 없다.
-- DB의 bigint id는 JSON에서 **숫자**로 나간다. decimal(별점, 좌표, 신뢰 온도)은 **문자열**로 나가니 필요하면 `Number()`로 바꿔서 보낸다.
+- DB의 bigint id는 JSON에서 **숫자**로 나간다. decimal(별점, 좌표, 신뢰 온도)은 **문자열**로 나가니 `Number()`로 바꿔서 보낸다.
+- 시각은 DB에 UTC로 저장하고 응답은 KST ISO 8601(`2026-10-06T13:02:11+09:00`)로 준다. `common/time.ts`의 `toKstIso()`, 날짜만은 `toKstDate()` / DB DATE 컬럼은 `formatDbDate()`.
+- 목록은 `common/pagination.ts`의 `pageQuery`(page 1부터, size 기본 20·최대 50)와 `toPageResult()`(items, page, size, totalCount, hasNext)를 쓴다.
 
-### 공통 에러 코드
+### 공통 에러 코드 (`common/errors/error-codes.ts`)
 
-| HTTP | code | 기본 메시지 | 언제 |
-| --- | --- | --- | --- |
-| 400 | `COMMON_001` | 잘못된 요청입니다. | 요청 검증 실패, 깨진 JSON |
-| 401 | `AUTH_001` | 로그인이 필요합니다. | 토큰 없음·만료 |
-| 403 | `AUTH_002` | 권한이 없습니다. | 남의 리소스 접근 |
-| 404 | `COMMON_002` | 요청한 경로를 찾을 수 없습니다. | 없는 API 경로 |
-| 500 | `COMMON_500` | 서버 오류가 발생했습니다. | 처리하지 못한 에러 |
+| HTTP | code | 언제 |
+| --- | --- | --- |
+| 400 | `VALIDATION_ERROR` | 필수 값 누락, 타입·형식 오류, 깨진 JSON (API별 세부 코드가 있으면 그것을 우선) |
+| 401 | `TOKEN_REQUIRED` / `TOKEN_INVALID` / `TOKEN_EXPIRED` | accessToken 없음 / 위조·형식 오류·탈퇴 회원 / 만료 (만료만 재발급 시도) |
+| 403 | `FORBIDDEN` | 남의 데이터에 접근 |
+| 403 | `TERMS_REQUIRED` / `PROFILE_REQUIRED` | 가입 절차가 남은 회원 (아래 "로그인이 필요한 API") |
+| 403 | `MEMBER_SUSPENDED` | 이용 정지 회원 |
+| 404 | `NOT_FOUND` | 대상 없음 (API별 코드가 있으면 그것을 우선, 예: `RESTAURANT_NOT_FOUND`) |
+| 409 | `CONFLICT` | 중복·상태 충돌 (API별 코드 우선) |
+| 429 | `TOO_MANY_REQUESTS` | 요청 횟수 제한 초과 |
+| 500 | `INTERNAL_SERVER_ERROR` | 처리하지 못한 에러 |
+| 502 | `KAKAO_API_FAILED` | 카카오 API 실패 |
 
 ### 도메인 에러 코드
 
-- 형식: `도메인_번호` — `USER_001`, `RESTAURANT_002`, `VISIT_003`, `REVIEW_001`, `RANK_001` …
-- 각자 `modules/<도메인>/<도메인>.errors.ts`에 공통 에러 코드와 같은 모양으로 만든다.
+- 코드 이름은 **명세서 Error 항목에 적힌 이름 그대로** 쓴다 (`EMAIL_REQUIRED`, `REGION_NOT_FOUND` …). 번호 코드(`USER_001`)는 쓰지 않는다.
+- 각자 `modules/<도메인>/<도메인>.errors.ts`에 `defineErrors()`로 만든다. 같은 코드를 다른 HTTP 상태로 두 번 정의하면 서버가 시작할 때 에러가 난다.
 
 ```ts
-export const ReviewError = {
-  NOT_FOUND: { status: 404, code: 'REVIEW_001', message: '리뷰를 찾을 수 없습니다.' },
-  ALREADY_WRITTEN: { status: 409, code: 'REVIEW_002', message: '이미 리뷰를 작성한 방문입니다.' },
-} as const satisfies Record<string, ErrorCodeDef>;
+import { defineErrors } from '../../common/errors/error-codes';
+
+export const ReviewError = defineErrors({
+  REVIEW_NOT_FOUND: { status: 404, code: 'REVIEW_NOT_FOUND', message: '리뷰를 찾을 수 없어요.' },
+  REVIEW_ALREADY_WRITTEN: { status: 409, code: 'REVIEW_ALREADY_WRITTEN', message: '이미 리뷰를 쓴 방문이에요.' },
+});
 ```
 
 ### 요청 검증
 
-`validate({ body, query, params })`에 zod 스키마를 넘긴다. 실패하면 `COMMON_001`과 첫 번째 오류 메시지로 응답하고, 통과하면 `req.body` 등이 검증·변환된 값으로 바뀐다.
+`validate({ body, query, params })`에 zod 스키마를 넘긴다. 통과하면 `req.body` 등이 검증·변환된 값으로 바뀐다.
+
+- zod 에러 메시지 자리에 `defineErrors()`로 만든 **코드 이름**을 넣으면 그 코드로 응답한다.
+- 그 밖의 오류는 `VALIDATION_ERROR`로 응답하고 `data.field`에 어느 필드인지 넣는다. 명세서에 VALIDATION_ERROR 문구가 따로 있으면 `validate(schemas, { validationMessage })`로 바꾼다.
 
 ```ts
-const createReviewSchema = z.object({ taste: z.number().int().min(1).max(5), content: z.string().max(500).optional() });
-router.post('/', validate({ body: createReviewSchema }), async (req, res) => { ... });
+const signupSchema = z.object({
+  email: z.string({ error: 'EMAIL_REQUIRED' }).trim().min(1, { error: 'EMAIL_REQUIRED' }).email({ error: 'INVALID_EMAIL_FORMAT' }),
+  taste: z.number().int().min(1).max(5), // 실패하면 VALIDATION_ERROR (data.field = 'taste')
+});
+router.post('/', validate({ body: signupSchema }), async (req, res) => { ... });
+```
+
+### 로그인이 필요한 API (`common/auth/require-auth.ts`)
+
+`requireAuth(level)`이 `Authorization: Bearer {accessToken}`을 확인하고 `req.auth`에 회원 id·상태를 넣는다. level은 명세서 "회원 상태별 접근" 표를 따른다.
+
+| level | 들어올 수 있는 회원 | 막히면 |
+| --- | --- | --- |
+| `'terms'` | 약관 동의 전 소셜 신규 회원(status P)부터 | — |
+| `'profile'` | 약관 동의를 마친 프로필 설정 전 회원(status P)부터 | `TERMS_REQUIRED` |
+| `'active'` (기본값) | 활성 회원(status A)만 | `TERMS_REQUIRED` / `PROFILE_REQUIRED` |
+
+이용 정지(S)는 어느 level이든 `MEMBER_SUSPENDED`, 탈퇴(D) 회원의 토큰은 `TOKEN_INVALID`다.
+
+```ts
+import { getAuthUser, requireAuth } from '../../common/auth/require-auth';
+
+router.post('/', requireAuth(), validate({ body: createReviewSchema }), async (req, res) => {
+  const { userId } = getAuthUser(req); // bigint
+  ...
+});
+```
+
+### 요청 횟수 제한
+
+같은 IP의 요청 수를 제한할 때는 `rateLimit({ windowMs, limit })`(`common/middlewares/rate-limit.ts`)을 라우트에 붙인다. 넘으면 429 `TOO_MANY_REQUESTS`. 서버 1대의 메모리에 세므로 서버를 여러 대로 늘리면 Redis 같은 저장소로 바꿔야 한다.
+
+<br>
+
+## 🧪 테스트
+
+`pnpm -C server test`는 **실제 MySQL의 테스트 전용 DB**(`foonquer_test`)에 붙어서 API를 끝까지 호출해 본다 (Vitest + supertest).
+
+- 로컬 Docker MySQL(3307)이 켜져 있으면 따로 할 것이 없다. 테스트를 시작할 때 `test/global-setup.ts`가 테스트 DB를 만들고, 마이그레이션을 적용하고(`prisma migrate deploy`), 카테고리 같은 기본 데이터를 넣는다.
+- 다른 DB를 쓰려면 `TEST_DATABASE_URL`을 지정한다. 실수로 개발 DB를 비우지 않도록 DB 이름이 `_test`로 끝나지 않으면 테스트가 시작하지 않는다.
+- 테스트는 매번 `resetDb()`로 테이블을 비운다(카테고리·지역 같은 기본 데이터는 남김). 같은 DB를 쓰므로 테스트 파일은 하나씩 차례로 돈다.
+- 외부 API(카카오, 메일 등)는 `vi.mock()`으로 바꿔서 실제로 호출하지 않는다.
+- GitHub Actions CI도 MySQL 8.4 컨테이너를 띄워 같은 방식으로 돈다.
+
+```ts
+import { resetDb } from '../helpers/db';
+import { bearer, createMember } from '../helpers/fixtures';
+
+beforeEach(async () => { await resetDb(); });
+
+it('내 프로필을 조회한다', async () => {
+  const member = await createMember();
+  const res = await request(app).get('/api/v1/users/me').set('Authorization', bearer(member.id));
+  expect(res.body.data.id).toBe(Number(member.id));
+});
 ```
 
 <br>
