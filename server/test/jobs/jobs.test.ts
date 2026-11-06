@@ -144,11 +144,10 @@ describe('주기 작업', () => {
   });
 
   it('cleanup: 사진 삭제가 끝나지 않은 탈퇴 회원(files_purged_at 없음)의 폴더를 다 지울 때까지 다시 지운다', async () => {
-    const [left, done, failing] = await Promise.all([
-      createMember(),
-      createMember(),
-      createMember(),
-    ]);
+    // 다시 지우는 순서가 id 순이라 left → failing 순서로 만든다 (Promise.all이면 id 순서가 정해지지 않는다)
+    const left = await createMember();
+    const done = await createMember();
+    const failing = await createMember();
     const longAgo = addDays(new Date(), -30);
     await prisma.member.updateMany({
       where: { id: { in: [left.id, failing.id] } },
