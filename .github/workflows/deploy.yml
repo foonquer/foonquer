@@ -28,15 +28,21 @@ permissions:
   # GCP 로그인은 키 파일 없이 GitHub OIDC 토큰으로 (Workload Identity Federation)
   id-token: write
 
+# 비밀값이 아닌 배포 대상 (GCP 프로젝트 foonquer-prod, README 배포)
 env:
   IMAGE: ghcr.io/foonquer/foonquer-server
+  GCP_PROJECT_ID: foonquer-prod
+  GCE_INSTANCE: foonquer-api
+  GCE_ZONE: asia-northeast3-a
+  API_DOMAIN: api.foonquer.me
+  # 키 파일 없이 이 저장소의 Actions만 배포용 서비스 계정을 쓴다 (Workload Identity Federation)
+  GCP_WIF_PROVIDER: projects/119591913227/locations/global/workloadIdentityPools/github/providers/foonquer
+  GCP_DEPLOY_SA: foonquer-deploy@foonquer-prod.iam.gserviceaccount.com
 
 jobs:
   deploy:
     name: Build · Deploy
     runs-on: ubuntu-latest
-    # GCP 준비 전(변수 없음)에는 돌지 않는다
-    if: vars.GCE_INSTANCE != ''
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -66,8 +72,8 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.GCP_DEPLOY_SA }}
+          workload_identity_provider: ${{ env.GCP_WIF_PROVIDER }}
+          service_account: ${{ env.GCP_DEPLOY_SA }}
 
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
@@ -83,9 +89,9 @@ jobs:
           sed -e "s|__GHCR_ACTOR__|${GHCR_ACTOR}|g" -e "s|__GHCR_TOKEN__|${GHCR_TOKEN}|g" \
             -e "s|__BUNDLE__|${BUNDLE}|" \
             scripts/deploy-remote.sh > "$RUNNER_TEMP/deploy.sh"
-          gcloud compute ssh "${{ vars.GCE_INSTANCE }}" \
-            --project "${{ vars.GCP_PROJECT_ID }}" \
-            --zone "${{ vars.GCE_ZONE }}" \
+          gcloud compute ssh "$GCE_INSTANCE" \
+            --project "$GCP_PROJECT_ID" \
+            --zone "$GCE_ZONE" \
             --tunnel-through-iap \
             --quiet \
             --strict-host-key-checking=no \
@@ -94,7 +100,7 @@ jobs:
       - name: Health check
         run: |
           for i in $(seq 1 20); do
-            if curl -fsS "https://${{ vars.API_DOMAIN }}/api/v1/health"; then exit 0; fi
+            if curl -fsS "https://$API_DOMAIN/api/v1/health"; then exit 0; fi
             sleep 6
           done
           echo "health check failed" >&2

@@ -624,22 +624,13 @@ GCP에서 준비할 것:
 | `GCS_BUCKET`, `GCS_PRIVATE_BUCKET`, `IMAGE_BASE_URL` | 버킷 이름, `https://storage.googleapis.com/<공개 버킷>` |
 | `CLOVA_OCR_URL`, `CLOVA_OCR_SECRET`, `GEMINI_API_KEY` | 각 콘솔 값 (비우면 그 기능만 꺼진다) |
 
-GitHub 저장소 설정(Settings → Secrets and variables → Actions)에 필요한 값:
+GitHub에는 비밀값을 두지 않는다. 배포 대상(프로젝트·VM·영역·도메인)과 Workload Identity 공급자·배포용 서비스 계정 이름은 비밀이 아니라서 `.github/workflows/deploy.yml`의 `env`에 적어 두었다. 서버 비밀값은 모두 Secret Manager에만 있다.
 
-| 종류 | 이름 | 내용 |
+DNS(Cloudflare > foonquer.me > DNS > Records). Cloudflare 프록시(주황 구름)는 끄고 **DNS only**로 둔다 (Caddy·Vercel이 직접 인증서를 받는다):
+
+| 종류 | 이름 | 값 |
 | --- | --- | --- |
-| Variable | `GCP_WIF_PROVIDER` | `projects/<프로젝트 번호>/locations/global/workloadIdentityPools/github/providers/foonquer` |
-| Variable | `GCP_DEPLOY_SA` | `foonquer-deploy@<프로젝트 ID>.iam.gserviceaccount.com` |
-| Variable | `GCP_PROJECT_ID`, `GCE_INSTANCE`, `GCE_ZONE` | 프로젝트 ID, `foonquer-api`, `asia-northeast3-a` |
-| Variable | `API_DOMAIN` | `api.foonquer.me` (배포 후 상태 확인) |
-
-`GCE_INSTANCE` 변수가 없으면 배포 워크플로는 돌지 않는다.
-
-DNS(Namecheap > Domain List > foonquer.me > Advanced DNS):
-
-| 종류 | 호스트 | 값 |
-| --- | --- | --- |
-| A | `api` | VM 고정 외부 IP |
+| A | `api` | VM 고정 외부 IP (`foonquer-api-ip`) |
 | A | `@` | Vercel이 알려 주는 값 (Vercel 프로젝트 > Settings > Domains) |
 | CNAME | `www` | Vercel이 알려 주는 값 |
 
