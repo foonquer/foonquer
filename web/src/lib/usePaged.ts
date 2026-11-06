@@ -44,10 +44,17 @@ export function usePaged<P extends PageLike<unknown>>(
   const last = pages[pages.length - 1];
   const error = same(failed?.at) ? failed?.error : undefined;
 
-  const loadMore = useCallback(
-    () => setWant({ ...target, page: pages.length + 1 }),
+  /** 실패한 요청을 다시 보낸다 (다시 불러오기가 실패했으면 1쪽, 더 보기가 실패했으면 그 쪽) */
+  const retry = useCallback(
+    () => setWant({ ...target, version: target.version + 1 }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [key, pages.length, target.version],
+    [key, target.page, target.version],
+  );
+  // 실패한 뒤 "더 보기"를 다시 누르면 같은 요청이라 다시 가지 않으므로 실패한 요청부터 다시 보낸다
+  const loadMore = useCallback(
+    () => (error !== undefined ? retry() : setWant({ ...target, page: pages.length + 1 })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key, pages.length, target.version, error, retry],
   );
   const reload = useCallback(
     () => setWant({ key, page: 1, version: target.version + 1 }),
@@ -87,6 +94,7 @@ export function usePaged<P extends PageLike<unknown>>(
     error,
     loadMore,
     reload,
+    retry,
     update,
     edit,
   };

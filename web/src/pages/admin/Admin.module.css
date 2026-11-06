@@ -166,3 +166,19 @@
   text-align: right;
   color: var(--mk-muted);
 }
+
+.moreError {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--mk-coral-text);
+}
+
+.moreError button {
+  flex: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
