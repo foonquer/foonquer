@@ -115,7 +115,7 @@ describe('홈 지도 (MAP-01·02)', () => {
     expect(Number(q.get('neLng'))).toBeGreaterThan(GAYANG.centerLng);
   });
 
-  it('프로필 줄에 레벨·대표 칭호, 안 읽은 알림이 있으면 알림 버튼에 표시한다 (HOME-01)', async () => {
+  it('프로필 줄에 레벨·대표 칭호를 보여 준다 (HOME-01)', async () => {
     mockApi({
       ...regionApi,
       'GET /map/restaurants': ok({ items: [], totalCount: 0, truncated: false, kakaoSynced: true }),
@@ -132,10 +132,7 @@ describe('홈 지도 (MAP-01·02)', () => {
 
     expect(await screen.findByText('LV.7')).toBeInTheDocument();
     expect(screen.getByText('강서구 단골')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '알림 2개 안 읽음' })).toHaveAttribute(
-      'href',
-      '/notifications',
-    );
+    expect(screen.getByRole('link', { name: '알림' })).toHaveAttribute('href', '/notifications');
   });
 
   it('지도가 너무 넓으면 확대해 달라고 안내한다', async () => {

@@ -91,7 +91,12 @@ export function ItemBoxesPage() {
               <>
                 <h2 className={flow.title}>{eulReul(item.name)} 얻었어요!</h2>
                 <div className={styles.reveal}>
-                  <ItemIcon category={item.category} rarity={item.rarity} size={120} />
+                  <ItemIcon
+                    category={item.category}
+                    rarity={item.rarity}
+                    code={item.code}
+                    size={120}
+                  />
                 </div>
                 <p className={styles.chips}>
                   <span>{RARITY_NAME[item.rarity]}</span>

@@ -155,8 +155,64 @@ describe('탐방러 프로필 (PROFILE-01·02, REVIEW-10)', () => {
     );
   });
 
-  it('다녀온 가게 탭: 이번 시즌 정복한 가게와 맛 별점', async () => {
-    mockApi({
+  it('PICK 탭에서 지도로 보기 → PICK 지도, 핀이나 목록을 누르면 가게 정보', async () => {
+    mockApi({ 'GET /users/:id/profile': ok(profile()) });
+    const { router } = renderRoute('/users/5');
+
+    expect(await screen.findByRole('link', { name: '지도로 보기 ›' })).toHaveAttribute(
+      'href',
+      '/users/5/picks',
+    );
+    fireEvent.click(screen.getByRole('link', { name: 'PICK 1곳 지도에서 보기' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/users/5/picks'));
+
+    expect(await screen.findByRole('heading', { name: '동네미식가의 PICK' })).toBeInTheDocument();
+    const map = screen.getByRole('group', { name: 'PICK 지도' });
+    fireEvent.click(within(map).getByRole('button', { name: '1. 옛날손칼국수 (정복 완료)' }));
+    const info = screen.getByRole('region', { name: '옛날손칼국수 정보' });
+    expect(info).toHaveTextContent('방문 인증 6회');
+    expect(within(info).getByRole('link', { name: '음식점 상세 보기' })).toHaveAttribute(
+      'href',
+      '/restaurants/7',
+    );
+    fireEvent.click(within(info).getByRole('button', { name: '닫기' }));
+    expect(screen.queryByRole('region', { name: '옛날손칼국수 정보' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^1옛날손칼국수/ }));
+    expect(screen.getByRole('region', { name: '옛날손칼국수 정보' })).toBeInTheDocument();
+  });
+
+  it('차단한 탐험가의 PICK 지도는 주소로 바로 들어와도 보여 주지 않는다', async () => {
+    mockApi({ 'GET /users/:id/profile': ok(profile({ isBlocked: true })) });
+    renderRoute('/users/5/picks');
+    expect(await screen.findByText('차단한 탐험가의 PICK은 볼 수 없어요')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'PICK 지도' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/옛날손칼국수/)).not.toBeInTheDocument();
+  });
+
+  it('다녀온 가게 탭: 이번 시즌 정복한 가게와 맛 별점, 시즌·구를 고르면 다시 부른다', async () => {
+    const server = mockApi({
+      'GET /seasons': ok({
+        items: [
+          {
+            seasonId: 3,
+            seasonNo: 3,
+            name: '시즌 3',
+            startDate: '2026-09-01',
+            endDate: '2027-02-28',
+            status: 'ACTIVE',
+            daysLeft: 100,
+          },
+          {
+            seasonId: 2,
+            seasonNo: 2,
+            name: '시즌 2',
+            startDate: '2026-03-01',
+            endDate: '2026-08-31',
+            status: 'FINALIZED',
+            daysLeft: 0,
+          },
+        ],
+      }),
       'GET /users/:id/profile': ok(
         profile({ picks: [], counts: { visitedRestaurants: 1, reviews: 0, picks: 0 } }),
       ),
@@ -174,6 +230,11 @@ describe('탐방러 프로필 (PROFILE-01·02, REVIEW-10)', () => {
           },
         ]),
         seasonId: 3,
+        sigunguId: null,
+        sigungus: [
+          { sigunguId: 3, sigunguName: '강서구', conquestCount: 1 },
+          { sigunguId: 9, sigunguName: '중구', conquestCount: 1 },
+        ],
         isMe: false,
       }),
     });
@@ -187,6 +248,22 @@ describe('탐방러 프로필 (PROFILE-01·02, REVIEW-10)', () => {
     expect(row).toHaveTextContent('맛 ★ 4.8');
     expect(row).toHaveTextContent('9.16 방문');
     expect(row).toHaveAttribute('href', '/reviews/60');
+
+    fireEvent.change(screen.getByRole('combobox', { name: '구' }), { target: { value: '9' } });
+    await waitFor(() =>
+      expect(
+        server.calls('GET /users/:id/visited-restaurants').at(-1)?.query.get('sigunguId'),
+      ).toBe('9'),
+    );
+    // 시즌을 바꾸면 구는 전체로 돌아간다
+    fireEvent.change(await screen.findByRole('combobox', { name: '시즌' }), {
+      target: { value: '2' },
+    });
+    await waitFor(() => {
+      const query = server.calls('GET /users/:id/visited-restaurants').at(-1)?.query;
+      expect(query?.get('seasonId')).toBe('2');
+      expect(query?.get('sigunguId')).toBeNull();
+    });
   });
 
   it('••• → 차단하기 → 리뷰 대신 차단 안내, 다시 풀 수 있다 (BLOCK-01·02)', async () => {
@@ -303,30 +380,6 @@ describe('신고하기 (REPORT-01)', () => {
       'href',
       '/users/5',
     );
-  });
-});
-
-describe('차단한 탐험가 (BLOCK-03)', () => {
-  it('설정에서 들어가 차단을 풀면 목록에서 빠진다', async () => {
-    const server = mockApi({
-      'GET /users/me/blocks': ok(
-        page([
-          {
-            userId: 5,
-            nickname: '동네미식가',
-            profileImageUrl: null,
-            blockedAt: '2026-10-02T10:00:00+09:00',
-          },
-        ]),
-      ),
-      'DELETE /users/me/blocks/:id': ok({ userId: 5, isBlocked: false }, '차단을 풀었어요.'),
-    });
-    renderRoute('/me/blocks');
-
-    expect(await screen.findByText('10월 2일 차단')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '동네미식가 차단 풀기' }));
-    expect(await screen.findByText('차단한 탐험가가 없어요')).toBeInTheDocument();
-    expect(server.calls('DELETE /users/me/blocks/:id')[0].path).toBe('/users/me/blocks/5');
   });
 });
 

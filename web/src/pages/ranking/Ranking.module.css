@@ -231,23 +231,41 @@
 }
 
 /* 먹짱 지도: 구 중심 좌표에 먹짱을 올린다 */
+/* 먹짱 지도: 피그마 서울 25개 구 모양 위에 먹짱·구 이름표 */
 .board {
   position: relative;
-  height: 400px;
+  aspect-ratio: 370 / 304;
   border-radius: 22px;
   background: #e8efe3;
   overflow: hidden;
 }
 
-.river {
+.seoul {
   position: absolute;
-  top: 52%;
-  left: -5%;
-  width: 110%;
-  height: 14px;
-  border-radius: 7px;
-  background: #cfe3ef;
-  transform: rotate(-8deg);
+  overflow: visible;
+}
+
+.seoul path {
+  stroke: var(--mk-white);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+  cursor: pointer;
+}
+
+.seoul path[data-selected='true'] {
+  stroke: var(--mk-forest);
+  stroke-width: 2;
+  filter: brightness(0.94);
+}
+
+.seoul .han {
+  fill: none;
+  stroke: #bcdcf0;
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
+  pointer-events: none;
 }
 
 .marker {

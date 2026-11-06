@@ -231,7 +231,7 @@ export async function listVisitedRestaurants(
     seasonId: season?.id ?? -1,
     sigunguId: query.sigunguId,
   };
-  const [rows, totalCount] = await Promise.all([
+  const [rows, totalCount, bySigungu] = await Promise.all([
     prisma.conquest.findMany({
       where,
       orderBy: [{ conqueredAt: 'desc' }, { id: 'desc' }],
@@ -251,7 +251,25 @@ export async function listVisitedRestaurants(
       },
     }),
     prisma.conquest.count({ where }),
+    // 구 고르기 칸: 그 시즌에 정복한 구와 구마다 정복 수 (구를 골라도 전체 목록을 준다)
+    prisma.conquest.groupBy({
+      by: ['sigunguId'],
+      where: { userId: member.id, seasonId: season?.id ?? -1 },
+      _count: { _all: true },
+    }),
   ]);
+  const names = await prisma.region.findMany({
+    where: { id: { in: bySigungu.map((g) => g.sigunguId) } },
+    select: { id: true, name: true },
+  });
+  const nameOf = new Map(names.map((r) => [r.id, r.name]));
+  const sigungus = bySigungu
+    .map((g) => ({
+      sigunguId: g.sigunguId,
+      sigunguName: nameOf.get(g.sigunguId) ?? '',
+      conquestCount: g._count._all,
+    }))
+    .sort((a, b) => b.conquestCount - a.conquestCount || a.sigunguId - b.sigunguId);
   const items = rows.map((c) => {
     const review = c.visit.review?.status === 'A' ? c.visit.review : null;
     return {
@@ -267,6 +285,8 @@ export async function listVisitedRestaurants(
   });
   return {
     seasonId: season?.id ?? null,
+    sigunguId: query.sigunguId ?? null,
+    sigungus,
     isMe: member.id === viewerId,
     ...toPageResult(items, { ...query, totalCount }),
   };

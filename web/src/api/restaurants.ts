@@ -110,6 +110,7 @@ export type RestaurantDetail = {
     service: number | null;
     price: number | null;
     revisitIntentRate: number | null;
+    revisitIntentCount: number;
     localVisitRate: number | null;
     revisitRate: number | null;
     textReviewCount: number;

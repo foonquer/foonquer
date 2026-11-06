@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { resetViewRegionForTest } from '../lib/region';
 import { mockApi, ok } from './http';
 import { renderRoute } from './render';
@@ -104,6 +104,12 @@ describe('랭킹/현황', () => {
     const card = await screen.findByRole('region', { name: '강서구의 먹짱' });
     expect(card).toHaveTextContent('동네미식가');
     expect(card).toHaveTextContent('내 순위 8위 · 먹짱까지 11곳');
+    // 서울 25개 구 경계를 그리고, 고른 구는 맨 위에 테두리를 굵게
+    const board = screen.getByRole('group', { name: /구별 먹짱 지도/ });
+    const outlines = board.querySelectorAll('path[data-selected]');
+    expect(outlines).toHaveLength(25);
+    expect(board.querySelectorAll('path[data-selected="true"]')).toHaveLength(1);
+    expect(outlines[24]).toHaveAttribute('data-selected', 'true');
     fireEvent.click(screen.getByRole('button', { name: '마포구' }));
     expect(screen.getByRole('region', { name: '마포구의 먹짱' })).toHaveTextContent(
       '아직 먹짱이 없어요',
@@ -381,12 +387,96 @@ describe('내 기록', () => {
       }),
     });
     renderRoute('/me/seasons');
+    // 먹짱이었던 적이 없으면 카드 만들기는 잠김
+    expect(
+      await within(await screen.findByRole('region', { name: '먹짱 카드 만들기' })).findByText(
+        '잠김',
+      ),
+    ).toBeInTheDocument();
     fireEvent.click(await screen.findByRole('button', { name: /첫 정복/ }));
     expect(await screen.findByText('대표 칭호를 첫 정복으로 바꿨어요')).toBeInTheDocument();
     expect(server.calls('PATCH /users/me/representative-title')[0].body).toEqual({
       type: 'ACHIEVEMENT',
       refId: 4,
     });
+  });
+
+  it('먹짱 카드: 시즌·구·PICK TOP 3를 담고 테마를 바꾸며 내 PICK 링크를 복사한다', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    mockApi({
+      'GET /users/me': ok({ id: 1, nickname: '동네미식가', localRegions: [] }),
+      'GET /users/me/season-records': ok({
+        current: {
+          season,
+          conquestCount: 18,
+          sigunguCount: 1,
+          best: {
+            sigunguId: 2,
+            sigunguName: '강서구',
+            rank: 1,
+            tier: 'MUKJJANG',
+            tierName: '먹짱',
+            tierTitle: '강서구의 먹짱',
+            nextTier: null,
+          },
+        },
+        records: [],
+      }),
+      'GET /users/:id/profile': ok({
+        userId: 1,
+        nickname: '동네미식가',
+        trustTemp: 51,
+        picks: ['옛날손칼국수', '수정식당', '이가네떡볶이', '마포숯불갈비'].map((name, i) => ({
+          order: i + 1,
+          restaurantId: i + 1,
+          name,
+          categoryName: '한식',
+          sigunguName: '강서구',
+          dongName: '가양동',
+          lat: 0,
+          lng: 0,
+          comment: null,
+          visitCount: 1,
+        })),
+      }),
+    });
+    renderRoute('/me/mukjjang-card');
+
+    const card = await screen.findByRole('img', { name: /시즌 3 강서구 먹짱 동네미식가 카드/ });
+    const svg = decodeURIComponent((card as HTMLImageElement).src.split(',')[1]);
+    expect(svg).toContain('SEASON 3 · HALL OF FAME');
+    expect(svg).toContain('정복 18곳 · 강서구 1위 · 신뢰 온도 51.0°');
+    expect(svg).toContain('이가네떡볶이');
+    expect(svg).not.toContain('마포숯불갈비'); // TOP 3까지만
+    expect(svg).toContain('#272b5e'); // 기본 테마 밤하늘
+
+    fireEvent.click(screen.getByRole('radio', { name: '크림' }));
+    expect(screen.getByRole('radio', { name: '크림' })).toHaveAttribute('aria-checked', 'true');
+    expect(decodeURIComponent((card as HTMLImageElement).src)).toContain('#fdf1d6');
+    // 라디오 묶음: 고른 테마만 탭 순서에 있고, 화살표로 옮긴다
+    expect(screen.getAllByRole('radio').map((r) => r.getAttribute('tabindex'))).toEqual([
+      '-1',
+      '0',
+      '-1',
+    ]);
+    fireEvent.keyDown(screen.getByRole('radio', { name: '크림' }), { key: 'ArrowRight' });
+    expect(screen.getByRole('radio', { name: '크림' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getAllByRole('radio')[2]).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: '링크 복사' }));
+    expect(await screen.findByText('내 PICK 링크를 복사했어요')).toBeInTheDocument();
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/users/1?tab=pick`);
+    Reflect.deleteProperty(navigator, 'clipboard');
+  });
+
+  it('먹짱 카드: 먹짱이었던 적이 없으면 만들 수 없다고 알려 준다', async () => {
+    mockApi({
+      'GET /users/me': ok({ id: 1, nickname: '동네미식가', localRegions: [] }),
+      'GET /users/me/season-records': ok({ current: null, records: [] }),
+    });
+    renderRoute('/me/mukjjang-card');
+    expect(await screen.findByText('구 먹짱이 되면 만들 수 있어요')).toBeInTheDocument();
   });
 
   it('정복 기록: 달별로 묶고 맛 별점을 보여 준다', async () => {

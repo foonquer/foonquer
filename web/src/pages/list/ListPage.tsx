@@ -1,59 +1,14 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { getSavedRestaurants, type SavedTab } from '../../api/saved';
 import { Button, ButtonLink } from '../../components/Button';
 import { Screen } from '../../components/Screen';
+import { MapView } from '../../components/MapView';
 import { EmptyState, Loading } from '../../components/StateViews';
 import { errorMessage } from '../../lib/api';
 import { formatKoreanDate, joinDot } from '../../lib/format';
 import { usePaged } from '../../lib/usePaged';
 import styles from './List.module.css';
-
-type Pin = { restaurantId: number; name: string; lat: number; lng: number; conquered: boolean };
-
-/** 저장한 가게 위치를 판에 맞춰 늘어놓는다 (전국에 흩어져 있어도 모두 보이게) */
-function PinBoard({
-  pins,
-  selectedId,
-  onSelect,
-}: {
-  pins: Pin[];
-  selectedId: number | null;
-  onSelect: (id: number) => void;
-}) {
-  const lats = pins.map((p) => p.lat);
-  const lngs = pins.map((p) => p.lng);
-  // 한 곳뿐이거나 가까이 모여 있으면 너무 확대되지 않게 최소 범위를 둔다
-  const spanLat = Math.max(Math.max(...lats) - Math.min(...lats), 0.02);
-  const spanLng = Math.max(Math.max(...lngs) - Math.min(...lngs), 0.02);
-  const midLat = (Math.max(...lats) + Math.min(...lats)) / 2;
-  const midLng = (Math.max(...lngs) + Math.min(...lngs)) / 2;
-  return (
-    <div className={styles.board} role="group" aria-label="저장한 맛집 지도">
-      {pins.map((p) => (
-        <button
-          key={p.restaurantId}
-          type="button"
-          className={styles.pin}
-          data-conquered={p.conquered}
-          aria-pressed={p.restaurantId === selectedId}
-          style={{
-            left: `${50 + ((p.lng - midLng) / spanLng) * 76}%`,
-            top: `${50 - ((p.lat - midLat) / spanLat) * 70}%`,
-          }}
-          onClick={() => onSelect(p.restaurantId)}
-        >
-          <span aria-hidden="true">{p.conquered ? '★' : '☆'}</span>
-          {p.name}
-        </button>
-      ))}
-      <p className={styles.legend}>
-        <span>☆ 가고 싶은 곳</span>
-        <span>★ 정복한 곳</span>
-      </p>
-    </div>
-  );
-}
 
 /** 맛집 리스트 탭 /list?tab=WANT|CONQUERED (LIST-01) */
 export function ListPage() {
@@ -62,6 +17,14 @@ export function ListPage() {
   const list = usePaged((page) => getSavedRestaurants({ tab, page, size: 20 }), [tab]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const first = list.first;
+  const pins = useMemo(
+    () =>
+      (first?.pins ?? []).map((p) => ({
+        ...p,
+        conquestState: p.conquered ? ('CONQUERED' as const) : ('NOT_CONQUERED' as const),
+      })),
+    [first],
+  );
   const selected = list.items.find((i) => i.restaurantId === selectedId);
   const pin = first?.pins.find((p) => p.restaurantId === selectedId);
 
@@ -123,7 +86,14 @@ export function ListPage() {
         <p className={styles.leadSub}>
           모아둔 {summary.totalCount}곳 · 아직 안 가본 맛집 {summary.wantCount}곳
         </p>
-        <PinBoard pins={first.pins} selectedId={selectedId} onSelect={setSelectedId} />
+        <div className={styles.board} role="group" aria-label="저장한 맛집 지도">
+          <MapView fit pins={pins} selectedId={selectedId} onPinClick={setSelectedId} />
+          <span className={styles.mapChip}>전국 · 저장 {summary.totalCount}</span>
+          <p className={styles.legend}>
+            <span>☆ 가고 싶은 곳</span>
+            <span>★ 정복한 곳</span>
+          </p>
+        </div>
         {pin && (
           <section className={styles.info} aria-label={`${pin.name} 정보`}>
             <div className={styles.infoHead}>

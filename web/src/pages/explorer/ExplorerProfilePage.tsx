@@ -7,10 +7,12 @@ import {
   type MemberProfile,
   unblockMember,
 } from '../../api/profile';
+import { getSeasons } from '../../api/ranking';
 import { getMemberReviews } from '../../api/reviews';
+import { AchievementIcon } from '../../components/AchievementIcon';
 import { AppHeader } from '../../components/AppHeader';
 import { BottomSheet } from '../../components/BottomSheet';
-import { Button } from '../../components/Button';
+import { Button, ButtonLink } from '../../components/Button';
 import { MukkaebiFigure } from '../../components/MukkaebiFigure';
 import { ReviewCard } from '../../components/ReviewCard';
 import { Screen } from '../../components/Screen';
@@ -93,8 +95,17 @@ function Profile({ p, onBlocked }: { p: MemberProfile; onBlocked: (blocked: bool
     { value: 'reviews', label: '리뷰', count: p.counts.reviews },
   ];
 
+  const showPickMap = tab === 'pick' && !p.isBlocked && p.picks.length > 0;
   return (
-    <Screen>
+    <Screen
+      footer={
+        showPickMap && (
+          <ButtonLink to={`/users/${p.userId}/picks`}>
+            PICK {p.picks.length}곳 지도에서 보기
+          </ButtonLink>
+        )
+      }
+    >
       <AppHeader
         title="탐방러 프로필"
         right={
@@ -116,7 +127,12 @@ function Profile({ p, onBlocked }: { p: MemberProfile; onBlocked: (blocked: bool
       />
       <div className={styles.content}>
         <section className={styles.hero} aria-label={`${name}의 프로필`}>
-          <MukkaebiFigure wearing={wearing} background={m.background?.sigunguName} height={240} />
+          <MukkaebiFigure
+            wearing={wearing}
+            stage={m.stage}
+            background={m.background}
+            height={240}
+          />
           <p className={styles.worn}>
             {joinDot([`${m.stageName} 먹깨비`, ...Object.values(wearing).map((w) => w?.name)])}
           </p>
@@ -194,9 +210,7 @@ function Profile({ p, onBlocked }: { p: MemberProfile; onBlocked: (blocked: bool
             <ul className={styles.achievements}>
               {p.achievements.recent.map((a) => (
                 <li key={a.achievementId}>
-                  <span className={styles.medal} aria-hidden="true">
-                    ★
-                  </span>
+                  <AchievementIcon iconKey={a.iconKey} />
                   <strong>{a.name}</strong>
                   <small>{formatKoreanDate(a.achievedAt)}</small>
                 </li>
@@ -273,6 +287,9 @@ function PickTab({ p }: { p: MemberProfile }) {
     <section aria-label="PICK">
       <p className={styles.listHead}>
         <strong>{p.nickname ?? '탐험가'}의 PICK</strong>
+        <Link to={`/users/${p.userId}/picks`} className={styles.headerLink}>
+          지도로 보기 ›
+        </Link>
       </p>
       <p className={styles.verified}>✓ 모두 직접 방문 인증한 가게 중에서 고른 곳이에요</p>
       <ol className={styles.rows}>
@@ -298,24 +315,29 @@ function PickTab({ p }: { p: MemberProfile }) {
   );
 }
 
-/** 다녀온 가게 — 이번 시즌 정복 (PROFILE-02) */
+/** 다녀온 가게 — 시즌·구를 골라 본다, 처음엔 이번 시즌 전체 구 (PROFILE-02) */
 function VisitedTab({ p }: { p: MemberProfile }) {
-  const list = usePaged((page) => getVisitedRestaurants(p.userId, { page, size: 20 }), [p.userId]);
+  const [seasonId, setSeasonId] = useState(p.currentSeason?.seasonId);
+  const [sigunguId, setSigunguId] = useState<number>();
+  const seasons = useAsync(getSeasons, []);
+  const list = usePaged(
+    (page) => getVisitedRestaurants(p.userId, { seasonId, sigunguId, page, size: 20 }),
+    [p.userId, seasonId, sigunguId],
+  );
+  // 다시 불러오는 동안에도 구 고르기 칸이 비지 않게 마지막 목록을 둔다
+  const [sigungus, setSigungus] = useState(list.first?.sigungus ?? []);
+  if (list.first && list.first.sigungus !== sigungus) setSigungus(list.first.sigungus);
+  const shownSeasonId = seasonId ?? list.first?.seasonId ?? undefined;
+
+  let body;
   if (list.error !== undefined && list.items.length === 0) {
-    return <EmptyState title={errorMessage(list.error)} onRetry={list.reload} />;
-  }
-  if (list.loading && list.items.length === 0) return <Loading />;
-  if (list.items.length === 0) {
-    return <EmptyState title="이번 시즌에 정복한 가게가 없어요" />;
-  }
-  return (
-    <section aria-label="다녀온 가게">
-      <p className={styles.listHead}>
-        <strong>
-          {p.currentSeason ? `시즌 ${p.currentSeason.seasonNo} · ` : ''}
-          {list.totalCount}곳
-        </strong>
-      </p>
+    body = <EmptyState title={errorMessage(list.error)} onRetry={list.reload} />;
+  } else if (list.loading && list.items.length === 0) {
+    body = <Loading />;
+  } else if (list.items.length === 0) {
+    body = <EmptyState title="이 시즌에 정복한 가게가 없어요" />;
+  } else {
+    body = (
       <ul className={styles.rows}>
         {list.items.map((r) => (
           <li key={`${r.restaurantId}-${r.conqueredAt}`}>
@@ -344,6 +366,50 @@ function VisitedTab({ p }: { p: MemberProfile }) {
           </li>
         ))}
       </ul>
+    );
+  }
+
+  return (
+    <section aria-label="다녀온 가게">
+      <div className={styles.listHead}>
+        <span className={styles.pickers}>
+          <select
+            aria-label="시즌"
+            className={styles.sort}
+            value={shownSeasonId ?? ''}
+            onChange={(e) => {
+              setSeasonId(Number(e.target.value));
+              setSigunguId(undefined);
+            }}
+          >
+            {!seasons.data && p.currentSeason && (
+              <option value={p.currentSeason.seasonId}>시즌 {p.currentSeason.seasonNo}</option>
+            )}
+            {seasons.data?.items.map((s) => (
+              <option key={s.seasonId} value={s.seasonId}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="구"
+            className={styles.sort}
+            // 시즌을 바꾸고 새 목록이 오기 전에는 지난 시즌의 구를 고르지 않게 잠근다
+            disabled={list.loading}
+            value={sigunguId ?? ''}
+            onChange={(e) => setSigunguId(Number(e.target.value) || undefined)}
+          >
+            <option value="">전체 구</option>
+            {sigungus.map((g) => (
+              <option key={g.sigunguId} value={g.sigunguId}>
+                {g.sigunguName} {g.conquestCount}곳
+              </option>
+            ))}
+          </select>
+        </span>
+        <strong>{list.totalCount}곳</strong>
+      </div>
+      {body}
       {list.hasNext && (
         <Button variant="white" size="sm" onClick={list.loadMore} disabled={list.loading}>
           더 보기

@@ -257,6 +257,7 @@
 
 .achievementText {
   display: flex;
+  flex: 1;
   flex-direction: column;
   min-width: 0;
 }
@@ -354,4 +355,56 @@
 .candidate[aria-checked='true'] .check {
   border-color: var(--mk-green);
   background: var(--mk-green);
+}
+
+/* 먹짱 카드 만들기 (시즌 기록 · 칭호) */
+.cardBanner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--mk-gold-light);
+  border-radius: 18px;
+  background: var(--mk-cream);
+}
+
+.crown {
+  flex-shrink: 0;
+  font-size: 26px;
+  color: var(--mk-gold);
+}
+
+.cardText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+}
+
+.cardText strong {
+  font-size: 14px;
+  color: var(--mk-ink);
+}
+
+.cardMake,
+.cardLocked {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cardMake {
+  background: var(--mk-forest);
+  color: var(--mk-white);
+}
+
+.cardLocked {
+  background: var(--mk-gray-button);
+  color: var(--mk-muted);
 }

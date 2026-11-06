@@ -285,6 +285,7 @@ describe('REST-01 GET /restaurants/{restaurantId}', () => {
         portion: 4,
         service: 4.7,
         price: 3.7,
+        revisitIntentCount: 2,
         revisitIntentRate: 50,
         localVisitRate: 70,
         revisitRate: 38,

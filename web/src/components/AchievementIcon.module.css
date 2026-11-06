@@ -1,0 +1,25 @@
+.icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--mk-green-50);
+}
+
+.icon[data-reward='true'] {
+  background: var(--mk-cream);
+}
+
+.icon img {
+  height: 72%;
+  object-fit: contain;
+}
+
+.icon[data-done='false'] {
+  background: var(--mk-gray-button);
+}
+
+.icon[data-done='false'] img {
+  filter: grayscale(1);
+  opacity: 0.45;
+}

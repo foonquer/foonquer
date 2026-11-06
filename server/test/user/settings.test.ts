@@ -250,6 +250,16 @@ describe('SET-04 DELETE /users/me', () => {
     });
     const other = await createMember();
     await agreeConsents(me.id, { marketing: true });
+    // 동의했다가 철회한 이력도 함께 지우는지 본다
+    await prisma.memberConsent.create({
+      data: {
+        userId: me.id,
+        consentType: 'MARKETING',
+        agreed: false,
+        policyVersion: 'test',
+        withdrawnAt: new Date(),
+      },
+    });
     await giveLocalRegions(me.id, [GAYANG]);
     const restaurant = await createRestaurant();
     await prisma.restaurantStat.create({
@@ -377,16 +387,8 @@ describe('SET-04 DELETE /users/me', () => {
       (await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).filesPurgedAt,
     ).not.toBeNull();
 
-    // 동의 중이던 항목은 철회 이력이 남는다
-    const latest = await prisma.memberConsent.findMany({
-      where: { userId: me.id, withdrawnAt: { not: null } },
-    });
-    expect(latest.map((r) => r.consentType).sort()).toEqual([
-      'LOCATION',
-      'MARKETING',
-      'PRIVACY',
-      'TERMS',
-    ]);
+    // 약관 동의·철회 이력도 남기지 않는다
+    expect(await prisma.memberConsent.count({ where: { userId: me.id } })).toBe(0);
 
     // 탈퇴한 회원의 토큰은 더 쓸 수 없다
     const after = await request(app)
@@ -439,6 +441,40 @@ describe('SET-04 DELETE /users/me', () => {
     expect(statuses[0]).toBe(200);
     expect([401, 409]).toContain(statuses[1]);
     expect(await prisma.memberWithdrawal.count({ where: { userId: me.id } })).toBe(1);
+  });
+
+  it('탈퇴가 회원 행을 잠근 사이 인증을 통과해 기다리던 동의 저장·알림 설정은 401이고 동의 이력을 다시 만들지 않는다', async () => {
+    const me = await createMember();
+    await agreeConsents(me.id);
+    const consentReq = request(app)
+      .post('/api/v1/users/me/consents')
+      .set('Authorization', bearer(me.id))
+      .send({ terms: true, privacy: true, location: true, marketing: true });
+    const settingsReq = request(app)
+      .patch('/api/v1/users/me/notification-settings')
+      .set('Authorization', bearer(me.id))
+      .send({ marketingAlarm: true });
+
+    // withdrawMember처럼 회원 행을 잠그고 탈퇴 처리하는 사이에 두 요청을 보낸다.
+    // 인증(requireAuth)은 아직 커밋 전이라 지나가고, 두 서비스는 회원 행 잠금을 기다린다
+    let pending: Promise<request.Response[]> | undefined;
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM member WHERE id = ${me.id} FOR UPDATE`;
+        pending = Promise.all([Promise.resolve(consentReq), Promise.resolve(settingsReq)]);
+        await waitForRunningQueries('%status FROM member WHERE id', 2);
+        await tx.member.update({ where: { id: me.id }, data: { status: 'D' } });
+        await tx.memberConsent.deleteMany({ where: { userId: me.id } });
+      },
+      { timeout: 10_000 },
+    );
+
+    const responses = await pending;
+    expect(responses?.map((r) => [r.status, r.body.code])).toEqual([
+      [401, 'TOKEN_INVALID'],
+      [401, 'TOKEN_INVALID'],
+    ]);
+    expect(await prisma.memberConsent.count({ where: { userId: me.id } })).toBe(0);
   });
 
   it('사진 삭제가 실패해도 탈퇴는 성공하고 files_purged_at이 비어 cleanup이 다시 지운다', async () => {

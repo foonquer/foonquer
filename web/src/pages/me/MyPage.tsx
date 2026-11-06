@@ -118,6 +118,10 @@ export function MyPage() {
           ]}
         />
 
+        {me.data?.isAdmin && (
+          <MenuList label="운영" items={[{ label: '운영 관리 · 신고·문의 처리', to: '/admin' }]} />
+        )}
+
         <div className={styles.etc}>
           <Link to="/notices">공지사항</Link>
           <Link to="/support">고객센터</Link>

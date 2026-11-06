@@ -177,7 +177,7 @@ export type Celebration =
       celebrationId: string;
       type: 'BACKGROUND';
       occurredAt: string;
-      data: { sigunguId: number; sigunguName: string };
+      data: { sigunguId: number; sigunguName: string; bgKey: string | null };
     }
   | {
       celebrationId: string;

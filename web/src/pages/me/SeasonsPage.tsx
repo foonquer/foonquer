@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 import {
   getAchievements,
   getSeasonRecords,
@@ -6,6 +7,7 @@ import {
   type OwnedTitle,
   setRepresentativeTitle,
 } from '../../api/ranking';
+import { AchievementIcon } from '../../components/AchievementIcon';
 import { AppHeader } from '../../components/AppHeader';
 import { Screen } from '../../components/Screen';
 import { EmptyState, Loading } from '../../components/StateViews';
@@ -51,6 +53,9 @@ export function SeasonsPage() {
   const { records, titles, achievements } = data;
   const current = records.current;
   const best = current?.best;
+  // 이번 시즌이든 지난 시즌이든 구 먹짱이었으면 카드를 만들 수 있다
+  const wasMukjjang =
+    best?.tier === 'MUKJJANG' || records.records.some((r) => r.tier === 'MUKJJANG');
   const choose = async (title: OwnedTitle | null) => {
     setBusy(true);
     try {
@@ -161,6 +166,23 @@ export function SeasonsPage() {
           ))}
         </div>
 
+        <section className={styles.cardBanner} aria-label="먹짱 카드 만들기">
+          <span className={styles.crown} aria-hidden="true">
+            ♛
+          </span>
+          <span className={styles.cardText}>
+            <strong>먹짱 카드 만들기</strong>구 먹짱이 되면 인스타 · 블로그에 자랑할 수 있는 카드를
+            만들 수 있어요
+          </span>
+          {wasMukjjang ? (
+            <Link to="/me/mukjjang-card" className={styles.cardMake}>
+              만들기
+            </Link>
+          ) : (
+            <span className={styles.cardLocked}>잠김</span>
+          )}
+        </section>
+
         <h2 className={styles.sectionTitle}>
           업적{' '}
           <span className={styles.count}>
@@ -170,6 +192,7 @@ export function SeasonsPage() {
         <ul className={styles.card}>
           {achievements.items.map((a) => (
             <li key={a.achievementId} className={styles.achievement} data-done={a.achieved}>
+              <AchievementIcon iconKey={a.iconKey} size={40} done={a.achieved} />
               <span className={styles.achievementText}>
                 <strong>{a.name}</strong>
                 <span className={styles.rowMeta}>{a.description}</span>

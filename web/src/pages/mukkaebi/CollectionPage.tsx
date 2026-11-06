@@ -101,7 +101,13 @@ export function CollectionPage() {
           <div className={styles.grid}>
             {c.items.map((i) => (
               <div key={i.itemId} className={styles.tile} data-owned={i.owned}>
-                <ItemIcon category={i.category} rarity={i.rarity} size={48} owned={i.owned} />
+                <ItemIcon
+                  category={i.category}
+                  rarity={i.rarity}
+                  code={i.code}
+                  size={48}
+                  owned={i.owned}
+                />
                 <span className={styles.tileName}>{i.owned ? i.name : '???'}</span>
                 <span className={styles.tileSub}>
                   {i.owned ? RARITY_NAME[i.rarity] : (i.howToGet ?? '')}

@@ -74,6 +74,32 @@ describe('PROFILE·PICK·REPORT·BLOCK', () => {
     expect(visited.body.data.totalCount).toBe(2);
   });
 
+  it('다녀온 가게: 그 시즌에 정복한 구 목록(많은 순)과 구로 거르기', async () => {
+    const season = await createActiveSeason(3);
+    const explorer = await createMember();
+    const gangseo = [await createRestaurant(), await createRestaurant()];
+    const junggu = await createRestaurant({ dongCode: '1114016200' }); // 중구 신당동
+    for (const shop of [...gangseo, junggu]) await createConquest(explorer.id, shop, season.id);
+
+    const all = await request(app)
+      .get(`/api/v1/users/${explorer.id}/visited-restaurants`)
+      .set('Authorization', bearer(explorer.id));
+    expect(all.body.data).toMatchObject({ totalCount: 3, sigunguId: null });
+    expect(all.body.data.sigungus).toEqual([
+      { sigunguId: gangseo[0].sigunguId, sigunguName: '강서구', conquestCount: 2 },
+      { sigunguId: junggu.sigunguId, sigunguName: '중구', conquestCount: 1 },
+    ]);
+
+    const one = await request(app)
+      .get(`/api/v1/users/${explorer.id}/visited-restaurants`)
+      .query({ sigunguId: junggu.sigunguId })
+      .set('Authorization', bearer(explorer.id));
+    expect(one.body.data.totalCount).toBe(1);
+    expect(one.body.data.items[0].restaurantId).toBe(Number(junggu.id));
+    // 구를 골라도 고르기 칸은 그 시즌 전체 구를 그대로 준다
+    expect(one.body.data.sigungus).toHaveLength(2);
+  });
+
   it('PICK은 정복한 가게만, 10곳까지, 같은 가게 두 번 안 됨 — 거절되면 기존 PICK은 그대로', async () => {
     const season = await createActiveSeason(3);
     const me = await createMember();

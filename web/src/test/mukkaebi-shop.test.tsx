@@ -1,7 +1,13 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { MyMukkaebi, ShopItem } from '../api/mukkaebi';
-import { mockApi, ok } from './http';
+// 기대 그림은 backgroundArt를 거치지 않고 파일을 직접 가져와 비교한다
+import gangseoBg from '../assets/backgrounds/BG_1150000000.svg';
+import nightsky from '../assets/illust/mukkaebi-nightsky.svg';
+import { MukkaebiFigure } from '../components/MukkaebiFigure';
+import { itemArt } from '../lib/itemArt';
+import { fail, mockApi, ok } from './http';
+import { signIn } from '../lib/session';
 import { renderRoute } from './render';
 
 const mukkaebi = (patch: Partial<MyMukkaebi> = {}): MyMukkaebi => ({
@@ -75,6 +81,97 @@ describe('먹깨비 꾸미기', () => {
     fireEvent.click(save);
     await waitFor(() => expect(router.state.location.pathname).toBe('/me/mukkaebi'));
     expect(server.calls('PUT /characters/me/appearance')[0].body).toEqual({ hatItemId: 5 });
+  });
+
+  it('종류 탭: 기본 먹깨비와 가진 밤하늘 중에 고르고, 밤하늘을 고르면 미리보기 몸이 바뀐다', async () => {
+    const server = mockApi({
+      'GET /characters/me': ok(mukkaebi()),
+      'GET /characters/me/items': ok({
+        items: [
+          {
+            ...owned(11, '밤하늘'),
+            code: 'SKIN_NIGHTSKY',
+            category: 'SKIN',
+            rarity: 'H',
+          },
+        ],
+        backgrounds: [],
+      }),
+      'PUT /characters/me/appearance': ok({ equipped: {}, background: null }),
+    });
+    const { container } = renderRoute('/me/mukkaebi/decorate?tab=SKIN');
+
+    const tabs = await screen.findByRole('tablist', { name: '꾸미기 칸' });
+    expect(within(tabs).getAllByRole('tab')[0]).toHaveTextContent('종류');
+    expect(screen.getByRole('radio', { name: /기본 먹깨비/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    fireEvent.click(screen.getByRole('radio', { name: /밤하늘/ }));
+    // img.src는 절대 주소로 바뀔 수 있어 속성 값 그대로 비교한다
+    expect(
+      [...container.querySelectorAll('img')].some((img) => img.getAttribute('src') === nightsky),
+    ).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: '저장하기' }));
+    await waitFor(() =>
+      expect(server.calls('PUT /characters/me/appearance')[0]?.body).toEqual({ skinItemId: 11 }),
+    );
+  });
+
+  it('배경 탭: 얻은 구 배경을 그림으로 보여 주고, 고르면 미리보기 바탕이 그 구 그림이 된다', async () => {
+    const gangseo = gangseoBg;
+    const server = mockApi({
+      'GET /characters/me': ok(mukkaebi()),
+      'GET /characters/me/items': ok({
+        items: [],
+        backgrounds: [
+          { sigunguId: 3, sigunguName: '강서구', bgKey: 'BG_1150000000', isSelected: false },
+          { sigunguId: 9, sigunguName: '새로운구', bgKey: null, isSelected: false },
+        ],
+      }),
+      'PUT /characters/me/appearance': ok({ equipped: {}, background: null }),
+    });
+    const { container } = renderRoute('/me/mukkaebi/decorate?tab=BACKGROUND');
+
+    const tile = await screen.findByRole('radio', { name: /강서구/ });
+    expect(tile.querySelector('img')).toHaveAttribute('src', gangseo);
+    // 그림이 없는 구는 이름 두 글자
+    const plain = screen.getByRole('radio', { name: /새로운구/ });
+    expect(plain.querySelector('img')).toBeNull();
+    expect(within(plain).getByText('새로', { exact: true })).toBeInTheDocument();
+    fireEvent.click(tile);
+    expect(screen.getByText('미리보기').parentElement).toHaveTextContent('미리보기강서구 배경');
+    expect(
+      [...container.querySelectorAll('img')].filter((img) => img.src === gangseo),
+    ).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: '저장하기' }));
+    await waitFor(() =>
+      expect(server.calls('PUT /characters/me/appearance')[0]?.body).toEqual({ bgSigunguId: 3 }),
+    );
+  });
+});
+
+describe('꾸민 먹깨비 그림', () => {
+  it('그림이 있는 아이템은 몸 위에 입히고, 없는 아이템은 둘레에 이름을 단다', () => {
+    const { container } = render(
+      <MukkaebiFigure
+        wearing={{
+          HAT: { code: 'HAT_CROWN', name: '왕관' },
+          CLUB: { code: 'CLUB_GOLD', name: '황금 방망이' },
+          PROP: { code: 'PROP_NEW', name: '새 소품' },
+        }}
+      />,
+    );
+    const layers = [...container.querySelectorAll('img[data-layer]')].map((img) => [
+      img.getAttribute('data-layer'),
+      img.getAttribute('src'),
+    ]);
+    expect(layers).toEqual([
+      ['CLUB', itemArt('CLUB_GOLD')],
+      ['HAT', itemArt('HAT_CROWN')],
+    ]);
+    expect(screen.getByText('새 소품')).toBeInTheDocument();
+    expect(screen.queryByText('왕관')).not.toBeInTheDocument();
   });
 });
 
@@ -256,6 +353,90 @@ describe('아이템 상자·축하·먹포인트', () => {
     });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(server.calls('PATCH /users/me/celebrations/:id/seen')).toHaveLength(2);
+  });
+
+  it('닫고 바로 다른 탭으로 가서 확인 기록보다 목록이 먼저 와도 같은 축하를 다시 띄우지 않고, 기록이 실패하면 다음에 다시 띄운다', async () => {
+    const levelUp = {
+      celebrationId: 'LEVEL_UP:20',
+      type: 'LEVEL_UP',
+      occurredAt: '2026-09-25T12:00:00+09:00',
+      data: { fromLevel: 19, toLevel: 20, stage: 'KID', stageName: '어린이', itemBoxCount: 0 },
+    };
+    let answerSeen: (ok: boolean) => void = () => undefined;
+    const server = mockApi({
+      'GET /users/me/celebrations': ok({ items: [levelUp] }),
+      'PATCH /users/me/celebrations/:id/seen': () =>
+        new Promise((resolve) => {
+          answerSeen = (done) =>
+            resolve(done ? ok({ seen: true }) : fail(500, 'INTERNAL_SERVER_ERROR'));
+        }),
+    });
+    const { router } = renderRoute('/list');
+    const dialog = await screen.findByRole('dialog', { name: 'LV.19 → LV.20' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '나중에 할게요' }));
+
+    // 확인 기록이 끝나기 전에 다른 탭 → 새로 부른 목록에 같은 축하가 있어도 띄우지 않는다
+    await act(() => router.navigate('/ranking'));
+    await waitFor(() => expect(server.calls('GET /users/me/celebrations')).toHaveLength(2));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // 기록이 실패하면 다음에 부를 때 다시 띄운다
+    await act(async () => answerSeen(false));
+    await act(() => router.navigate('/me'));
+    expect(await screen.findByRole('dialog', { name: 'LV.19 → LV.20' })).toBeInTheDocument();
+  });
+
+  it('같은 계정이 토큰만 다시 받으면 닫은 축하를 계속 숨기고, 다른 계정이 되면 그 계정의 같은 축하는 띄운다', async () => {
+    const levelUp = {
+      celebrationId: 'LEVEL_UP:30',
+      type: 'LEVEL_UP',
+      occurredAt: '2026-09-25T12:00:00+09:00',
+      data: { fromLevel: 29, toLevel: 30, stage: 'KID', stageName: '어린이', itemBoxCount: 0 },
+    };
+    /** sub만 담은 가짜 JWT (화면은 서명을 확인하지 않는다) */
+    const tokenOf = (sub: string, n: number) =>
+      `h.${btoa(JSON.stringify({ sub, n })).replace(/=+$/, '')}.s`;
+    mockApi({
+      'GET /users/me/celebrations': ok({ items: [levelUp] }),
+      // 확인 기록이 끝나지 않은 채로 둔다
+      'PATCH /users/me/celebrations/:id/seen': () => new Promise(() => undefined),
+    });
+    const { router } = renderRoute('/list');
+    act(() => signIn(tokenOf('1', 1), 'HOME'));
+    const dialog = await screen.findByRole('dialog', { name: 'LV.29 → LV.30' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '나중에 할게요' }));
+
+    // 같은 계정의 토큰 재발급 → 그대로 숨김
+    act(() => signIn(tokenOf('1', 2), 'HOME'));
+    await act(() => router.navigate('/ranking'));
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // 다른 탭에서 다른 계정으로 바꾼 뒤 재발급 → 그 계정의 같은 id 축하는 띄운다
+    act(() => signIn(tokenOf('2', 3), 'HOME'));
+    await act(() => router.navigate('/me'));
+    expect(await screen.findByRole('dialog', { name: 'LV.29 → LV.30' })).toBeInTheDocument();
+  });
+
+  it('축하는 홈이 아닌 탭 화면에서도 뜨고, 누르면 그 화면으로 간다', async () => {
+    mockApi({
+      'GET /users/me/celebrations': ok({
+        items: [
+          {
+            celebrationId: 'BACKGROUND:3',
+            type: 'BACKGROUND',
+            occurredAt: '2026-09-25T12:00:00+09:00',
+            data: { sigunguId: 3, sigunguName: '강서구', bgKey: 'BG_1150000000' },
+          },
+        ],
+      }),
+      'PATCH /users/me/celebrations/:id/seen': ok({ seen: true }),
+    });
+    const { router } = renderRoute('/list');
+    const dialog = await screen.findByRole('dialog', { name: '강서구 배경을 얻었어요!' });
+    expect(dialog.querySelector('img')?.getAttribute('src')).toBe(gangseoBg);
+    fireEvent.click(within(dialog).getByRole('button', { name: '배경 바꾸러 가기' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/me/mukkaebi/decorate'));
   });
 
   it('먹포인트 내역을 날짜별로 묶고 모은/쓴 내역으로 거른다', async () => {

@@ -3,6 +3,7 @@ import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app';
 import { prisma } from '../../src/lib/prisma';
+import * as achievement from '../../src/modules/achievement/achievement.service';
 import * as storage from '../../src/lib/storage';
 import { resetDb } from '../helpers/db';
 import {
@@ -27,6 +28,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 /** 별점 대기(V) 방문 인증 */
@@ -61,6 +63,19 @@ describe('REVIEW-01 종합 별점 등록 및 정복 완료', () => {
         tier: 'MUKJJANG',
       },
       celebrations: { tierUp: { from: 'BEGINNER', to: 'MUKJJANG' } },
+    });
+    // 이 구에서 첫 정복이라 이전 순위가 없고, 먹짱은 다음 티어가 없다
+    expect(res.body.data.conquest).toMatchObject({ previousRank: null, nextTier: null });
+    // 다음 정복 보상: 첫 정복은 받았고, 남은 수가 가장 적은 "3개 구 탐험"(1/3)
+    expect(res.body.data.nextReward).toEqual({
+      achievementId: expect.any(Number),
+      name: '3개 구 탐험',
+      conditionType: 'DISTRICT_COUNT',
+      current: 1,
+      target: 3,
+      remaining: 2,
+      rewardPoint: 100,
+      rewardItems: [],
     });
     // 새 가게 첫 정복 +100, 티어 상승 +100 (방문 인증 +50은 인증 때 받음), 첫 정복 업적 +50
     expect(res.body.data.rewards.point).toBe(200);
@@ -108,8 +123,16 @@ describe('REVIEW-01 종합 별점 등록 및 정복 완료', () => {
     const rival = await createMember();
     const shops = await Promise.all([1, 2, 3, 4, 5, 6].map(() => createRestaurant()));
     await rate(rival.id, (await verified(rival.id, shops[0].id, season.id)).id, 4);
+    const results = [];
     for (const shop of shops.slice(0, 5))
-      await rate(me.id, (await verified(me.id, shop.id, season.id)).id, 4);
+      results.push(await rate(me.id, (await verified(me.id, shop.id, season.id)).id, 4));
+    // 1곳: 먼저 1곳을 채운 사람에게 밀려 2위, 단골까지 4곳 → 2곳: 2위 → 1위
+    expect(results[0].body.data.conquest).toMatchObject({
+      rank: 2,
+      previousRank: null,
+      nextTier: { tierName: '단골', remaining: 4 },
+    });
+    expect(results[1].body.data.conquest).toMatchObject({ rank: 1, previousRank: 2 });
 
     const mine = await prisma.seasonRegionStat.findFirstOrThrow({ where: { userId: me.id } });
     expect(mine).toMatchObject({ conquestCount: 5, rankNo: 1, tier: 'M' });
@@ -124,6 +147,42 @@ describe('REVIEW-01 종합 별점 등록 및 정복 완료', () => {
         where: { userId: me.id, achievement: { code: 'REGULAR_START' } },
       }),
     ).toBe(1);
+  });
+
+  it('다음 정복 보상은 아직 못 받은 정복 업적만 보고, 보상 아이템도 알려 준다', async () => {
+    const season = await createActiveSeason(3);
+    const me = await createMember();
+    // 남은 수가 적은 정복 업적은 이미 받았다고 두면 "한 시즌 30곳 정복"(황금 방망이)이 남는다
+    const done = await prisma.achievement.findMany({
+      where: { code: { in: ['REGULAR_START', 'DISTRICT_3', 'DISTRICT_5'] } },
+    });
+    await prisma.memberAchievement.createMany({
+      data: done.map((a) => ({ userId: me.id, achievementId: a.id })),
+    });
+    const shop = await createRestaurant();
+    const res = await rate(me.id, (await verified(me.id, shop.id, season.id)).id, 4);
+    expect(res.body.data.nextReward).toMatchObject({
+      name: '한 시즌 30곳 정복',
+      conditionType: 'SEASON_CONQUEST',
+      current: 1,
+      target: 30,
+      remaining: 29,
+      rewardItems: [{ code: 'CLUB_GOLD', name: '황금 방망이' }],
+    });
+  });
+
+  it('다음 정복 보상 조회가 실패해도 정복은 끝났으니 201로 답하고 nextReward만 null', async () => {
+    const season = await createActiveSeason(3);
+    const me = await createMember();
+    const shop = await createRestaurant();
+    const visit = await verified(me.id, shop.id, season.id);
+    vi.spyOn(achievement, 'nextConquestReward').mockRejectedValueOnce(new Error('DB 끊김'));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const res = await rate(me.id, visit.id, 4);
+    expect(res.status).toBe(201);
+    expect(res.body.data.nextReward).toBeNull();
+    expect(res.body.data.conquest.isNewConquest).toBe(true);
   });
 
   it('한 구에서 10곳을 정복하면 구 배경을 얻고 바로 골라 둔다', async () => {
@@ -269,6 +328,29 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
       .get(`/api/v1/reviews/${card.reviewId}`)
       .set('Authorization', bearer(viewer.id));
     expect(detail.body.data.reviewId).toBe(card.reviewId);
+  });
+
+  it('재방문 의사 있음 필터는 맛 별점 3.0 이상만, 가게 stats에 그 수를 준다', async () => {
+    const season = await createActiveSeason(3);
+    const viewer = await createMember();
+    const shop = await createRestaurant();
+    for (const score of [3, 2.5, 4.5]) {
+      await ratedReview((await createMember()).id, shop.id, season.id, score);
+    }
+
+    const res = await request(app)
+      .get(`/api/v1/restaurants/${shop.id}/reviews`)
+      .query({ revisitOnly: true })
+      .set('Authorization', bearer(viewer.id));
+    expect(res.status).toBe(200);
+    expect(res.body.data.items.map((r: { overallScore: number }) => r.overallScore)).toEqual([
+      4.5, 3,
+    ]);
+
+    const detail = await request(app)
+      .get(`/api/v1/restaurants/${shop.id}`)
+      .set('Authorization', bearer(viewer.id));
+    expect(detail.body.data.stats).toMatchObject({ revisitIntentCount: 2, revisitIntentRate: 67 });
   });
 
   it('리뷰 수정은 보낸 항목만, 삭제는 세부평가만 지우고 종합 별점은 남긴다', async () => {

@@ -2,6 +2,7 @@ import type { Tx } from '../../common/db';
 import { checkAchievements, type UnlockedAchievement } from '../achievement/achievement.service';
 import { notify } from '../notification/notify';
 import {
+  nextTierOf,
   recomputeSigunguRanking,
   TIER_API,
   TIER_NAME,
@@ -24,9 +25,13 @@ export interface ConquestResult {
   stat: {
     conquestCount: number;
     rank: number | null;
+    /** 이번 정복 전 순위 (이 구에서 이번 시즌 첫 정복이면 null) — 정복 완료 "8위 → 7위" */
+    previousRank: number | null;
     topPercent: number | null;
     tier: string;
     tierTitle: string;
+    /** 다음 티어와 남은 정복 수 (정복자·먹짱은 순위로 정해져서 remaining이 null) */
+    nextTier: { tierName: string; remaining: number | null } | null;
   } | null;
   tierUp: { from: string; to: string; tierTitle: string } | null;
   backgroundUnlocked: { sigunguId: number; sigunguName: string; bgKey: string | null } | null;
@@ -63,6 +68,10 @@ export async function applyConquest(
   if (seasonId !== null) {
     // 같은 구의 정복·순위 계산을 한 줄로 세운다 (둘이 동시에 1위·먹짱으로 저장되지 않게)
     await tx.$queryRaw`SELECT id FROM region WHERE id = ${restaurant.sigunguId} FOR UPDATE`;
+    const before = await tx.seasonRegionStat.findUnique({
+      where: { seasonId_sigunguId_userId: { seasonId, sigunguId: restaurant.sigunguId, userId } },
+      select: { rankNo: true },
+    });
     const existing = await tx.conquest.findUnique({
       where: {
         userId_restaurantId_seasonId: { userId, restaurantId: restaurant.id, seasonId },
@@ -159,12 +168,16 @@ export async function applyConquest(
       where: { seasonId_sigunguId_userId: { seasonId, sigunguId: restaurant.sigunguId, userId } },
     });
     if (mine) {
+      const tier = mine.tier as TierCode;
+      const next = nextTierOf(tier, mine.conquestCount);
       stat = {
         conquestCount: mine.conquestCount,
         rank: mine.rankNo,
+        previousRank: before?.rankNo ?? null,
         topPercent: mine.topPercent?.toNumber() ?? null,
-        tier: TIER_API[mine.tier as TierCode],
-        tierTitle: tierTitle(sigungu.name, mine.tier as TierCode),
+        tier: TIER_API[tier],
+        tierTitle: tierTitle(sigungu.name, tier),
+        nextTier: next ? { tierName: TIER_NAME[next.tier], remaining: next.remaining } : null,
       };
     }
   }

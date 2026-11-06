@@ -235,6 +235,53 @@ export async function checkAchievements(
   return unlocked;
 }
 
+/** 정복해서 채우는 업적 종류 (정복 완료 "다음 정복 보상") */
+const CONQUEST_REWARD_TYPES: ConditionType[] = [
+  'CONQUEST_TOTAL',
+  'SIGUNGU_CONQUEST',
+  'DISTRICT_COUNT',
+  'SEASON_CONQUEST',
+];
+
+/**
+ * 정복 완료 화면 "다음 정복 보상" (피그마 784:9805): 정복으로 채우는 업적 중 아직 못 받았고
+ * 남은 수가 가장 적은 것 (같으면 sortOrder 순). 남은 것이 없으면 null
+ */
+export async function nextConquestReward(db: Db, userId: bigint, now = new Date()) {
+  const candidates = await db.achievement.findMany({
+    where: {
+      status: 'A',
+      conditionType: { in: CONQUEST_REWARD_TYPES },
+      memberAchievements: { none: { userId } },
+    },
+    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+    include: {
+      items: { where: { status: 'A' }, select: { id: true, code: true, name: true } },
+    },
+  });
+  const progress = new Map<string, number>();
+  let best: { a: (typeof candidates)[number]; current: number; remaining: number } | null = null;
+  for (const a of candidates) {
+    if (!progress.has(a.conditionType)) {
+      progress.set(a.conditionType, await progressOf(db, userId, a.conditionType, now));
+    }
+    const current = progress.get(a.conditionType) ?? 0;
+    const remaining = a.conditionValue - current;
+    if (remaining > 0 && (!best || remaining < best.remaining)) best = { a, current, remaining };
+  }
+  if (!best) return null;
+  return {
+    achievementId: best.a.id,
+    name: best.a.name,
+    conditionType: best.a.conditionType,
+    current: best.current,
+    target: best.a.conditionValue,
+    remaining: best.remaining,
+    rewardPoint: best.a.rewardPoint,
+    rewardItems: best.a.items.map((i) => ({ itemId: i.id, code: i.code, name: i.name })),
+  };
+}
+
 /** 시즌 확정 때: 그 시즌 한 구에서 가장 높았던 최종 순위로 SEASON_RANK 업적(TOP 10·먹짱)을 준다 */
 export async function grantSeasonRankAchievements(
   tx: Tx,
