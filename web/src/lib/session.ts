@@ -34,6 +34,21 @@ export function getSession() {
   return session;
 }
 
+/**
+ * 지금 accessToken의 회원 id(sub). 토큰이 없거나 읽을 수 없으면 ''.
+ * 화면에서 계정이 바뀌었는지 볼 때만 쓴다 (서명 확인은 서버가 한다)
+ */
+export function sessionOwner(): string {
+  const payload = accessToken?.split('.')[1];
+  if (!payload) return '';
+  try {
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    return String((JSON.parse(json) as { sub?: unknown }).sub ?? '');
+  } catch {
+    return '';
+  }
+}
+
 /** 카카오 로그인·토큰 재발급이 성공했을 때 */
 export function signIn(token: string, nextAction: NextAction) {
   generation += 1;
