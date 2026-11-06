@@ -5,6 +5,7 @@ import nightsky from '../assets/illust/mukkaebi-nightsky.svg';
 import { MukkaebiFigure } from '../components/MukkaebiFigure';
 import { itemArt } from '../lib/itemArt';
 import { fail, mockApi, ok } from './http';
+import { signIn } from '../lib/session';
 import { renderRoute } from './render';
 
 const mukkaebi = (patch: Partial<MyMukkaebi> = {}): MyMukkaebi => ({
@@ -346,6 +347,26 @@ describe('아이템 상자·축하·먹포인트', () => {
     await act(async () => answerSeen(false));
     await act(() => router.navigate('/me'));
     expect(await screen.findByRole('dialog', { name: 'LV.19 → LV.20' })).toBeInTheDocument();
+  });
+
+  it('토큰을 다시 받으면(다른 탭에서 계정을 바꿨을 수 있음) 닫은 축하 기록을 비운다', async () => {
+    const levelUp = {
+      celebrationId: 'LEVEL_UP:30',
+      type: 'LEVEL_UP',
+      occurredAt: '2026-09-25T12:00:00+09:00',
+      data: { fromLevel: 29, toLevel: 30, stage: 'KID', stageName: '어린이', itemBoxCount: 0 },
+    };
+    mockApi({
+      'GET /users/me/celebrations': ok({ items: [levelUp] }),
+      // 확인 기록이 끝나지 않은 채로 둔다
+      'PATCH /users/me/celebrations/:id/seen': () => new Promise(() => undefined),
+    });
+    const { router } = renderRoute('/list');
+    const dialog = await screen.findByRole('dialog', { name: 'LV.29 → LV.30' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '나중에 할게요' }));
+    act(() => signIn('other-account-token', 'HOME'));
+    await act(() => router.navigate('/ranking'));
+    expect(await screen.findByRole('dialog', { name: 'LV.29 → LV.30' })).toBeInTheDocument();
   });
 
   it('축하는 홈이 아닌 탭 화면에서도 뜨고, 누르면 그 화면으로 간다', async () => {

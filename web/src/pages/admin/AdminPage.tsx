@@ -88,6 +88,18 @@ export function AdminPage() {
 }
 
 /** 운영자가 아니면 서버가 403을 준다 */
+/** 목록이 남아 있는데 다시 불러오기·더 보기가 실패했을 때 (실패한 요청을 다시) */
+function moreError(error: unknown, retry: () => void) {
+  return (
+    <p className={styles.moreError} role="alert">
+      {errorMessage(error)}
+      <button type="button" onClick={retry}>
+        다시 시도
+      </button>
+    </p>
+  );
+}
+
 function listError(error: unknown, reload: () => void) {
   return error instanceof ApiError && error.status === 403 ? (
     <EmptyState title="운영자만 볼 수 있어요" />
@@ -174,6 +186,7 @@ function Reports() {
           ))}
         </ul>
       )}
+      {list.error !== undefined && list.items.length > 0 && moreError(list.error, list.retry)}
       {list.hasNext && (
         <Button variant="white" size="sm" onClick={list.loadMore} disabled={list.loading}>
           더 보기
@@ -325,6 +338,7 @@ function Inquiries() {
           ))}
         </ul>
       )}
+      {list.error !== undefined && list.items.length > 0 && moreError(list.error, list.retry)}
       {list.hasNext && (
         <Button variant="white" size="sm" onClick={list.loadMore} disabled={list.loading}>
           더 보기

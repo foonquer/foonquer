@@ -177,6 +177,48 @@ describe('review-ai 주기 작업 (Gemini 리뷰 분석)', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('응답 본문이 JSON이 아니면 unreadable, 본문을 읽다 끊기면 다음 실행에서 다시 한다', async () => {
+    const html = await textReview('첫 번째 글');
+    const cut = await textReview('두 번째 글');
+    const broken = new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.error(new Error('연결 끊김'));
+        },
+      }),
+    );
+    const replies = [new Response('<html>오류</html>'), broken];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(replies.shift()!)),
+    );
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    expect(await runReviewAiJob(new Date(), noWait)).toMatchObject({ unreadable: 1, errors: 1 });
+    expect(
+      (await prisma.review.findUniqueOrThrow({ where: { id: html.id } })).aiCheckedAt,
+    ).not.toBeNull();
+    expect(
+      (await prisma.review.findUniqueOrThrow({ where: { id: cut.id } })).aiCheckedAt,
+    ).toBeNull();
+  });
+
+  it('근거 문장이 300자를 넘어도 버리지 않고 잘라서 협찬 의심으로 남긴다', async () => {
+    const review = await textReview('체험단으로 받은 음식이에요');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          answer({ adSuspected: true, adEvidence: '가'.repeat(400), aiLikeTone: false }),
+        ),
+      ),
+    );
+    expect(await runReviewAiJob(new Date(), noWait)).toMatchObject({ analyzed: 1, adSuspected: 1 });
+    const saved = await prisma.review.findUniqueOrThrow({ where: { id: review.id } });
+    expect(saved.adSuspected).toBe(true);
+    expect((saved.aiResult as { adEvidence: string }).adEvidence).toHaveLength(300);
+  });
+
   it('분석하는 사이에 글을 고치면 결과를 저장하지 않고, 고친 글은 다음 실행에서 다시 분석한다', async () => {
     const review = await textReview('사장님께 서비스 받고 작성');
     let edit = true;
