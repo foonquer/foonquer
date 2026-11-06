@@ -1,0 +1,81 @@
+/* Figma 프로필 수정: 캐릭터 88 (top 100) / 닉네임 (top 236) / 성별 (top 466) / 나이대 (top 551) / 내 동네 (top 634) */
+.saveText {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+.saveText:disabled {
+  color: var(--mk-disabled-text);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 8px var(--mk-side) 24px;
+}
+
+.avatar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatarChange {
+  padding: 4px 10px;
+  border: 1px solid var(--mk-line);
+  border-radius: 12px;
+  background: var(--mk-white);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.counter {
+  font-size: 12px;
+  color: var(--mk-subtle);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.regionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 50px;
+  padding: 0 16px;
+  border: 1px solid var(--mk-line);
+  border-radius: 14px;
+  background: var(--mk-white);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--mk-ink);
+}
+
+.regionChange {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+.info {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--mk-green-info);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mk-forest);
+  white-space: pre-line;
+}

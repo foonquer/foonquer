@@ -129,7 +129,8 @@ router.use('/reviews', reviewRouter);
 - **서버 호출**: `api.get/post/patch/delete`는 성공하면 `data`를, 실패하면 `ApiError`(`code`, `message`, `data`)를 던진다. 메시지까지 필요하면 `api.call()`. 로그인 토큰은 알아서 붙고, `TOKEN_EXPIRED`면 한 번 재발급한 뒤 다시 보낸다.
 - **로그인 상태**: accessToken은 메모리에만 두고 refreshToken은 서버의 httpOnly 쿠키다. 앱을 열면 `POST /auth/refresh`로 로그인을 복구한다. 로그인 API가 성공하면 `signIn(accessToken, nextAction)`만 부르면 라우트 가드가 다음 화면(약관 동의·프로필 설정·홈)으로 보낸다.
 - **화면 데이터**: `useAsync(() => api.get(...), [deps])` → `{ data, error, loading, reload }`.
-- **공통 컴포넌트**: `Screen`(화면 틀·하단 버튼), `AppHeader`(‹ 제목), `PageTitle`(큰 제목·설명), `Button`, `TextField`, `ChoiceGroup`(성별·나이대 같은 버튼 고르기), `BottomSheet`, `Dialog`, `useToast()`, `FilterChips`, `ResultScreen`(메일 발송·완료 안내), `DongFinder`(동 검색·현재 위치·구/동 목록), `ConsentCard`(약관 동의), `EmptyState`, `Loading`.
+- **보고 있는 동네·내 위치**: 홈·검색·추천은 `useViewRegion()`(처음엔 내 동네 첫 곳, 지역 선택 시트로 바꾼다)과 `useMyCoords()`(위치 권한이 없으면 `null`)를 같이 쓴다.
+- **공통 컴포넌트**: `Screen`(화면 틀·하단 버튼), `AppHeader`(‹ 제목), `PageTitle`(큰 제목·설명), `Button`, `TextField`, `ChoiceGroup`(성별·나이대 같은 버튼 고르기), `BottomSheet`, `Dialog`, `useToast()`, `FilterChips`, `ResultScreen`(메일 발송·완료 안내), `DongFinder`(동 검색·현재 위치·구/동 목록), `ConsentCard`(약관 동의), `MenuList`(내 정보·설정 메뉴 줄), `RestaurantCard`(음식점 목록 카드), `RegionSelectSheet`(지역 선택), `EmptyState`, `Loading`.
 
 ```tsx
 export function MyReviewsPage() {
