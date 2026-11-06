@@ -290,23 +290,35 @@ describe('아이템 상자·축하·먹포인트', () => {
     expect(await screen.findByRole('dialog', { name: 'LV.19 → LV.20' })).toBeInTheDocument();
   });
 
-  it('토큰을 다시 받으면(다른 탭에서 계정을 바꿨을 수 있음) 닫은 축하 기록을 비운다', async () => {
+  it('같은 계정이 토큰만 다시 받으면 닫은 축하를 계속 숨기고, 다른 계정이 되면 그 계정의 같은 축하는 띄운다', async () => {
     const levelUp = {
       celebrationId: 'LEVEL_UP:30',
       type: 'LEVEL_UP',
       occurredAt: '2026-09-25T12:00:00+09:00',
       data: { fromLevel: 29, toLevel: 30, stage: 'KID', stageName: '어린이', itemBoxCount: 0 },
     };
+    /** sub만 담은 가짜 JWT (화면은 서명을 확인하지 않는다) */
+    const tokenOf = (sub: string, n: number) =>
+      `h.${btoa(JSON.stringify({ sub, n })).replace(/=+$/, '')}.s`;
     mockApi({
       'GET /users/me/celebrations': ok({ items: [levelUp] }),
       // 확인 기록이 끝나지 않은 채로 둔다
       'PATCH /users/me/celebrations/:id/seen': () => new Promise(() => undefined),
     });
     const { router } = renderRoute('/list');
+    act(() => signIn(tokenOf('1', 1), 'HOME'));
     const dialog = await screen.findByRole('dialog', { name: 'LV.29 → LV.30' });
     fireEvent.click(within(dialog).getByRole('button', { name: '나중에 할게요' }));
-    act(() => signIn('other-account-token', 'HOME'));
+
+    // 같은 계정의 토큰 재발급 → 그대로 숨김
+    act(() => signIn(tokenOf('1', 2), 'HOME'));
     await act(() => router.navigate('/ranking'));
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // 다른 탭에서 다른 계정으로 바꾼 뒤 재발급 → 그 계정의 같은 id 축하는 띄운다
+    act(() => signIn(tokenOf('2', 3), 'HOME'));
+    await act(() => router.navigate('/me'));
     expect(await screen.findByRole('dialog', { name: 'LV.29 → LV.30' })).toBeInTheDocument();
   });
 

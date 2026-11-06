@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { RECEIPT_ACCEPT, uploadImage } from '../../api/uploads';
 import { submitReceipt } from '../../api/visits';
@@ -43,7 +43,16 @@ export function ReceiptPage() {
   const restaurantId = Number.isInteger(id) && id > 0 ? id : undefined;
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [sending, setSending] = useState(false);
-  const { video, state: cam, start: startCamera, stop: stopCamera, capture } = useCamera();
+  const {
+    video,
+    state: cam,
+    start: startCamera,
+    stop: stopCamera,
+    resume: resumeCamera,
+    capture,
+  } = useCamera();
+  /** 촬영 번호. 찍는 사이에 앨범에서 고르거나 화면을 떠나면 올려서, 늦게 끝난 촬영 결과를 버린다 */
+  const shot = useRef(0);
 
   useEffect(
     () => () => {
@@ -51,16 +60,25 @@ export function ReceiptPage() {
     },
     [photo],
   );
+  useEffect(
+    () => () => {
+      shot.current += 1;
+    },
+    [],
+  );
 
   const pick = (files: FileList | null) => {
     const file = files?.[0];
     if (!file) return;
+    shot.current += 1;
     stopCamera();
     setPhoto({ file, url: URL.createObjectURL(file) });
   };
 
   const shoot = async () => {
+    const mine = ++shot.current;
     const file = await capture();
+    if (mine !== shot.current) return;
     if (!file) {
       toast('사진을 찍지 못했어요. 잠시 뒤 다시 눌러 주세요.');
       return;
@@ -71,8 +89,8 @@ export function ReceiptPage() {
 
   const retake = () => {
     setPhoto(null);
-    // 켜는 중에 앨범 사진을 골랐으면(starting) 그 요청은 버려졌으니 새로 켠다
-    if (cam === 'live' || cam === 'starting') void startCamera();
+    // 사진을 고르느라 꺼 둔 카메라를 다시 켠다 (켜진 적이 없으면 권한 확인부터)
+    if (cam === 'paused') resumeCamera();
   };
 
   const retry = async () => {
