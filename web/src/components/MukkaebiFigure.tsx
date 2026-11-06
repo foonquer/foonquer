@@ -3,6 +3,7 @@ import type { ItemCategory, Stage } from '../api/mukkaebi';
 import egg from '../assets/illust/mukkaebi-egg.svg';
 import nightsky from '../assets/illust/mukkaebi-nightsky.svg';
 import mukkaebi from '../assets/illust/mukkaebi.svg';
+import { backgroundArt } from '../lib/backgroundArt';
 import { ITEM_SIZE, itemArt } from '../lib/itemArt';
 import type { Wearing } from '../lib/wearing';
 import { ItemIcon } from './ItemIcon';
@@ -15,8 +16,8 @@ type Props = {
   sizePercent?: number;
   /** 알이면 알 그림 */
   stage?: Stage;
-  /** 구 배경 이름 (있으면 바탕을 바꾼다) */
-  background?: string | null;
+  /** 고른 구 배경 (있으면 바탕을 그 구 그림으로 바꾼다) */
+  background?: { sigunguName: string; bgKey: string | null } | null;
   /** 왼쪽 위 칩 (미리보기 · LV.7 아기 먹깨비) */
   badge?: string;
   height?: number;
@@ -92,10 +93,17 @@ export function MukkaebiFigure({
   });
   // 그림이 없는 아이템은 둘레에 칸 모양 아이콘과 이름
   const spots = SPOTS.filter((c) => wearing[c] && !placed.some((p) => p.c === c));
+  const bgArt = backgroundArt(background?.bgKey);
   return (
     <div className={styles.stage} data-bg={Boolean(background)} style={{ height }}>
-      {badge && <span className={styles.badge}>{badge}</span>}
-      {background && <span className={styles.bgName}>{background} 배경</span>}
+      {bgArt && <img src={bgArt} alt="" className={styles.bgArt} />}
+      {/* 피그마 꾸미기 · 배경(318:5872): 왼쪽 위 칩에 미리보기와 배경 이름을 함께 */}
+      {(badge || background) && (
+        <span className={styles.label} data-bg={Boolean(background)}>
+          {badge && <span className={styles.badge}>{badge}</span>}
+          {background && <span className={styles.bgName}>{background.sigunguName} 배경</span>}
+        </span>
+      )}
       <span
         className={styles.body}
         style={{ width: `${Math.max(40, Math.min(100, sizePercent)) * 1.5}px` }}

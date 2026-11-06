@@ -20,6 +20,7 @@ import { Screen } from '../../components/Screen';
 import { EmptyState, Loading } from '../../components/StateViews';
 import { useToast } from '../../components/Toast';
 import { errorMessage } from '../../lib/api';
+import { backgroundArt } from '../../lib/backgroundArt';
 import { useAsync } from '../../lib/useAsync';
 import styles from './Mukkaebi.module.css';
 
@@ -177,7 +178,7 @@ function Decorate({
           wearing={wearing}
           sizePercent={m.sizePercent}
           stage={m.stage}
-          background={bg?.sigunguName}
+          background={bg}
           badge="미리보기"
           height={250}
         />
@@ -223,7 +224,11 @@ function Decorate({
                   draft.BACKGROUND === b.sigunguId,
                   () => setDraft({ ...draft, BACKGROUND: b.sigunguId }),
                   <>
-                    <span className={styles.bgThumb}>{b.sigunguName.slice(0, 2)}</span>
+                    {backgroundArt(b.bgKey) ? (
+                      <img src={backgroundArt(b.bgKey)} alt="" className={styles.bgThumb} />
+                    ) : (
+                      <span className={styles.bgThumb}>{b.sigunguName.slice(0, 2)}</span>
+                    )}
                     <span className={styles.tileName}>{b.sigunguName}</span>
                     <span className={styles.tileSub}>
                       {saved.BACKGROUND === b.sigunguId ? '사용 중' : '보유'}
