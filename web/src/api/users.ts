@@ -107,9 +107,22 @@ export const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 type ProfileImage = { profileImageUrl: string | null; profileImageSource: 'CUSTOM' | 'DEFAULT' };
 
-/** USER-02 → 스토리지 PUT → USER-06 프로필 사진 바꾸기 */
+const TYPE_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+};
+
+/**
+ * USER-02 → 스토리지 PUT → USER-06 프로필 사진 바꾸기.
+ * 여기 형식 검사는 안내용이고, 실제 형식(파일 앞부분)은 서버가 USER-06에서 확인한다
+ */
 export async function changeProfileImage(file: File) {
-  if (!PROFILE_IMAGE_ACCEPT.split(',').includes(file.type)) {
+  // 일부 브라우저는 형식을 비워 주므로 그때는 확장자로 정한다
+  const type =
+    file.type || TYPE_BY_EXTENSION[file.name.split('.').pop()?.toLowerCase() ?? ''] || '';
+  if (!PROFILE_IMAGE_ACCEPT.split(',').includes(type)) {
     throw new ApiError(400, 'UNSUPPORTED_IMAGE_TYPE', 'JPG, PNG, WebP 사진만 올릴 수 있어요.');
   }
   if (file.size > PROFILE_IMAGE_MAX_BYTES) {
@@ -120,7 +133,7 @@ export async function changeProfileImage(file: File) {
     method: 'PUT';
     headers: Record<string, string>;
     imageKey: string;
-  }>('/users/me/profile-image/upload-url', { contentType: file.type, fileSize: file.size });
+  }>('/users/me/profile-image/upload-url', { contentType: type, fileSize: file.size });
   let res: Response;
   try {
     res = await fetch(target.uploadUrl, { method: 'PUT', headers: target.headers, body: file });

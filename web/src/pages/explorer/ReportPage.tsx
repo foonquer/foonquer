@@ -19,7 +19,8 @@ export function ReportPage() {
   const params = useParams();
   const navigate = useNavigate();
   const toast = useToast();
-  const name = (useLocation().state as { name?: string } | null)?.name ?? '이 탐험가';
+  const location = useLocation();
+  const name = (location.state as { name?: string } | null)?.name ?? '이 탐험가';
   const isReview = params.reviewId !== undefined;
   const targetId = Number(isReview ? params.reviewId : params.userId);
   const detailId = useId();
@@ -38,7 +39,12 @@ export function ReportPage() {
         detail: detail.trim() || null,
       });
       toast({ message: message.replace(/\.$/, ''), check: true });
-      navigate(-1);
+      // 링크로 바로 들어와 이전 화면이 없으면(key가 default) 앱 밖으로 나가지 않게 신고한 화면으로 (AppHeader와 같은 규칙)
+      if (location.key === 'default') {
+        navigate(isReview ? `/reviews/${targetId}` : `/users/${targetId}`, { replace: true });
+      } else {
+        navigate(-1);
+      }
     } catch (err) {
       toast(errorMessage(err));
     } finally {

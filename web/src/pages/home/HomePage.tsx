@@ -84,8 +84,8 @@ export function HomePage() {
           <MukkaebiAvatar size={54} />
           <div className={styles.profileText}>
             {summary.data && <span className={styles.level}>LV.{summary.data.mukkaebi.level}</span>}
-            <p className={styles.nickname}>
-              {me.data?.nickname ?? ''}
+            <p className={styles.nameRow}>
+              <span className={styles.nickname}>{me.data?.nickname ?? ''}</span>
               {title && <span className={styles.title}>{title}</span>}
             </p>
           </div>

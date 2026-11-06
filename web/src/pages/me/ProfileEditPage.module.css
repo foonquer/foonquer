@@ -111,6 +111,14 @@
   color: var(--mk-ink);
 }
 
+.bioBox:focus-within {
+  border-color: var(--mk-green);
+}
+
+.bio:focus {
+  outline: none;
+}
+
 .bioBox .counter {
   align-self: flex-end;
 }
