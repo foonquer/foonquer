@@ -242,7 +242,13 @@ function RankTab({
           </p>
           <p className={styles.selectedRow}>
             <span className={styles.selectedName}>
-              {selected.mukjjang?.nickname ?? '아직 먹짱이 없어요'}
+              {selected.mukjjang ? (
+                <Link to={`/users/${selected.mukjjang.userId}`} className={styles.profileLink}>
+                  {selected.mukjjang.nickname}
+                </Link>
+              ) : (
+                '아직 먹짱이 없어요'
+              )}
             </span>
             {selected.mukjjang && (
               <span className={styles.selectedCount}>{selected.mukjjang.conquestCount}곳 정복</span>

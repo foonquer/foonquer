@@ -66,7 +66,13 @@ export function ReviewCard({ review: r, showRestaurant, onChange }: Props) {
             <MukkaebiAvatar size={36} />
           )}
           <div className={styles.author}>
-            <p className={styles.nickname}>{r.author.nickname ?? '탐방러'}</p>
+            {r.author.userId !== null ? (
+              <Link to={`/users/${r.author.userId}`} className={styles.nickname}>
+                {r.author.nickname ?? '탐방러'}
+              </Link>
+            ) : (
+              <p className={styles.nickname}>{r.author.nickname ?? '탐방러'}</p>
+            )}
             <p className={styles.authorMeta}>
               {joinDot([
                 r.author.title,

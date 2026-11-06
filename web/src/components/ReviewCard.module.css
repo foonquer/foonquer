@@ -26,6 +26,7 @@
 }
 
 .nickname {
+  display: block;
   font-size: 14px;
   font-weight: 700;
   color: var(--mk-ink);

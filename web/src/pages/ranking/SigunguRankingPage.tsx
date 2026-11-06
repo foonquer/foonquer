@@ -66,7 +66,15 @@ export function SigunguRankingPage() {
               {podium.map((p) => (
                 <li key={p.rank} className={styles.podiumItem} data-rank={p.rank}>
                   <img src={p.profileImageUrl ?? mukkaebi} alt="" />
-                  <span className={styles.podiumName}>{p.nickname}</span>
+                  <span className={styles.podiumName}>
+                    {p.userId !== null ? (
+                      <Link to={`/users/${p.userId}`} className={styles.profileLink}>
+                        {p.nickname}
+                      </Link>
+                    ) : (
+                      p.nickname
+                    )}
+                  </span>
                   <span className={styles.podiumMeta}>
                     {p.rank}위 · {p.rank === 1 ? '먹짱 ' : ''}
                     {p.conquestCount}곳{p.rank === 1 ? '' : ' 정복'}
@@ -116,7 +124,13 @@ export function SigunguRankingPage() {
                       {p.rank}
                     </span>
                     <span className={styles.rowName}>
-                      {p.nickname}의 PICK
+                      {p.userId !== null ? (
+                        <Link to={`/users/${p.userId}?tab=pick`} className={styles.profileLink}>
+                          {p.nickname}의 PICK
+                        </Link>
+                      ) : (
+                        `${p.nickname}의 PICK`
+                      )}
                       <br />
                       <span className={styles.rowSub}>
                         {p.restaurants.map((r) => r.name).join(' · ')}
@@ -141,7 +155,13 @@ export function SigunguRankingPage() {
                 <li key={r.rank} data-me={r.isMe}>
                   <span className={styles.rowRank}>{r.rank}</span>
                   <span className={styles.rowName}>
-                    {r.nickname}
+                    {r.userId !== null ? (
+                      <Link to={`/users/${r.userId}`} className={styles.profileLink}>
+                        {r.nickname}
+                      </Link>
+                    ) : (
+                      r.nickname
+                    )}
                     {r.isMe && ' (나)'}
                   </span>
                   <span className={styles.rowTier}>{r.tierName}</span>

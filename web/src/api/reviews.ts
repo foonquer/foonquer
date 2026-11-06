@@ -159,6 +159,12 @@ export const getMyReviews = (query: {
   size?: number;
 }) => api.get<Page<Review>>('/users/me/reviews', query);
 
+/** REVIEW-10 탐방러 리뷰 목록 (차단한 탐험가면 빈 목록) */
+export const getMemberReviews = (
+  userId: number,
+  query: { sort?: 'LATEST' | 'HELPFUL'; page?: number; size?: number },
+) => api.get<Page<Review>>(`/users/${userId}/reviews`, query);
+
 /** 좋았던 점·아쉬웠던 점 칩 (맛·양·가격·서비스·청결·대기시간·분위기) */
 export const getReviewAspects = () =>
   api.get<{ items: { aspectId: number; code: string; name: string }[] }>('/review-aspects');
