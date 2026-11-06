@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished } from 'vitest';
 import { createApp } from '../../src/app';
 import { prisma } from '../../src/lib/prisma';
 import { grantSeasonRankAchievements } from '../../src/modules/achievement/achievement.service';
@@ -446,6 +446,49 @@ describe('v1.3 아이템 상자 · 세트 · 업적 보상 아이템', () => {
     );
     expect(await prisma.pointHistory.count({ where: { userId: poor.id } })).toBe(0);
     expect(await prisma.memberItem.count({ where: { userId: poor.id } })).toBe(0);
+  });
+
+  it('판매 기간이 지난 세트는 400 SET_NOT_FOR_SALE, 숨긴 세트는 404 SET_NOT_FOUND, 실패하면 DB는 그대로', async () => {
+    const me = await createMember();
+    await give(me.id, 1000);
+    // item_set은 resetDb가 비우지 않는 기본 데이터라 테스트용 세트는 끝나고 지운다
+    const ids = [await itemId('HAT_SNAPBACK'), await itemId('FACE_MUSTACHE')];
+    const ended = await prisma.itemSet.create({
+      data: {
+        code: 'TEST_SET_ENDED',
+        name: '지난 세트',
+        price: 100,
+        saleEnd: new Date(Date.now() - 60_000),
+        items: { create: ids.map((itemId) => ({ itemId })) },
+      },
+    });
+    const hidden = await prisma.itemSet.create({
+      data: {
+        code: 'TEST_SET_HIDDEN',
+        name: '숨긴 세트',
+        price: 100,
+        status: 'H',
+        items: { create: ids.map((itemId) => ({ itemId })) },
+      },
+    });
+    onTestFinished(async () => {
+      await prisma.itemSetItem.deleteMany({ where: { setId: { in: [ended.id, hidden.id] } } });
+      await prisma.itemSet.deleteMany({ where: { id: { in: [ended.id, hidden.id] } } });
+    });
+
+    const shop = await api(me.id).get('/shop/items?category=HAT');
+    expect(shop.body.data.sets.map((s: { code: string }) => s.code)).toEqual(['SET_STRAWBERRY']);
+    const late = await api(me.id).post('/shop/set-purchases', { setId: ended.id });
+    expect([late.status, late.body.code]).toEqual([400, 'SET_NOT_FOR_SALE']);
+    const gone = await api(me.id).post('/shop/set-purchases', { setId: hidden.id });
+    expect([gone.status, gone.body.code]).toEqual([404, 'SET_NOT_FOUND']);
+    expect((await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).pointBalance).toBe(
+      1000,
+    );
+    expect(await prisma.memberItem.count({ where: { userId: me.id } })).toBe(0);
+    expect(await prisma.pointHistory.count({ where: { userId: me.id, reason: 'PURCHASE' } })).toBe(
+      0,
+    );
   });
 
   it('명예 아이템은 업적 보상: 상점 명예 탭에 필요한 업적을 보여 주고, 업적을 달성하면 받는다', async () => {
