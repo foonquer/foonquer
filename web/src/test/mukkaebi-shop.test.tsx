@@ -1,7 +1,8 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { MyMukkaebi, ShopItem } from '../api/mukkaebi';
-import { mockApi, ok } from './http';
+import { fail, mockApi, ok } from './http';
+import { signIn } from '../lib/session';
 import { renderRoute } from './render';
 
 const mukkaebi = (patch: Partial<MyMukkaebi> = {}): MyMukkaebi => ({
@@ -256,6 +257,89 @@ describe('아이템 상자·축하·먹포인트', () => {
     });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(server.calls('PATCH /users/me/celebrations/:id/seen')).toHaveLength(2);
+  });
+
+  it('닫고 바로 다른 탭으로 가서 확인 기록보다 목록이 먼저 와도 같은 축하를 다시 띄우지 않고, 기록이 실패하면 다음에 다시 띄운다', async () => {
+    const levelUp = {
+      celebrationId: 'LEVEL_UP:20',
+      type: 'LEVEL_UP',
+      occurredAt: '2026-09-25T12:00:00+09:00',
+      data: { fromLevel: 19, toLevel: 20, stage: 'KID', stageName: '어린이', itemBoxCount: 0 },
+    };
+    let answerSeen: (ok: boolean) => void = () => undefined;
+    const server = mockApi({
+      'GET /users/me/celebrations': ok({ items: [levelUp] }),
+      'PATCH /users/me/celebrations/:id/seen': () =>
+        new Promise((resolve) => {
+          answerSeen = (done) =>
+            resolve(done ? ok({ seen: true }) : fail(500, 'INTERNAL_SERVER_ERROR'));
+        }),
+    });
+    const { router } = renderRoute('/list');
+    const dialog = await screen.findByRole('dialog', { name: 'LV.19 → LV.20' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '나중에 할게요' }));
+
+    // 확인 기록이 끝나기 전에 다른 탭 → 새로 부른 목록에 같은 축하가 있어도 띄우지 않는다
+    await act(() => router.navigate('/ranking'));
+    await waitFor(() => expect(server.calls('GET /users/me/celebrations')).toHaveLength(2));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // 기록이 실패하면 다음에 부를 때 다시 띄운다
+    await act(async () => answerSeen(false));
+    await act(() => router.navigate('/me'));
+    expect(await screen.findByRole('dialog', { name: 'LV.19 → LV.20' })).toBeInTheDocument();
+  });
+
+  it('같은 계정이 토큰만 다시 받으면 닫은 축하를 계속 숨기고, 다른 계정이 되면 그 계정의 같은 축하는 띄운다', async () => {
+    const levelUp = {
+      celebrationId: 'LEVEL_UP:30',
+      type: 'LEVEL_UP',
+      occurredAt: '2026-09-25T12:00:00+09:00',
+      data: { fromLevel: 29, toLevel: 30, stage: 'KID', stageName: '어린이', itemBoxCount: 0 },
+    };
+    /** sub만 담은 가짜 JWT (화면은 서명을 확인하지 않는다) */
+    const tokenOf = (sub: string, n: number) =>
+      `h.${btoa(JSON.stringify({ sub, n })).replace(/=+$/, '')}.s`;
+    mockApi({
+      'GET /users/me/celebrations': ok({ items: [levelUp] }),
+      // 확인 기록이 끝나지 않은 채로 둔다
+      'PATCH /users/me/celebrations/:id/seen': () => new Promise(() => undefined),
+    });
+    const { router } = renderRoute('/list');
+    act(() => signIn(tokenOf('1', 1), 'HOME'));
+    const dialog = await screen.findByRole('dialog', { name: 'LV.29 → LV.30' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '나중에 할게요' }));
+
+    // 같은 계정의 토큰 재발급 → 그대로 숨김
+    act(() => signIn(tokenOf('1', 2), 'HOME'));
+    await act(() => router.navigate('/ranking'));
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // 다른 탭에서 다른 계정으로 바꾼 뒤 재발급 → 그 계정의 같은 id 축하는 띄운다
+    act(() => signIn(tokenOf('2', 3), 'HOME'));
+    await act(() => router.navigate('/me'));
+    expect(await screen.findByRole('dialog', { name: 'LV.29 → LV.30' })).toBeInTheDocument();
+  });
+
+  it('축하는 홈이 아닌 탭 화면에서도 뜨고, 누르면 그 화면으로 간다', async () => {
+    mockApi({
+      'GET /users/me/celebrations': ok({
+        items: [
+          {
+            celebrationId: 'BACKGROUND:3',
+            type: 'BACKGROUND',
+            occurredAt: '2026-09-25T12:00:00+09:00',
+            data: { sigunguId: 3, sigunguName: '강서구', bgKey: null },
+          },
+        ],
+      }),
+      'PATCH /users/me/celebrations/:id/seen': ok({ seen: true }),
+    });
+    const { router } = renderRoute('/list');
+    const dialog = await screen.findByRole('dialog', { name: '강서구 배경을 얻었어요!' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '배경 바꾸러 가기' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/me/mukkaebi/decorate'));
   });
 
   it('먹포인트 내역을 날짜별로 묶고 모은/쓴 내역으로 거른다', async () => {

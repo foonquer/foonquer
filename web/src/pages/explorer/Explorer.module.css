@@ -271,6 +271,11 @@
   color: var(--mk-ink);
 }
 
+.pickers {
+  display: flex;
+  gap: 4px;
+}
+
 .sort {
   border: 0;
   background: transparent;

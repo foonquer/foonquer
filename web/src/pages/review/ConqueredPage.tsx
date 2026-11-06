@@ -1,5 +1,5 @@
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
-import type { RatingResult } from '../../api/reviews';
+import type { NextConquestReward, RatingResult } from '../../api/reviews';
 import mukkaebi from '../../assets/illust/mukkaebi.svg';
 import { AppHeader } from '../../components/AppHeader';
 import { Button } from '../../components/Button';
@@ -16,12 +16,19 @@ export function ConqueredPage() {
   // 새로 고침 등으로 결과를 잃었으면 내 리뷰로 (정복은 이미 끝났다)
   if (!result?.reviewId) return <Navigate to="/me/reviews" replace />;
 
-  const { conquest, rewards, celebrations } = result;
+  const { conquest, rewards, celebrations, nextReward } = result;
+  const { rank, previousRank, nextTier } = conquest;
+  // 피그마 "강서구 8위 → 7위 · 미식가까지 11곳"
   const standing = conquest.isNewConquest
     ? joinDot([
-        conquest.rank !== null ? `${conquest.sigunguName} ${conquest.rank}위` : null,
-        conquest.tierTitle,
-        conquest.conquestCount !== null ? `이번 시즌 ${conquest.conquestCount}곳` : null,
+        rank === null
+          ? null
+          : previousRank !== null && previousRank !== rank
+            ? `${conquest.sigunguName} ${previousRank}위 → ${rank}위`
+            : `${conquest.sigunguName} ${rank}위`,
+        nextTier?.remaining
+          ? `${nextTier.tierName}까지 ${nextTier.remaining}곳`
+          : conquest.tierTitle,
       ])
     : '이번 시즌에 이미 정복한 가게라 순위는 그대로예요';
   const extras = [
@@ -71,6 +78,8 @@ export function ConqueredPage() {
           <p className={flow.celebrateSub}>{standing}</p>
         </section>
 
+        {nextReward && <NextReward reward={nextReward} />}
+
         {(rewards.point > 0 || extras.length > 0) && (
           <section className={flow.card} aria-label="받은 보상">
             <p className={flow.sectionLabel}>받은 보상</p>
@@ -97,5 +106,52 @@ export function ConqueredPage() {
         </section>
       </div>
     </Screen>
+  );
+}
+
+/** 지금 진행 값 (피그마 "누적 정복 8곳") */
+const PROGRESS: Record<NextConquestReward['conditionType'], (n: number) => string> = {
+  CONQUEST_TOTAL: (n) => `누적 정복 ${n}곳`,
+  SIGUNGU_CONQUEST: (n) => `한 구에서 정복 ${n}곳`,
+  SEASON_CONQUEST: (n) => `한 시즌에 정복 ${n}곳`,
+  DISTRICT_COUNT: (n) => `정복한 구 ${n}개`,
+};
+
+/** 다음 정복 보상 카드 (피그마 784:9805) — 아이템을 주면 아이템 이름, 아니면 업적 이름과 포인트 */
+function NextReward({ reward }: { reward: NextConquestReward }) {
+  const item = reward.rewardItems[0];
+  const district = reward.conditionType === 'DISTRICT_COUNT';
+  return (
+    <section className={flow.card} aria-label="다음 정복 보상">
+      <p className={flow.rewardLabel}>다음 정복 보상</p>
+      <p className={flow.rewardName}>{item?.name ?? reward.name}</p>
+      <p className={flow.rewardText}>
+        {district
+          ? `새 구 ${reward.remaining}곳에서만 더 정복하면`
+          : `${reward.remaining}곳만 더 정복하면`}{' '}
+        {item ? '내 것이 돼요!' : `+${formatPoint(reward.rewardPoint)}를 받아요!`}
+      </p>
+      <span
+        className={flow.progress}
+        role="progressbar"
+        aria-label={`${reward.name} 진행도`}
+        aria-valuemin={0}
+        aria-valuemax={reward.target}
+        aria-valuenow={reward.current}
+      >
+        <span
+          style={{
+            width: `${Math.min(100, Math.max(0, (reward.current / reward.target) * 100))}%`,
+          }}
+        />
+      </span>
+      <p className={flow.progressFoot}>
+        <strong>{PROGRESS[reward.conditionType](reward.current)}</strong>
+        <span>
+          {district ? `${reward.target}개 구` : `${reward.target}곳`} 달성 시{' '}
+          {item ? '해금' : '보상'}
+        </span>
+      </p>
+    </section>
   );
 }

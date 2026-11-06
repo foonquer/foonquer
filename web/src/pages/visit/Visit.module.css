@@ -361,9 +361,40 @@
   opacity: 0.6;
 }
 
+/* 화면 안 카메라: 영상을 네모에 꽉 채우고 안내 글은 아래에 얹는다 */
+.frame[data-live='true'] {
+  position: relative;
+  overflow: hidden;
+  background: var(--mk-ink);
+}
+
+.video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.frameHint {
+  position: absolute;
+  bottom: 14px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  color: var(--mk-white);
+}
+
 .captureButtons {
   display: flex;
   gap: 10px;
+}
+
+/* 버튼은 남은 칸을 나눠 갖는다 (앨범 칸은 96px 고정) */
+.captureButtons > button {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .fileButton {
@@ -385,6 +416,11 @@
   flex: 0 0 96px;
   background: var(--mk-white);
   color: var(--mk-forest);
+}
+
+/* 아래 버튼 칸에 세로로 쌓을 때 (카메라 안내·꺼짐) */
+.fileButton[data-full='true'] {
+  flex: none;
 }
 
 .fileButton input {

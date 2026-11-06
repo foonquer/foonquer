@@ -8,13 +8,22 @@ type Props<T extends string> = {
   value: T;
   onChange: (value: T) => void;
   label: string;
+  /** 칩이 한 줄에 다 안 들어가면 글자 길이대로 두고 가로로 밀어 본다 */
+  scroll?: boolean;
 };
 
 /** 정렬·추천 기준 칩 (현지인 인기 / 재방문 많음 / …). 고른 칩은 진초록 */
-export function FilterChips<T extends string>({ options, value, onChange, label }: Props<T>) {
+export function FilterChips<T extends string>({
+  options,
+  value,
+  onChange,
+  label,
+  scroll,
+}: Props<T>) {
   return (
     <div
       className={styles.row}
+      data-scroll={scroll || undefined}
       role="radiogroup"
       aria-label={label}
       onKeyDown={(e) =>

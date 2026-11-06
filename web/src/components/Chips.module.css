@@ -16,6 +16,17 @@
   white-space: nowrap;
 }
 
+.row[data-scroll] {
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.row[data-scroll] .chip {
+  flex: 0 0 auto;
+  padding: 0 14px;
+}
+
 .chip[aria-checked='true'] {
   background: var(--mk-forest);
   color: var(--mk-white);
