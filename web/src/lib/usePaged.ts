@@ -70,6 +70,13 @@ export function usePaged<P extends PageLike<unknown>>(
     [],
   );
 
+  /** 받아 둔 쪽을 모두 고친다 (지우기·모두 읽음처럼 다시 부르지 않을 때) */
+  const edit = useCallback(
+    (fn: (page: P) => P) =>
+      setLoaded((prev) => (prev ? { ...prev, pages: prev.pages.map(fn) } : prev)),
+    [],
+  );
+
   return {
     items: pages.flatMap((p) => p.items as T[]),
     /** 1쪽 응답 전체 (요약 등 목록 밖 값) */
@@ -81,5 +88,6 @@ export function usePaged<P extends PageLike<unknown>>(
     loadMore,
     reload,
     update,
+    edit,
   };
 }
