@@ -196,9 +196,9 @@ describe('ADMIN 관리자 API', () => {
     });
     expect(deleted.status).toBe(409);
     expect(deleted.body.code).toBe('INVALID_REVIEW_STATUS');
-    expect(
-      (await as(admin.id).patch('/admin/reviews/999999/status', { status: 'HIDDEN' })).status,
-    ).toBe(404);
+    expect((await prisma.review.findUniqueOrThrow({ where: { id: review.id } })).status).toBe('D');
+    const missing = await as(admin.id).patch('/admin/reviews/999999/status', { status: 'HIDDEN' });
+    expect([missing.status, missing.body.code]).toEqual([404, 'REVIEW_NOT_FOUND']);
   });
 
   it('회원 신고 → 이용 정지(모든 API 403), 찾기, 정지 해제, 내 계정은 정지 못 함', async () => {
@@ -234,13 +234,15 @@ describe('ADMIN 관리자 API', () => {
     const self = await as(admin.id).patch(`/admin/members/${admin.id}/status`, {
       status: 'SUSPENDED',
     });
-    expect(self.body.code).toBe('CANNOT_SUSPEND_SELF');
+    expect([self.status, self.body.code]).toEqual([400, 'CANNOT_SUSPEND_SELF']);
+    expect((await prisma.member.findUniqueOrThrow({ where: { id: admin.id } })).status).toBe('A');
     const pending = await createMember({ status: 'P', nickname: null });
     const invalid = await as(admin.id).patch(`/admin/members/${pending.id}/status`, {
       status: 'SUSPENDED',
     });
     expect(invalid.status).toBe(409);
     expect(invalid.body.code).toBe('INVALID_MEMBER_STATUS');
+    expect((await prisma.member.findUniqueOrThrow({ where: { id: pending.id } })).status).toBe('P');
   });
 
   it('마패 붙이기(가게 has_mapae) → 같은 가게 또 붙이면 409 → 해제 → 다시 해제하면 409', async () => {
@@ -265,9 +267,10 @@ describe('ADMIN 관리자 API', () => {
     });
     expect(dup.status).toBe(409);
     expect(dup.body.code).toBe('MAPAE_ALREADY_ACTIVE');
-    expect(
-      (await as(admin.id).post('/admin/mapae', { restaurantId: 999999, reason: 'AD' })).status,
-    ).toBe(404);
+    expect(await prisma.restaurantMapae.count()).toBe(1);
+    const noShop = await as(admin.id).post('/admin/mapae', { restaurantId: 999999, reason: 'AD' });
+    expect([noShop.status, noShop.body.code]).toEqual([404, 'RESTAURANT_NOT_FOUND']);
+    expect(await prisma.restaurantMapae.count()).toBe(1);
 
     const list = await as(admin.id).get('/admin/mapae');
     expect(list.body.data.items).toEqual([
@@ -284,7 +287,13 @@ describe('ADMIN 관리자 API', () => {
     const again = await as(admin.id).patch(`/admin/mapae/${mapae.id}/release`, {
       releaseReason: '이벤트 종료',
     });
-    expect(again.body.code).toBe('MAPAE_ALREADY_RELEASED');
+    expect([again.status, again.body.code]).toEqual([409, 'MAPAE_ALREADY_RELEASED']);
+    expect(
+      (await prisma.restaurantMapae.findUniqueOrThrow({ where: { id: mapae.id } })).status,
+    ).toBe('R');
+    expect((await prisma.restaurant.findUniqueOrThrow({ where: { id: shop.id } })).hasMapae).toBe(
+      false,
+    );
   });
 
   it('1:1 문의 답변 → 답변 완료 + 알림(처음 한 번), 고쳐 쓸 수 있다', async () => {
