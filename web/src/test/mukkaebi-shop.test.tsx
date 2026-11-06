@@ -106,7 +106,10 @@ describe('먹깨비 꾸미기', () => {
       'true',
     );
     fireEvent.click(screen.getByRole('radio', { name: /밤하늘/ }));
-    expect([...container.querySelectorAll('img')].some((img) => img.src === nightsky)).toBe(true);
+    // img.src는 절대 주소로 바뀔 수 있어 속성 값 그대로 비교한다
+    expect(
+      [...container.querySelectorAll('img')].some((img) => img.getAttribute('src') === nightsky),
+    ).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: '저장하기' }));
     await waitFor(() =>
       expect(server.calls('PUT /characters/me/appearance')[0]?.body).toEqual({ skinItemId: 11 }),
