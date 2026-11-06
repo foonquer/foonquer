@@ -136,7 +136,9 @@ describe('먹깨비 꾸미기', () => {
     const tile = await screen.findByRole('radio', { name: /강서구/ });
     expect(tile.querySelector('img')).toHaveAttribute('src', gangseo);
     // 그림이 없는 구는 이름 두 글자
-    expect(screen.getByRole('radio', { name: /새로운구/ })).toHaveTextContent('새로');
+    const plain = screen.getByRole('radio', { name: /새로운구/ });
+    expect(plain.querySelector('img')).toBeNull();
+    expect(within(plain).getByText('새로', { exact: true })).toBeInTheDocument();
     fireEvent.click(tile);
     expect(screen.getByText('미리보기').parentElement).toHaveTextContent('미리보기강서구 배경');
     expect(
