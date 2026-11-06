@@ -196,6 +196,8 @@ export async function getMyProfile(userId: bigint, now = new Date()) {
     ageGroup: member.ageGroup,
     bio: member.bio,
     status: member.status,
+    /** 운영자(role = A)면 웹에서 운영 관리(신고·문의 처리) 메뉴를 보여 준다 */
+    isAdmin: member.role === 'A',
     localRegions,
     regDate: toKstIso(member.regDate),
   };

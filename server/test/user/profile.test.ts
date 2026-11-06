@@ -391,9 +391,16 @@ describe('USER-04 GET /users/me', () => {
       ageGroup: 30,
       bio: null,
       status: 'A',
+      isAdmin: false,
       localRegions: [expect.objectContaining({ dongName: '가양동', sigunguName: '강서구' })],
       regDate: toKstIso(me.regDate),
     });
+  });
+
+  it('운영자면 isAdmin', async () => {
+    const admin = await createMember({ role: 'A' });
+    const res = await request(app).get('/api/v1/users/me').set('Authorization', bearer(admin.id));
+    expect(res.body.data.isAdmin).toBe(true);
   });
 
   it('사진이 있으면 CUSTOM과 사진 주소를 준다', async () => {
