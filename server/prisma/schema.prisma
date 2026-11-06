@@ -47,6 +47,8 @@ model Member {
   marketingAlarm          Boolean                   @default(false) @map("marketing_alarm")
   /// P 프로필 설정 전 / A 활성 / S 이용 정지 / D 탈퇴
   status                  String                    @default("P") @db.Char(1)
+  /// U 일반 회원 / A 운영자 — /api/v1/admin을 쓸 수 있다 (v1.3). 운영자는 DB에서 직접 지정한다
+  role                    String                    @default("U") @db.Char(1)
   lastLoginAt             DateTime?                 @map("last_login_at")
   regDate                 DateTime                  @default(now()) @map("reg_date")
   updateDate              DateTime?                 @updatedAt @map("update_date")
