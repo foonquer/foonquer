@@ -170,12 +170,24 @@ docker run -d --name foonquer-mysql -p 3307:3306 -e MYSQL_ROOT_PASSWORD=password
 
 ### 3. 환경변수
 
-`server/.env.example`을 복사해 `server/.env`를 만든다. 위 Docker 설정 그대로면 고칠 것이 없다.
+`server/.env.example`을 복사해 `server/.env`를 만들고, 웹은 `web/.env.example`을 복사해 `web/.env.local`을 만든다. 위 Docker 설정 그대로면 서버는 켜진다.
 
 ```bash
 cp server/.env.example server/.env                 # macOS / Linux
+cp web/.env.example web/.env.local
 Copy-Item server\.env.example server\.env          # Windows PowerShell
+Copy-Item web\.env.example web\.env.local
 ```
+
+키가 필요한 기능은 아래 값을 채워야 동작한다. 키는 저장소에 올리지 않고 팀 채널로 따로 주고받는다.
+
+| 기능 | 넣을 값 | 비워 두면 |
+| --- | --- | --- |
+| 지도·맛집 검색에 카카오 가게 불러오기, 카카오 로그인 | `server/.env`의 `KAKAO_REST_API_KEY` | DB에 있는 가게만 보이고(처음엔 없음) 카카오 로그인이 안 된다 |
+| 구글 로그인 | `server/.env`의 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 구글 로그인이 안 된다 |
+| 홈 카카오 지도 | `web/.env.local`의 `VITE_KAKAO_MAP_KEY` | 가게 위치만 점으로 보여 주는 간단한 지도 |
+
+이메일 회원가입·로그인은 키 없이 된다 (인증 코드는 서버 터미널에 찍힌다).
 
 ### 4. 테이블 만들기와 기본 데이터
 
@@ -316,8 +328,9 @@ Vite는 `VITE_`로 시작하는 변수만 화면 코드에 넣는다. **비밀�
 | 변수 | 설명 | 로컬 |
 | --- | --- | --- |
 | `VITE_API_BASE_URL` | API 서버 주소 | 비워 둔다 (개발 프록시 사용) |
+| `VITE_KAKAO_MAP_KEY` | 카카오 지도 JavaScript 키 (홈 지도). 비우면 가게 위치만 점으로 보여 주는 간단한 지도로 뜬다 | 카카오 개발자 콘솔 > 앱 키 > JavaScript 키 |
 
-배포(Vercel)에서는 프로젝트 환경변수에 서버 도메인을 넣는다.
+배포(Vercel)에서는 프로젝트 환경변수에 서버 도메인과 카카오 지도 키를 넣는다. 카카오 지도는 카카오 개발자 콘솔 > 플랫폼 > Web에 사이트 도메인(로컬 `http://localhost:5173`, 배포 주소)을 등록해야 뜬다. JavaScript 키는 화면에 공개되는 키라 `VITE_`로 넣어도 된다.
 
 <br>
 

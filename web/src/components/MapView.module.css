@@ -1,0 +1,79 @@
+.map {
+  position: absolute;
+  inset: 0;
+  background: var(--mk-bg);
+}
+
+/* 간단한 지도: 바탕에 동네 길 느낌의 격자 */
+.simple {
+  overflow: hidden;
+  background-color: var(--mk-bg);
+  background-image:
+    linear-gradient(var(--mk-white) 6px, transparent 6px),
+    linear-gradient(90deg, var(--mk-white) 6px, transparent 6px);
+  background-size: 120px 96px;
+  background-position: 40px 30px;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+}
+
+.notice {
+  position: absolute;
+  top: 58px;
+  right: var(--mk-side);
+  left: var(--mk-side);
+  font-size: 10px;
+  color: var(--mk-subtle);
+}
+
+/* 핀 (Figma 음식점 핀 49×57 + 가게명 배경) */
+.pin {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.simplePin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+}
+
+.pinImage {
+  width: 49px;
+  height: 57px;
+  filter: drop-shadow(0 5px 8px rgba(33, 61, 41, 0.09));
+}
+
+.pin[data-selected='true'] .pinImage {
+  transform: scale(1.12);
+  transform-origin: 50% 100%;
+}
+
+.pinImage {
+  display: block;
+}
+
+/* 가게 이름은 핀 아래에 붙인다 (핀 끝이 가게 좌표에 오도록 이름은 크기 계산에서 뺀다) */
+.pinLabel {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  max-width: 96px;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--mk-white);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--mk-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

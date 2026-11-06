@@ -1,0 +1,38 @@
+/* Figma: 목록 카드 칩 (안쪽 3·8, 둥글기 8, Bold 10) / 시트·상세 칩 (81×28, 둥글기 14, Bold 12) */
+.badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge[data-size='sm'] {
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+}
+
+.badge[data-size='md'] {
+  min-width: 81px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 14px;
+  font-size: 12px;
+}
+
+.badge[data-state='CONQUERED'] {
+  background: var(--mk-green);
+  color: var(--mk-white);
+}
+
+.badge[data-state='NOT_CONQUERED'] {
+  background: var(--mk-coral-50);
+  color: var(--mk-coral-text);
+}
+
+.badge[data-state='MOVING'] {
+  background: var(--mk-cream);
+  color: var(--mk-star);
+}

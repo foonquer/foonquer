@@ -1,0 +1,114 @@
+/* Figma 추천맛집: 지역 선택 (top 110) / 제목 Bold 24 (top 173) / 칩 (top 261) / 그림 346×160 (top 324) / 카드 (top 476) / 점 (top 652) */
+.content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 2px var(--mk-side) 16px;
+}
+
+.title {
+  margin-top: 21px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--mk-ink);
+}
+
+.subtitle {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--mk-muted);
+}
+
+.chips {
+  align-self: stretch;
+  margin-top: 23px;
+}
+
+.carousel {
+  width: 100%;
+  margin-top: 29px;
+}
+
+.viewport {
+  overflow: hidden;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.track {
+  display: flex;
+  transition: transform 0.3s ease;
+}
+
+.slide {
+  display: flex;
+  flex: 0 0 100%;
+  flex-direction: column;
+}
+
+.illust {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 20px;
+  pointer-events: none;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 163px;
+  margin-top: -8px;
+  padding: 16px 18px 18px;
+  border-radius: 20px;
+  background: var(--mk-white);
+}
+
+.reason {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mk-forest);
+}
+
+.name {
+  margin-top: 10px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--mk-ink);
+}
+
+.meta {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--mk-muted);
+}
+
+.rates {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--mk-forest);
+}
+
+.dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 13px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--mk-dot);
+  transition: width 0.2s;
+}
+
+.dot[data-active='true'] {
+  width: 18px;
+  background: var(--mk-green);
+}
