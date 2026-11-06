@@ -42,7 +42,6 @@ async function giveStats(restaurantId: bigint) {
       weightSum: 3.5,
       weightedScoreSum: 14.7,
       displayScore: 4.2,
-      tasteSum: 13,
       cleanlinessSum: 13,
       portionSum: 12,
       serviceSum: 14,
@@ -111,6 +110,8 @@ describe('MAP-02 GET /restaurants/{restaurantId}/preview', () => {
       dongName: '가양동',
       distanceM: expect.any(Number),
       rating: { score: 4.2, reviewCount: 4 },
+      // 취향을 안 골랐으면 다섯 항목 같은 비중: (4.2 + 4.3 + 4.0 + 4.7 + 3.7) ÷ 5 = 4.18
+      myOverallScore: 4.2,
       hasMapae: false,
       businessStatus: { isOpen: true, todayOpenTime: '11:00', todayCloseTime: '22:00' },
       currentSeasonConquerorCount: 2,
@@ -238,6 +239,7 @@ describe('REST-01 GET /restaurants/{restaurantId}', () => {
       businessHours: { ...HOURS, sun: undefined },
     });
     await giveStats(r.id);
+    await prisma.member.update({ where: { id: me.id }, data: { weightService: 3 } });
 
     // 2026-10-25(일) 12:00 KST — 일요일은 휴무
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -266,9 +268,19 @@ describe('REST-01 GET /restaurants/{restaurantId}', () => {
       businessHours: { ...HOURS, sun: [] },
       businessStatus: { isOpen: false, todayOpenTime: null, todayCloseTime: null },
       rating: { score: 4.2, reviewCount: 4 },
+      // 서비스만 아주 중요: (4.2 + 4.3 + 4.0 + 4.7×3 + 3.7) ÷ 7 = 4.33
+      myOverall: {
+        score: 4.3,
+        items: [
+          { key: 'taste', average: 4.2, weightPercent: 15 },
+          { key: 'cleanliness', average: 4.3, weightPercent: 14 },
+          { key: 'portion', average: 4, weightPercent: 14 },
+          { key: 'service', average: 4.7, weightPercent: 43 },
+          { key: 'price', average: 3.7, weightPercent: 14 },
+        ],
+      },
       hasMapae: false,
       stats: {
-        taste: 4.3,
         cleanliness: 4.3,
         portion: 4,
         service: 4.7,
@@ -317,8 +329,8 @@ describe('REST-01 GET /restaurants/{restaurantId}', () => {
       businessHours: null,
       businessStatus: null,
       rating: { score: null, reviewCount: 0 },
+      myOverall: { score: null },
       stats: {
-        taste: null,
         cleanliness: null,
         portion: null,
         service: null,

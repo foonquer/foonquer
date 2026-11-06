@@ -45,6 +45,12 @@ model Member {
   rankAlarm               Boolean                   @default(true) @map("rank_alarm")
   /// 이벤트·혜택 알림 — 켜고 끌 때 member_consent(MARKETING)도 함께 기록
   marketingAlarm          Boolean                   @default(false) @map("marketing_alarm")
+  /// 내 취향 (v1.4, 피그마 3-2 "무엇을 중요하게 보세요?") — 1 보통 / 2 중요 / 3 아주 중요. 내 종합 별점 = 항목 평균 × (내 점수 ÷ 다섯 항목 합)
+  weightTaste             Int                       @default(1) @map("weight_taste") @db.TinyInt
+  weightCleanliness       Int                       @default(1) @map("weight_cleanliness") @db.TinyInt
+  weightPortion           Int                       @default(1) @map("weight_portion") @db.TinyInt
+  weightService           Int                       @default(1) @map("weight_service") @db.TinyInt
+  weightPrice             Int                       @default(1) @map("weight_price") @db.TinyInt
   /// P 프로필 설정 전 / A 활성 / S 이용 정지 / D 탈퇴
   status                  String                    @default("P") @db.Char(1)
   /// U 일반 회원 / A 운영자 — /api/v1/admin을 쓸 수 있다 (v1.3). 운영자는 DB에서 직접 지정한다
@@ -372,14 +378,13 @@ model RestaurantStat {
   displayScore       Decimal?   @map("display_score") @db.Decimal(2, 1)
   /// display_score를 계산한 시각
   displayScoreAt     DateTime?  @map("display_score_at")
-  tasteSum           Int        @default(0) @map("taste_sum")
   cleanlinessSum     Int        @default(0) @map("cleanliness_sum")
   portionSum         Int        @default(0) @map("portion_sum")
   serviceSum         Int        @default(0) @map("service_sum")
   priceSum           Int        @default(0) @map("price_sum")
-  /// 세부 별점(맛·청결·양·서비스·가격)을 남긴 리뷰 수 — 항목별 평균의 분모
+  /// 세부 별점(청결·양·서비스·가격)을 남긴 리뷰 수 — 항목별 평균의 분모
   detailReviewCount  Int        @default(0) @map("detail_review_count")
-  /// 종합 별점 2.5 이상(다시 갈 의향) 리뷰 수 → 재방문 의사 % = revisit_intent_count ÷ review_count
+  /// 맛 별점 3.0 이상(다시 먹을 의향, v1.4) 리뷰 수 → 재방문 의사 % = revisit_intent_count ÷ review_count
   revisitIntentCount Int        @default(0) @map("revisit_intent_count")
   /// 성공한 방문 인증 수 (영수증 + 현장)
   visitCount         Int        @default(0) @map("visit_count")
@@ -545,11 +550,9 @@ model Review {
   visitId             BigInt             @unique @map("visit_id")
   userId              BigInt             @map("user_id")
   restaurantId        BigInt             @map("restaurant_id")
-  /// 종합 별점 0.5~5.0, 0.5 단위(10단계) · 별점 버전 5: 이것만 남기면 정복. 재방문 의사가 이 점수에 포함된다(2.5 이상 다시 갈 의향 / 2.0 이하 식당의 문제)
+  /// 맛 별점 0.5~5.0, 0.5 단위(10단계, 맛 기준표) · 이것만 남기면 정복 (v1.4, 피그마 3-2). 재방문 의사가 이 점수에 포함된다(3.0 이상 다시 먹을 의향 / 2.5 이하 재방문 의사 없음)
   overallScore        Decimal            @map("overall_score") @db.Decimal(2, 1)
-  /// 맛 1~5 · 세부 별점(선택): 다섯 항목을 모두 고르거나 모두 비운다
-  taste               Int?               @db.TinyInt
-  /// 청결 1~5 · 세부 별점
+  /// 청결 1~5 · 세부 별점(선택, 맛은 맛 별점으로 남겨서 뺐다 v1.4): 네 항목을 모두 고르거나 모두 비운다
   cleanliness         Int?               @db.TinyInt
   /// 양 1~5 · 세부 별점
   portion             Int?               @db.TinyInt

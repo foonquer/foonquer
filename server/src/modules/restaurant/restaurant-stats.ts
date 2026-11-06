@@ -1,4 +1,10 @@
 import type { Prisma } from '../../generated/prisma/client';
+import {
+  TASTE_KEYS,
+  type TasteKey,
+  type TasteWeights,
+  weightPercents,
+} from '../user/taste-weights';
 
 // 명세서 "값 규칙": 별점은 소수점 1자리(리뷰가 없으면 null), 비율(...Rate)은 0~100 정수(분모가 0이면 null).
 // restaurant_stat 행이 아직 없는 가게(방문·리뷰 0)는 null을 넘기면 된다.
@@ -40,13 +46,12 @@ export function localVisitRateOf(stat: Stat) {
 }
 
 /**
- * REST-01 stats. 세부 별점 5항목은 detail_review_count가 분모(다섯 항목을 모두 남기거나 모두 비운다),
- * 재방문 의사 %는 종합 별점 2.5 이상 리뷰 수(revisit_intent_count) ÷ review_count (ERD v1.0)
+ * REST-01 stats. 세부 별점 4항목(청결·양·서비스·가격)은 detail_review_count가 분모(네 항목을 모두 남기거나 모두 비운다),
+ * 재방문 의사 %는 맛 별점 3.0 이상 리뷰 수(revisit_intent_count) ÷ review_count (ERD v1.4)
  */
 export function detailStatsOf(stat: Stat) {
   const detail = stat?.detailReviewCount ?? 0;
   return {
-    taste: stat ? average(stat.tasteSum, detail) : null,
     cleanliness: stat ? average(stat.cleanlinessSum, detail) : null,
     portion: stat ? average(stat.portionSum, detail) : null,
     service: stat ? average(stat.serviceSum, detail) : null,
@@ -57,5 +62,35 @@ export function detailStatsOf(stat: Stat) {
     textReviewCount: stat?.textReviewCount ?? 0,
     photoReviewCount: stat?.photoReviewCount ?? 0,
     visitCount: stat?.visitCount ?? 0,
+  };
+}
+
+/**
+ * 내 종합 별점 (ERD v1.4, 피그마 3-2): 항목 평균 × 내 취향 비중. 맛 평균은 맛 별점(rating.score)을 쓴다.
+ * 세부 별점이 없는 항목은 빼고 남은 항목끼리 비중을 다시 나눈다. 맛 별점이 없으면 null.
+ * 예) 맛 4.4·청결 4.3·양 4.4·서비스 4.5·가격 4.2, 비중 30·30·10·10·20% → 4.3
+ */
+export function myOverallOf(stat: Stat, weights: TasteWeights) {
+  const taste = ratingOf(stat).score;
+  const d = detailStatsOf(stat);
+  const averages: Record<TasteKey, number | null> = {
+    taste,
+    cleanliness: d.cleanliness,
+    portion: d.portion,
+    service: d.service,
+    price: d.price,
+  };
+  const used = TASTE_KEYS.filter((k) => averages[k] !== null);
+  const percents = taste === null ? {} : weightPercents(weights, used);
+  const total = used.reduce((sum, k) => sum + weights[k], 0);
+  const weighted = used.reduce((sum, k) => sum + (averages[k] ?? 0) * weights[k], 0);
+  const score = taste === null ? null : Math.round((weighted / total) * 10) / 10;
+  return {
+    score,
+    items: TASTE_KEYS.map((key) => ({
+      key,
+      average: averages[key],
+      weightPercent: percents[key] ?? null,
+    })),
   };
 }

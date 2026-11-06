@@ -76,10 +76,9 @@ export async function toReviewCards(rows: ReviewCardRow[], viewerId: bigint) {
       visitedAt: toKstIsoOrNull(r.visit.verifiedAt),
       overallScore: r.overallScore.toNumber(),
       detailScores:
-        r.taste === null
+        r.cleanliness === null
           ? null
           : {
-              taste: r.taste,
               cleanliness: r.cleanliness,
               portion: r.portion,
               service: r.service,

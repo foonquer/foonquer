@@ -176,6 +176,9 @@ describe('USER-03 POST /users/me/profile', () => {
       // 가입 때 고른 것은 변경 횟수에 세지 않는다
       nicknameChangedAt: null,
       localChangedAt: null,
+      // 내 취향을 안 보내면 모두 보통
+      weightTaste: 1,
+      weightPrice: 1,
     });
     const mukkaebi = await prisma.mukkaebi.findUniqueOrThrow({ where: { userId: me.id } });
     expect(mukkaebi).toMatchObject({ level: 1, exp: 0 });
@@ -184,6 +187,34 @@ describe('USER-03 POST /users/me/profile', () => {
       orderBy: { categoryId: 'asc' },
     });
     expect(preferred.map((p) => p.categoryId)).toEqual([1, 6]);
+  });
+
+  it('S-05-2 중요하게 보는 것을 보내면 같이 저장한다', async () => {
+    const me = await pendingMember();
+    const tasteWeights = {
+      taste: 'VERY',
+      cleanliness: 'VERY',
+      portion: 'NORMAL',
+      service: 'NORMAL',
+      price: 'IMPORTANT',
+    };
+    expect((await setup(me.id, await setupBody({ tasteWeights }))).status).toBe(201);
+    const member = await prisma.member.findUniqueOrThrow({ where: { id: me.id } });
+    expect(member).toMatchObject({
+      weightTaste: 3,
+      weightCleanliness: 3,
+      weightPortion: 1,
+      weightService: 1,
+      weightPrice: 2,
+    });
+
+    const other = await pendingMember();
+    const bad = await setup(
+      other.id,
+      await setupBody({ nickname: '다른깨비', tasteWeights: { ...tasteWeights, price: 'LOW' } }),
+    );
+    expect(bad.status).toBe(400);
+    expect(bad.body.code).toBe('INVALID_TASTE_WEIGHT');
   });
 
   it('진행 중 시즌이 있으면 시즌 번호를, 레벨 정책(기본 데이터)의 단계를 준다', async () => {

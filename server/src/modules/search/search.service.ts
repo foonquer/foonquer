@@ -5,6 +5,7 @@ import { TtlCache } from '../../common/ttl-cache';
 import { Prisma } from '../../generated/prisma/client';
 import { KakaoApiError, searchPlacesByKeyword } from '../../lib/kakao-local';
 import { prisma } from '../../lib/prisma';
+import { loadTasteWeights } from '../user/taste-weights';
 import { RegionError } from '../region/region.errors';
 import { type RegionNode, requireSeoulArea, requireSeoulDong } from '../region/region.service';
 import { bboxOfRegionCode } from '../region/seoul-regions';
@@ -183,9 +184,10 @@ export async function searchRestaurants(userId: bigint, q: RestaurantSearchQuery
   const ids = idRows.map((r) => BigInt(r.id));
 
   const season = await findCurrentSeason();
-  const [rows, states, menus] = await Promise.all([
+  const [rows, states, weights, menus] = await Promise.all([
     loadRestaurantsInOrder(ids),
     loadMyStates(userId, ids, season),
+    loadTasteWeights(userId),
     keyword ? topMatchedMenus(ids, like) : Promise.resolve(new Map<string, string>()),
   ]);
 
@@ -196,7 +198,7 @@ export async function searchRestaurants(userId: bigint, q: RestaurantSearchQuery
     const byName = !!lowerKeyword && r.name.toLowerCase().includes(lowerKeyword);
     const matchedBy = !keyword ? null : !byName && menuName ? 'MENU' : 'NAME';
     return {
-      ...toRestaurantCard(r, myStateOf(states, r.id), q),
+      ...toRestaurantCard(r, myStateOf(states, r.id), q, weights),
       matchedBy,
       matchedMenuName: matchedBy === 'MENU' ? menuName : null,
     };
@@ -284,13 +286,14 @@ export async function getRecommendations(userId: bigint, q: RecommendationQuery)
   const ids = idRows.map((r) => BigInt(r.id));
 
   const season = await findCurrentSeason();
-  const [rows, states] = await Promise.all([
+  const [rows, states, weights] = await Promise.all([
     loadRestaurantsInOrder(ids),
     loadMyStates(userId, ids, season),
+    loadTasteWeights(userId),
   ]);
   const offset = (q.page - 1) * q.size;
   const items = rows.map((r, index) => {
-    const { conquestState, ...card } = toRestaurantCard(r, myStateOf(states, r.id), q);
+    const { conquestState, ...card } = toRestaurantCard(r, myStateOf(states, r.id), q, weights);
     return {
       rank: offset + index + 1,
       ...card,

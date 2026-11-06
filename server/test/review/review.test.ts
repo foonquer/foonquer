@@ -174,7 +174,7 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
       .post(`/api/v1/visits/${visit.id}/review`)
       .set('Authorization', bearer(me.id))
       .send({
-        detailScores: { taste: 5, cleanliness: 4, portion: 5, service: 4, price: 3 },
+        detailScores: { cleanliness: 4, portion: 5, service: 4, price: 3 },
         aspects: [{ aspectId: taste.id, polarity: 'G' }],
         content: '제육 정식 추천해요.',
         imageKeys: [key],
@@ -182,7 +182,7 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
     expect(res.status).toBe(201);
     expect(res.body.data.rewards.point).toBe(70);
     expect(res.body.data.review).toMatchObject({
-      detailScores: { taste: 5, price: 3 },
+      detailScores: { cleanliness: 4, price: 3 },
       aspects: [{ name: '맛', polarity: 'G' }],
       content: '제육 정식 추천해요.',
       imageCount: 1,
@@ -200,7 +200,7 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
     });
     expect(stat).toMatchObject({
       detailReviewCount: 1,
-      tasteSum: 5,
+      cleanlinessSum: 4,
       textReviewCount: 1,
       photoReviewCount: 1,
     });
@@ -210,7 +210,7 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
     expect(aspectStat.goodCount).toBe(1);
   });
 
-  it('세부 별점은 다섯 개 모두 있어야 하고, 아무것도 없으면 400', async () => {
+  it('세부 별점은 네 개 모두 있어야 하고, 아무것도 없으면 400', async () => {
     const season = await createActiveSeason(3);
     const me = await createMember();
     const visit = await ratedReview(me.id, (await createRestaurant()).id, season.id);
@@ -219,7 +219,9 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
         .post(`/api/v1/visits/${visit.id}/review`)
         .set('Authorization', bearer(me.id))
         .send(body);
-    expect((await post({ detailScores: { taste: 5 } })).body.code).toBe('INVALID_DETAIL_SCORES');
+    expect((await post({ detailScores: { cleanliness: 5 } })).body.code).toBe(
+      'INVALID_DETAIL_SCORES',
+    );
     expect((await post({})).body.code).toBe('REVIEW_DETAIL_EMPTY');
     expect((await post({ content: 'a'.repeat(301) })).body.code).toBe('REVIEW_CONTENT_TOO_LONG');
     const key = `review/${me.id}/a.jpg`;
@@ -297,7 +299,7 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
       .set('Authorization', bearer(me.id));
     expect(removed.body.data).toMatchObject({ overallScore: 4.5, detailDeleted: true });
     const after = await prisma.review.findUniqueOrThrow({ where: { id: review.id } });
-    expect(after).toMatchObject({ content: null, imageCount: 0, taste: null, status: 'A' });
+    expect(after).toMatchObject({ content: null, imageCount: 0, cleanliness: null, status: 'A' });
 
     const mine = await request(app)
       .get('/api/v1/users/me/reviews')
