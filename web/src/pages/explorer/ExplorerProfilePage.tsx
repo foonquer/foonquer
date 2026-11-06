@@ -390,6 +390,8 @@ function VisitedTab({ p }: { p: MemberProfile }) {
           <select
             aria-label="구"
             className={styles.sort}
+            // 시즌을 바꾸고 새 목록이 오기 전에는 지난 시즌의 구를 고르지 않게 잠근다
+            disabled={list.loading}
             value={sigunguId ?? ''}
             onChange={(e) => setSigunguId(Number(e.target.value) || undefined)}
           >

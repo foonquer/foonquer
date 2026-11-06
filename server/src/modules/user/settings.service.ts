@@ -1,4 +1,6 @@
+import { MemberStatus } from '../../common/auth/member-status';
 import { AppError } from '../../common/errors/app-error';
+import { AuthError } from '../../common/errors/error-codes';
 import { toKstIso, toKstIsoOrNull } from '../../common/time';
 import type { Prisma } from '../../generated/prisma/client';
 import { prisma } from '../../lib/prisma';
@@ -65,8 +67,12 @@ export async function updateNotificationSettings(
 
   return prisma.$transaction(async (tx) => {
     // 같은 회원의 토글이 동시에 와도 동의 이력과 marketing_alarm이 어긋나지 않게 차례로 처리한다.
-    const [locked] = await tx.$queryRaw<{ marketing_alarm: number | boolean }[]>`
-      SELECT marketing_alarm FROM member WHERE id = ${userId} FOR UPDATE`;
+    const [locked] = await tx.$queryRaw<{ marketing_alarm: number | boolean; status: string }[]>`
+      SELECT marketing_alarm, status FROM member WHERE id = ${userId} FOR UPDATE`;
+    // 잠금을 기다리는 사이 탈퇴가 커밋됐으면 탈퇴 때 지운 동의 이력을 다시 만들지 않는다
+    if (!locked || locked.status === MemberStatus.WITHDRAWN) {
+      throw new AppError(AuthError.TOKEN_INVALID);
+    }
     const marketingBefore = Boolean(locked?.marketing_alarm);
     const marketingChanged =
       body.marketingAlarm !== undefined && body.marketingAlarm !== marketingBefore;

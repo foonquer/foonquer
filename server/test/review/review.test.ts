@@ -3,6 +3,7 @@ import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app';
 import { prisma } from '../../src/lib/prisma';
+import * as achievement from '../../src/modules/achievement/achievement.service';
 import * as storage from '../../src/lib/storage';
 import { resetDb } from '../helpers/db';
 import {
@@ -27,6 +28,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 /** 별점 대기(V) 방문 인증 */
@@ -167,6 +169,20 @@ describe('REVIEW-01 종합 별점 등록 및 정복 완료', () => {
       remaining: 29,
       rewardItems: [{ code: 'CLUB_GOLD', name: '황금 방망이' }],
     });
+  });
+
+  it('다음 정복 보상 조회가 실패해도 정복은 끝났으니 201로 답하고 nextReward만 null', async () => {
+    const season = await createActiveSeason(3);
+    const me = await createMember();
+    const shop = await createRestaurant();
+    const visit = await verified(me.id, shop.id, season.id);
+    vi.spyOn(achievement, 'nextConquestReward').mockRejectedValueOnce(new Error('DB 끊김'));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const res = await rate(me.id, visit.id, 4);
+    expect(res.status).toBe(201);
+    expect(res.body.data.nextReward).toBeNull();
+    expect(res.body.data.conquest.isNewConquest).toBe(true);
   });
 
   it('한 구에서 10곳을 정복하면 구 배경을 얻고 바로 골라 둔다', async () => {
