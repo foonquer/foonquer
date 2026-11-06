@@ -1,9 +1,10 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { MyMukkaebi, ShopItem } from '../api/mukkaebi';
+// 기대 그림은 backgroundArt를 거치지 않고 파일을 직접 가져와 비교한다
+import gangseoBg from '../assets/backgrounds/BG_1150000000.svg';
 import nightsky from '../assets/illust/mukkaebi-nightsky.svg';
 import { MukkaebiFigure } from '../components/MukkaebiFigure';
-import { backgroundArt } from '../lib/backgroundArt';
 import { itemArt } from '../lib/itemArt';
 import { fail, mockApi, ok } from './http';
 import { signIn } from '../lib/session';
@@ -115,7 +116,7 @@ describe('먹깨비 꾸미기', () => {
   });
 
   it('배경 탭: 얻은 구 배경을 그림으로 보여 주고, 고르면 미리보기 바탕이 그 구 그림이 된다', async () => {
-    const gangseo = backgroundArt('BG_1150000000');
+    const gangseo = gangseoBg;
     const server = mockApi({
       'GET /characters/me': ok(mukkaebi()),
       'GET /characters/me/items': ok({
@@ -416,7 +417,7 @@ describe('아이템 상자·축하·먹포인트', () => {
     });
     const { router } = renderRoute('/list');
     const dialog = await screen.findByRole('dialog', { name: '강서구 배경을 얻었어요!' });
-    expect(dialog.querySelector('img')).toHaveAttribute('src', backgroundArt('BG_1150000000'));
+    expect(dialog.querySelector('img')?.getAttribute('src')).toBe(gangseoBg);
     fireEvent.click(within(dialog).getByRole('button', { name: '배경 바꾸러 가기' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/me/mukkaebi/decorate'));
   });
