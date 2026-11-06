@@ -23,7 +23,7 @@ export const RARITY_NAME: Record<Rarity, string> = {
   H: '명예',
 };
 
-type ItemRef = { itemId: number; code: string; name: string } | null;
+type ItemRef = { itemId: number; code: string; name: string; rarity: Rarity } | null;
 
 export type MyMukkaebi = {
   level: number;

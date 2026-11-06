@@ -87,7 +87,7 @@ export function MukkaebiPage() {
             {stages.map((s) => (
               <li key={s.stage} data-reached={s.reached} data-current={s.isCurrent}>
                 <span className={styles.stageDot} aria-hidden="true" />
-                {s.name} · LV.{s.fromLevel}
+                {joinDot([s.name, s.fromLevel !== null && `LV.${s.fromLevel}`])}
               </li>
             ))}
           </ol>

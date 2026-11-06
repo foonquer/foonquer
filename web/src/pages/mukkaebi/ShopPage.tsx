@@ -50,6 +50,10 @@ export function ShopPage() {
   const category = TABS.find((t) => t.value === params.get('category'))?.value ?? 'HAT';
   const { data, error, reload, mutate } = useAsync(() => getShopItems(category), [category]);
   const [sheet, setSheet] = useState<Sheet | null>(null);
+  // 탭을 바꾸면 data가 비는 동안에도 세트 배너·포인트·탭 줄은 그대로 둔다 (깜빡임·포커스 잃음 방지)
+  const [last, setLast] = useState(data);
+  if (data && data !== last) setLast(data);
+  const shown = data ?? last;
 
   if (error) {
     return (
@@ -64,59 +68,59 @@ export function ShopPage() {
       <AppHeader
         title="상점"
         right={
-          data && (
+          shown && (
             <Link
               to="/me/points"
               className={styles.point}
-              aria-label={`내 먹포인트 ${data.pointBalance}`}
+              aria-label={`내 먹포인트 ${shown.pointBalance}`}
             >
               <span aria-hidden="true">P</span>
-              {data.pointBalance.toLocaleString('ko-KR')}
+              {shown.pointBalance.toLocaleString('ko-KR')}
             </Link>
           )
         }
       />
-      {!data ? (
-        <Loading />
-      ) : (
-        <div className={styles.content}>
-          {data.sets.map((set) => (
+      <div className={styles.content}>
+        {shown?.sets.map((set) => (
+          <button
+            key={set.setId}
+            type="button"
+            className={styles.set}
+            onClick={() => setSheet({ kind: 'set', set })}
+          >
+            {set.badge && <span className={styles.badge}>{set.badge}</span>}
+            <span className={styles.setName}>{set.name}</span>
+            <span className={styles.setText}>{set.description}</span>
+            <span className={styles.setPrice}>
+              {formatPoint(set.price)}
+              <s>{formatPoint(set.originalPrice)}</s>
+              {!set.purchasable && (
+                <span className={styles.setOwned}>이미 가진 아이템이 있어요</span>
+              )}
+            </span>
+          </button>
+        ))}
+
+        <div className={styles.tabs} role="tablist" aria-label="상점 종류">
+          {TABS.map((t) => (
             <button
-              key={set.setId}
+              key={t.value}
               type="button"
-              className={styles.set}
-              onClick={() => setSheet({ kind: 'set', set })}
+              role="tab"
+              aria-selected={t.value === category}
+              onClick={() => setParams({ category: t.value }, { replace: true })}
             >
-              {set.badge && <span className={styles.badge}>{set.badge}</span>}
-              <span className={styles.setName}>{set.name}</span>
-              <span className={styles.setText}>{set.description}</span>
-              <span className={styles.setPrice}>
-                {formatPoint(set.price)}
-                <s>{formatPoint(set.originalPrice)}</s>
-                {!set.purchasable && (
-                  <span className={styles.setOwned}>이미 가진 아이템이 있어요</span>
-                )}
-              </span>
+              {t.label}
             </button>
           ))}
+        </div>
+        {category === 'HONOR' && (
+          <p className={styles.caption}>포인트로는 살 수 없어요. 업적을 달성하면 열려요.</p>
+        )}
 
-          <div className={styles.tabs} role="tablist" aria-label="상점 종류">
-            {TABS.map((t) => (
-              <button
-                key={t.value}
-                type="button"
-                role="tab"
-                aria-selected={t.value === category}
-                onClick={() => setParams({ category: t.value }, { replace: true })}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-          {category === 'HONOR' && (
-            <p className={styles.caption}>포인트로는 살 수 없어요. 업적을 달성하면 열려요.</p>
-          )}
-
+        {!data ? (
+          <Loading />
+        ) : (
           <div className={styles.grid}>
             {data.items.map((item) => (
               <button
@@ -141,12 +145,12 @@ export function ShopPage() {
               </button>
             ))}
           </div>
-        </div>
-      )}
-      {data && (
+        )}
+      </div>
+      {shown && (
         <PurchaseSheet
           sheet={sheet}
-          balance={data.pointBalance}
+          balance={shown.pointBalance}
           onClose={() => setSheet(null)}
           onBought={(next) => {
             setSheet(next);

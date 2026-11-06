@@ -26,7 +26,7 @@ async function load() {
 /** 먹깨비 도감 /me/mukkaebi/collection (CHAR-07) — 성장 단계·아이템 컬렉션·구 배경, 전설의 방망이 합성(CHAR-10) */
 export function CollectionPage() {
   const toast = useToast();
-  const { data, error, reload } = useAsync(load, []);
+  const { data, error, loading, reload } = useAsync(load, []);
   const [busy, setBusy] = useState(false);
 
   if (error) {
@@ -55,6 +55,7 @@ export function CollectionPage() {
     try {
       const r = await craftItem(legend.itemId);
       toast({ message: `${eulReul(r.item.name)} 만들었어요!`, check: true });
+      // 다시 받는 동안(loading)에도 버튼을 잠가 이전 재료 수로 또 합성하지 않게 한다
       reload();
     } catch (err) {
       toast(errorMessage(err));
@@ -125,7 +126,7 @@ export function CollectionPage() {
               </span>
             </p>
             <p className={styles.sheetText}>황금 방망이 3개를 모으면 합쳐서 만들 수 있어요.</p>
-            <Button size="sm" onClick={craft} disabled={gold < GOLD_NEED || busy}>
+            <Button size="sm" onClick={craft} disabled={gold < GOLD_NEED || busy || loading}>
               전설의 방망이 만들기
             </Button>
           </section>
