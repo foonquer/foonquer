@@ -5,10 +5,15 @@ import styles from './Search.module.css';
 /** 서버 SEARCH-02 검색어 최대 길이 */
 const KEYWORD_MAX = 30;
 
-type Props = { initial?: string; onSubmit: (keyword: string) => void };
+type Props = {
+  initial?: string;
+  onSubmit: (keyword: string) => void;
+  /** 기본: 음식점·메뉴 검색 */
+  placeholder?: string;
+};
 
 /** 음식점·메뉴 검색창 (엔터로 찾는다) */
-export function SearchBar({ initial = '', onSubmit }: Props) {
+export function SearchBar({ initial = '', onSubmit, placeholder = '음식점·메뉴 검색' }: Props) {
   const [value, setValue] = useState(initial);
 
   const submit = (e: FormEvent) => {
@@ -25,9 +30,9 @@ export function SearchBar({ initial = '', onSubmit }: Props) {
         enterKeyHint="search"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="음식점·메뉴 검색"
+        placeholder={placeholder}
         maxLength={KEYWORD_MAX}
-        aria-label="음식점·메뉴 검색"
+        aria-label={placeholder}
       />
     </form>
   );
