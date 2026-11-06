@@ -1,6 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { addDays } from '../../src/common/time';
-import { runCleanupJob, runRatingJob, runSavedReminderJob } from '../../src/jobs/jobs';
+import {
+  FILE_SWEEP_BATCH,
+  runCleanupJob,
+  runRatingJob,
+  runSavedReminderJob,
+} from '../../src/jobs/jobs';
 import { prisma } from '../../src/lib/prisma';
 import { deletePrefixQuietly } from '../../src/lib/storage';
 import { notify } from '../../src/modules/notification/notify';
@@ -182,5 +187,32 @@ describe('주기 작업', () => {
     expect(
       (await prisma.member.findUniqueOrThrow({ where: { id: failing.id } })).filesPurgedAt,
     ).not.toBeNull();
+  });
+
+  it(`cleanup: 앞의 ${FILE_SWEEP_BATCH}명이 계속 실패해도 뒤의 탈퇴 회원까지 다시 지운다`, async () => {
+    const members = [];
+    for (let i = 0; i <= FILE_SWEEP_BATCH; i += 1) members.push(await createMember());
+    await prisma.member.updateMany({
+      where: { id: { in: members.map((m) => m.id) } },
+      data: { status: 'D', deleteDate: addDays(new Date(), -3) },
+    });
+    const last = members[members.length - 1];
+    // 마지막 회원 폴더만 지워지고 나머지는 계속 실패
+    onTestFinished(() => {
+      vi.mocked(deletePrefixQuietly).mockImplementation(() => Promise.resolve(true));
+    });
+    vi.mocked(deletePrefixQuietly).mockImplementation((prefix: string) =>
+      Promise.resolve(prefix.includes(`/${last.id.toString()}/`)),
+    );
+    expect(await runCleanupJob()).toMatchObject({
+      withdrawnFileMembers: FILE_SWEEP_BATCH + 1,
+      failed: FILE_SWEEP_BATCH,
+    });
+    expect(
+      (await prisma.member.findUniqueOrThrow({ where: { id: last.id } })).filesPurgedAt,
+    ).not.toBeNull();
+    expect(await prisma.member.count({ where: { status: 'D', filesPurgedAt: null } })).toBe(
+      FILE_SWEEP_BATCH,
+    );
   });
 });

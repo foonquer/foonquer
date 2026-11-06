@@ -591,6 +591,22 @@ describe('VISIT-03·04·05 홈에서 바로 찍은 영수증', () => {
     ).toContain(Number(spaced.id));
   });
 
+  it('첫 단어가 한 글자인 가게명도 후보로 찾는다 ("더 맛있는 식당")', async () => {
+    const { me } = await setup();
+    const shop = await createRestaurant({ name: '더 맛있는 식당' });
+    vi.mocked(readReceipt).mockResolvedValue(
+      receipt({ storeName: '더 맛있는 식당', businessNo: null }),
+    );
+    const id = await submitHome(me.id);
+    expect((await prisma.visit.findUniqueOrThrow({ where: { id: BigInt(id) } })).status).toBe('R');
+    const check = await request(app)
+      .get(`/api/v1/visit-verifications/${id}`)
+      .set('Authorization', bearer(me.id));
+    expect(check.body.data.candidates).toEqual([
+      expect.objectContaining({ restaurantId: Number(shop.id), matchedBy: 'NAME' }),
+    ]);
+  });
+
   it('사업자번호가 같은 가게가 있으면 이름만 맞는 다른 가게는 고를 수 없다', async () => {
     const { me } = await setup();
     const branch = await createRestaurant({ name: '옛날손칼국수 가양점' });

@@ -169,6 +169,10 @@ export async function withdrawMember(userId: bigint, body: WithdrawalBody, now =
   );
 
   // DB는 이미 지웠으니 파일 삭제가 실패해도 탈퇴는 성공으로 돌려주고, files_purged_at이 빈 채로 남아 cleanup 작업이 다시 지운다
-  await purgeMemberFiles(userId, now);
+  try {
+    await purgeMemberFiles(userId, now);
+  } catch (err) {
+    console.error(`탈퇴 회원 사진 삭제 실패 member=${userId.toString()}`, err);
+  }
   return { withdrawnAt: toKstIso(now) };
 }
