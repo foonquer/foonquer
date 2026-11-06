@@ -1,7 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { JOBS, type JobName } from './jobs';
 
-// 사용법: pnpm -C server job <rating|season|cleanup|saved-reminder|all>
+// 사용법: pnpm -C server job <rating|season|cleanup|saved-reminder|review-ai|all>
 // 운영 서버(VM)에서는 crontab으로 하루 1번 돌린다 (README "주기 작업")
 
 async function main() {
