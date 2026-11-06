@@ -174,10 +174,20 @@ describe('ADMIN 관리자 API', () => {
       targetId: Number(review.id),
       reason: 'AD',
     });
+    // 같은 리뷰에 신고가 하나 더 있어도 반려는 고른 신고만
+    const second = await prisma.report.create({
+      data: {
+        reporterId: (await createMember()).id,
+        targetType: 'R',
+        targetId: review.id,
+        reason: 'SPAM',
+      },
+    });
     const rejected = await as(admin.id).patch(`/admin/reports/${reported.body.data.reportId}`, {
       action: 'REJECT',
     });
     expect(rejected.body.data).toMatchObject({ status: 'REJECTED', closedCount: 1 });
+    expect((await prisma.report.findUniqueOrThrow({ where: { id: second.id } })).status).toBe('P');
     expect((await prisma.review.findUniqueOrThrow({ where: { id: review.id } })).status).toBe('A');
 
     await prisma.review.update({ where: { id: review.id }, data: { status: 'D' } });
