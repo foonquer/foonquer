@@ -24,4 +24,4 @@ export type HomeSummary = {
   unreadNotificationCount: number;
   celebrationCount: number;
 };
-export const getHomeSummary = () => api.get<HomeSummary>('/home');
+export const getHomeSummary = () => api.get<HomeSummary>('/home/summary');

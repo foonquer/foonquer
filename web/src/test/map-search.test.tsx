@@ -119,7 +119,7 @@ describe('홈 지도 (MAP-01·02)', () => {
     mockApi({
       ...regionApi,
       'GET /map/restaurants': ok({ items: [], totalCount: 0, truncated: false, kakaoSynced: true }),
-      'GET /home': ok({
+      'GET /home/summary': ok({
         mukkaebi: { level: 7, stage: 'BABY', stageName: '아기', equipped: {} },
         title: null,
         season: null,
