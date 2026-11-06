@@ -1,4 +1,4 @@
-// 탐방러 프로필·내 PICK·신고·차단 API (PROFILE-01·02, PICK-01·02, REPORT-01, BLOCK-01~03)
+// 탐방러 프로필·내 PICK·신고·차단 API (PROFILE-01·02, PICK-01·02, REPORT-01, BLOCK-01·02)
 
 import { api } from '../lib/api';
 import type { MyMukkaebi } from './mukkaebi';
@@ -141,13 +141,3 @@ export const blockMember = (userId: number) =>
 /** BLOCK-02 차단 풀기 */
 export const unblockMember = (userId: number) =>
   api.call<{ userId: number; isBlocked: false }>('DELETE', `/users/me/blocks/${userId}`);
-
-export type BlockedMember = {
-  userId: number;
-  nickname: string | null;
-  profileImageUrl: string | null;
-  blockedAt: string;
-};
-/** BLOCK-03 차단한 탐험가 (최근 차단한 순) */
-export const getBlocks = (query: { page?: number; size?: number }) =>
-  api.get<Page<BlockedMember>>('/users/me/blocks', query);

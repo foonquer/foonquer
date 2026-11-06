@@ -28,9 +28,8 @@ const FETCH_DELAY_MS = 300;
 export function HomePage() {
   const toast = useToast();
   const me = useAsync(getMe, []);
-  // 레벨·칭호·안 읽은 알림 — 못 받아도 홈은 그대로 쓴다
+  // 레벨·칭호 — 못 받아도 홈은 그대로 쓴다
   const summary = useAsync(getHomeSummary, []);
-  const unread = summary.data?.unreadNotificationCount ?? 0;
   const title = summary.data ? (summary.data.title ?? summary.data.rank.main?.tierTitle) : null;
   const { region, error: regionError, retry } = useViewRegion();
   const { coords } = useMyCoords();
@@ -89,13 +88,8 @@ export function HomePage() {
               {title && <span className={styles.title}>{title}</span>}
             </p>
           </div>
-          <Link
-            to="/notifications"
-            className={styles.iconButton}
-            aria-label={unread > 0 ? `알림 ${unread}개 안 읽음` : '알림'}
-          >
+          <Link to="/notifications" className={styles.iconButton} aria-label="알림">
             <img src={bellIcon} alt="" width={24} height={24} />
-            {unread > 0 && <span className={styles.dot} aria-hidden="true" />}
           </Link>
           <Link to="/me/settings" className={styles.iconButton} aria-label="설정">
             <img src={gearIcon} alt="" width={24} height={23} />

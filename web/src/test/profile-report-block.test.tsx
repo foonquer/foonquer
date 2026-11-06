@@ -306,30 +306,6 @@ describe('신고하기 (REPORT-01)', () => {
   });
 });
 
-describe('차단한 탐험가 (BLOCK-03)', () => {
-  it('설정에서 들어가 차단을 풀면 목록에서 빠진다', async () => {
-    const server = mockApi({
-      'GET /users/me/blocks': ok(
-        page([
-          {
-            userId: 5,
-            nickname: '동네미식가',
-            profileImageUrl: null,
-            blockedAt: '2026-10-02T10:00:00+09:00',
-          },
-        ]),
-      ),
-      'DELETE /users/me/blocks/:id': ok({ userId: 5, isBlocked: false }, '차단을 풀었어요.'),
-    });
-    renderRoute('/me/blocks');
-
-    expect(await screen.findByText('10월 2일 차단')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '동네미식가 차단 풀기' }));
-    expect(await screen.findByText('차단한 탐험가가 없어요')).toBeInTheDocument();
-    expect(server.calls('DELETE /users/me/blocks/:id')[0].path).toBe('/users/me/blocks/5');
-  });
-});
-
 describe('프로필 수정 — 사진·소개글 (USER-02·05·06·07)', () => {
   const me = {
     id: 1,

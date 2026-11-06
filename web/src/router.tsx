@@ -53,7 +53,6 @@ import { VerificationPage } from './pages/visit/VerificationPage';
 import { VisitNewPage } from './pages/visit/VisitNewPage';
 import { ExplorerProfilePage } from './pages/explorer/ExplorerProfilePage';
 import { ReportPage } from './pages/explorer/ReportPage';
-import { BlocksPage } from './pages/me/BlocksPage';
 
 export const routes: RouteObject[] = [
   {
@@ -118,7 +117,6 @@ export const routes: RouteObject[] = [
           { path: '/me/mukkaebi/boxes', element: <ItemBoxesPage /> },
           { path: '/me/points', element: <PointsPage /> },
           { path: '/me/withdraw', element: <WithdrawPage /> },
-          { path: '/me/blocks', element: <BlocksPage /> },
           { path: '/users/:userId', element: <ExplorerProfilePage /> }, // ?tab=pick|visited|reviews
           { path: '/users/:userId/report', element: <ReportPage /> },
           { path: '/notifications', element: <NotificationsPage /> },
