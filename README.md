@@ -62,6 +62,9 @@ foonquer/
 │   │   │   ├── time.ts      # KST 시각 변환
 │   │   │   └── pagination.ts
 │   │   ├── modules/         # 도메인별 router · service · schema · errors
+│   │   │   ├── auth/        # 이메일·소셜 로그인, 토큰, 비밀번호
+│   │   │   ├── user/        # 프로필, 내 동네
+│   │   │   ├── region/      # 동 검색 (data/seoul-regions.json = 서울 구·법정동 원본)
 │   │   │   └── health/
 │   │   ├── types/           # Express Request 타입 확장 (req.auth)
 │   │   └── generated/       # Prisma가 만드는 코드 (커밋하지 않음)
@@ -69,7 +72,7 @@ foonquer/
 │   │   ├── schema.prisma    # DB 스키마 (ERD와 같게 유지)
 │   │   ├── migrations/      # 마이그레이션 SQL (커밋한다)
 │   │   ├── check-constraints.sql
-│   │   ├── seed-data.ts     # 기본 데이터 목록 (카테고리 12개 …)
+│   │   ├── seed-data.ts     # 기본 데이터 목록 (카테고리 12개, 약관, 서울 구·법정동 …)
 │   │   └── seed.ts          # 기본 데이터 넣기 (배포·로컬)
 │   ├── test/                # Vitest + supertest (실제 MySQL 테스트 DB)
 │   │   ├── global-setup.ts  # 테스트 DB 생성·마이그레이션·기본 데이터
@@ -259,6 +262,7 @@ pnpm -C server db:migrate                                       # 적용
 | `MAIL_FROM` | 보내는 사람 주소. SES에서 인증한 도메인·주소여야 한다 (`ses`일 때 필수) | 비워 둔다 |
 | `AWS_REGION` | SES·S3 리전 | `ap-northeast-2` |
 | `IMAGE_BASE_URL` | 프로필·리뷰 사진 공개 주소(CloudFront). 비우면 사진 URL을 `null`로 준다 | 비워 둔다 |
+| `AWS_S3_BUCKET` | 사진을 두는 S3 버킷. 올린 사진 key가 실제로 있는지 확인한다. 비우면 사진 key를 받지 않는다(`PROFILE_IMAGE_NOT_FOUND`) | 비워 둔다 |
 | `API_BASE_URL` | 이 API 서버의 바깥 주소. 소셜 로그인 redirect_uri를 만든다 | `http://localhost:3000` |
 | `KAKAO_REST_API_KEY` | 카카오 REST API 키 (카카오 로그인 client_id, 카카오 로컬 API) | 카카오 개발자 콘솔 |
 | `KAKAO_CLIENT_SECRET` | 카카오 로그인 Client Secret (콘솔에서 켰을 때만) | 비워 둔다 |

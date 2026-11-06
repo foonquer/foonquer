@@ -13,6 +13,7 @@ const testEnv = {
   API_BASE_URL: 'http://localhost:3000',
   MAIL_DRIVER: 'console',
   KAKAO_REST_API_KEY: 'test-kakao-rest-key',
+  IMAGE_BASE_URL: 'https://images.test',
   GOOGLE_CLIENT_ID: 'test-google-client-id',
   GOOGLE_CLIENT_SECRET: 'test-google-client-secret',
 };

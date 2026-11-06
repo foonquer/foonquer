@@ -56,6 +56,12 @@ export function kstTodayAsDbDate(now = new Date()): Date {
   return new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate()));
 }
 
+/** 화면 문구용 KST 날짜. 예) 2026-11-05T04:00:00Z → '11월 5일' */
+export function toKoreanMonthDay(date: Date): string {
+  const kst = new Date(date.getTime() + KST_OFFSET_MS);
+  return `${kst.getUTCMonth() + 1}월 ${kst.getUTCDate()}일`;
+}
+
 export function addDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * DAY_MS);
 }
