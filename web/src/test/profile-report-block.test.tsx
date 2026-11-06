@@ -181,6 +181,14 @@ describe('탐방러 프로필 (PROFILE-01·02, REVIEW-10)', () => {
     expect(screen.getByRole('region', { name: '옛날손칼국수 정보' })).toBeInTheDocument();
   });
 
+  it('차단한 탐험가의 PICK 지도는 주소로 바로 들어와도 보여 주지 않는다', async () => {
+    mockApi({ 'GET /users/:id/profile': ok(profile({ isBlocked: true })) });
+    renderRoute('/users/5/picks');
+    expect(await screen.findByText('차단한 탐험가의 PICK은 볼 수 없어요')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'PICK 지도' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/옛날손칼국수/)).not.toBeInTheDocument();
+  });
+
   it('다녀온 가게 탭: 이번 시즌 정복한 가게와 맛 별점, 시즌·구를 고르면 다시 부른다', async () => {
     const server = mockApi({
       'GET /seasons': ok({
