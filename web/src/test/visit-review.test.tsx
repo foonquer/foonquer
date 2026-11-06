@@ -282,6 +282,32 @@ describe('방문 인증', () => {
       expect(stop).toHaveBeenCalled();
     });
 
+    it('권한을 확인하는 중에 앨범에서 고르면 카메라를 켜지 않고, 다시 촬영하면 권한 확인부터 다시 한다', async () => {
+      let answer: (state: PermissionState) => void = () => undefined;
+      const stream = { getTracks: () => [{ stop: vi.fn() }] } as unknown as MediaStream;
+      const media = { getUserMedia: vi.fn(() => Promise.resolve(stream)) };
+      Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: media });
+      const query = vi.fn(
+        () =>
+          new Promise<{ state: PermissionState }>((resolve) => {
+            answer = (state) => resolve({ state });
+          }),
+      );
+      Object.defineProperty(navigator, 'permissions', { configurable: true, value: { query } });
+      renderRoute('/visits/new/receipt?restaurantId=7');
+
+      fireEvent.change(await screen.findByLabelText('앨범'), { target: { files: [photo()] } });
+      expect(await screen.findByText('글자가 잘 보이나요?')).toBeInTheDocument();
+      await act(async () => answer('granted'));
+      expect(media.getUserMedia).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: '다시 촬영' }));
+      await waitFor(() => expect(query).toHaveBeenCalledTimes(2));
+      await act(async () => answer('granted'));
+      expect(await screen.findByRole('button', { name: '촬영' })).toBeEnabled();
+      expect(media.getUserMedia).toHaveBeenCalledTimes(1);
+    });
+
     it('켜는 중에 앨범에서 고르면 늦게 켜진 카메라는 바로 끄고, 다시 촬영하면 새로 켠다', async () => {
       const stop = vi.fn();
       const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream;

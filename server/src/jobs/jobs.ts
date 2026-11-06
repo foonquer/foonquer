@@ -296,6 +296,10 @@ export async function runReviewAiJob(now = new Date(), wait = sleep) {
       rateLimited = true;
       break;
     }
+    // 키·모델이 틀렸으면 나머지 리뷰도 같은 이유로 실패하니 더 부르지 않고 실패로 끝낸다 (job 종료 코드 1)
+    if (result === 'CONFIG_ERROR') {
+      throw new Error('Gemini 설정 오류: GEMINI_API_KEY·GEMINI_MODEL을 확인하세요');
+    }
     if (!result) {
       errors += 1;
       continue;

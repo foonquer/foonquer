@@ -45,9 +45,19 @@ export type ReviewAiResult = z.infer<typeof answerSchema> & {
 /**
  * 분석 결과. RATE_LIMITED면 호출 한도에 걸린 것(이번 작업은 멈춘다),
  * UNREADABLE이면 200인데 답을 읽을 수 없는 것(안전 필터로 답이 비었거나 스키마와 다름 — 다시 해도 같아서 대기열에서 뺀다),
+ * CONFIG_ERROR면 키·모델 설정이 틀린 것(작업을 멈추고 실패로 알린다),
  * null이면 일시적 실패(5xx·시간 초과·네트워크 — 다음 실행에서 다시)
  */
-export type ReviewAiOutcome = ReviewAiResult | 'RATE_LIMITED' | 'UNREADABLE' | null;
+export type ReviewAiOutcome =
+  ReviewAiResult | 'RATE_LIMITED' | 'UNREADABLE' | 'CONFIG_ERROR' | null;
+
+/** 리뷰와 상관없이 키·모델 설정이 틀린 응답 (모든 리뷰가 같은 이유로 실패하므로 작업을 멈춘다) */
+async function isConfigError(res: Response) {
+  // 401·403: 키가 틀렸거나 막힘(API 꺼짐·제한), 404: GEMINI_MODEL 이름이 없음
+  if (res.status === 401 || res.status === 403 || res.status === 404) return true;
+  // 400 중에서는 키가 틀린 경우만 (INVALID_ARGUMENT는 글 내용 때문에도 날 수 있다)
+  return res.status === 400 && (await res.text().catch(() => '')).includes('API_KEY_INVALID');
+}
 
 type GenerateResponse = { candidates?: { content?: { parts?: { text?: string }[] } }[] };
 
@@ -92,7 +102,7 @@ export async function analyzeReview(input: {
     if (res.status === 429) return 'RATE_LIMITED';
     if (!res.ok) {
       console.error(`Gemini 리뷰 분석 실패: ${res.status}`);
-      return null;
+      return (await isConfigError(res)) ? 'CONFIG_ERROR' : null;
     }
     // 본문을 읽다 끊기면(네트워크) 아래 catch로 가서 다시 하고, 읽었는데 JSON이 아니면 UNREADABLE
     const body = parseJson(await res.text()) as GenerateResponse | null;

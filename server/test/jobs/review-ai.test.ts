@@ -177,6 +177,22 @@ describe('review-ai 주기 작업 (Gemini 리뷰 분석)', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('JSON이지만 필드 형식이 다르면 unreadable로 빼고 협찬 의심으로 두지 않는다', async () => {
+    const review = await textReview('체험단');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(answer({ adSuspected: 'yes', adEvidence: 3, aiLikeTone: false })),
+      ),
+    );
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    expect(await runReviewAiJob(new Date(), noWait)).toMatchObject({ unreadable: 1, analyzed: 0 });
+    expect(await prisma.review.findUniqueOrThrow({ where: { id: review.id } })).toMatchObject({
+      adSuspected: false,
+      aiResult: { unreadable: true },
+    });
+  });
+
   it('응답 본문이 JSON이 아니면 unreadable, 본문을 읽다 끊기면 다음 실행에서 다시 한다', async () => {
     const html = await textReview('첫 번째 글');
     const cut = await textReview('두 번째 글');
@@ -249,18 +265,79 @@ describe('review-ai 주기 작업 (Gemini 리뷰 분석)', () => {
     expect(body.contents[0].parts[0].text).toContain('내 돈 내고 먹었어요');
   });
 
-  it('리뷰 글을 고치면 분석 결과를 지우고 다시 분석한다', async () => {
+  it('리뷰 수정 API로 글을 고치면 분석 결과를 지우고, 다음 실행에서 고친 글을 분석해 저장한다', async () => {
     const review = await textReview('서비스 받고 작성');
     await prisma.review.update({
       where: { id: review.id },
       data: { aiCheckedAt: new Date(), adSuspected: true, aiResult: { adSuspected: true } },
     });
-    const res = await request(app)
-      .patch(`/api/v1/reviews/${review.id}`)
-      .set('Authorization', bearer(review.userId))
-      .send({ content: '내 돈 내고 먹었어요' });
-    expect(res.status).toBe(200);
+    const patch = (body: object) =>
+      request(app)
+        .patch(`/api/v1/reviews/${review.id}`)
+        .set('Authorization', bearer(review.userId))
+        .send(body);
+
+    expect((await patch({ content: '내 돈 내고 먹었어요' })).status).toBe(200);
     const saved = await prisma.review.findUniqueOrThrow({ where: { id: review.id } });
     expect(saved).toMatchObject({ aiCheckedAt: null, adSuspected: false, aiResult: null });
+
+    const fetch = vi.fn(() =>
+      Promise.resolve(answer({ adSuspected: false, adEvidence: null, aiLikeTone: false })),
+    );
+    vi.stubGlobal('fetch', fetch);
+    const now = new Date('2026-11-07T03:00:00Z');
+    expect(await runReviewAiJob(now, noWait)).toMatchObject({ checked: 1, analyzed: 1 });
+    expect(
+      JSON.parse((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)
+        .contents[0].parts[0].text,
+    ).toContain('내 돈 내고 먹었어요');
+    expect(await prisma.review.findUniqueOrThrow({ where: { id: review.id } })).toMatchObject({
+      aiCheckedAt: now,
+      aiResult: expect.objectContaining({ adSuspected: false }),
+    });
+
+    // 글이 아닌 세부 별점만 고치면 분석 결과는 그대로
+    expect(
+      (await patch({ detailScores: { cleanliness: 4, portion: 4, service: 4, price: 4 } })).status,
+    ).toBe(200);
+    expect(
+      (await prisma.review.findUniqueOrThrow({ where: { id: review.id } })).aiCheckedAt,
+    ).toEqual(now);
+
+    // 글을 비우면 null로 두고 분석 대상에서 뺀다
+    expect((await patch({ content: '   ' })).status).toBe(200);
+    expect(await prisma.review.findUniqueOrThrow({ where: { id: review.id } })).toMatchObject({
+      content: null,
+      aiResult: null,
+      aiCheckedAt: null,
+    });
+    expect(await runReviewAiJob(now, noWait)).toMatchObject({ checked: 0 });
+  });
+
+  it('키·모델 설정이 틀린 응답(401·403·404, 400 API_KEY_INVALID)이면 더 부르지 않고 실패로 끝낸다', async () => {
+    await textReview('첫 번째 글');
+    await textReview('두 번째 글');
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    for (const reply of [
+      () => new Response('{}', { status: 403 }),
+      () => new Response('{}', { status: 404 }),
+      () =>
+        new Response(JSON.stringify({ error: { details: [{ reason: 'API_KEY_INVALID' }] } }), {
+          status: 400,
+        }),
+    ]) {
+      const fetch = vi.fn(() => Promise.resolve(reply()));
+      vi.stubGlobal('fetch', fetch);
+      await expect(runReviewAiJob(new Date(), noWait)).rejects.toThrow('Gemini 설정 오류');
+      expect(fetch).toHaveBeenCalledTimes(1);
+    }
+    // 키와 상관없는 400은 그 리뷰만 실패로 세고 계속한다
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(new Response('{"error":{"status":"INVALID_ARGUMENT"}}', { status: 400 })),
+      ),
+    );
+    expect(await runReviewAiJob(new Date(), noWait)).toMatchObject({ checked: 2, errors: 2 });
   });
 });
