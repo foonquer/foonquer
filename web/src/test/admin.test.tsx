@@ -107,6 +107,56 @@ describe('운영 관리', () => {
     });
   });
 
+  it('처리한 뒤 다시 불러오기가 실패해도 처리한 신고·같은 대상 신고는 다시 처리할 수 없다', async () => {
+    let calls = 0;
+    mockApi({
+      'GET /admin/reports': () => {
+        calls += 1;
+        return calls === 1
+          ? ok(
+              page([
+                reviewReport(),
+                reviewReport({ reportId: 12 }),
+                reviewReport({ reportId: 13, targetId: 51 }),
+              ]),
+            )
+          : fail(500, 'INTERNAL_SERVER_ERROR', '잠시 후 다시 시도해 주세요.');
+      },
+      'PATCH /admin/reports/:id': ok({ reportId: 11, status: 'DONE', closedCount: 2 }),
+    });
+    renderRoute('/admin');
+    const card = await screen.findByRole('article', { name: '신고 11' });
+    fireEvent.click(within(card).getByRole('button', { name: '블라인드' }));
+    fireEvent.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: '블라인드' }),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('잠시 후 다시 시도해 주세요.');
+    // 같은 리뷰(50) 신고 두 건은 버튼 없이 처리 표시, 다른 리뷰(51) 신고는 그대로
+    for (const id of [11, 12]) {
+      const c = screen.getByRole('article', { name: `신고 ${id}` });
+      expect(within(c).queryByRole('button')).not.toBeInTheDocument();
+      expect(c).toHaveTextContent('처리했어요');
+    }
+    expect(
+      within(screen.getByRole('article', { name: '신고 13' })).getByRole('button', {
+        name: '블라인드',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('신고·문의 탭은 패널과 연결돼 있다', async () => {
+    mockApi({ 'GET /admin/reports': ok(page([])) });
+    renderRoute('/admin');
+    const tab = await screen.findByRole('tab', { name: '신고' });
+    const panel = screen.getByRole('tabpanel', { name: '신고' });
+    expect(tab).toHaveAttribute('aria-controls', panel.id);
+    expect(screen.getByRole('tab', { name: '1:1 문의' })).toHaveAttribute(
+      'aria-controls',
+      'admin-panel-inquiries',
+    );
+    expect(document.getElementById('admin-panel-inquiries')).not.toBeVisible();
+  });
+
   it('탐험가 신고는 이용 정지·반려만 고를 수 있다', async () => {
     mockApi({
       'GET /admin/reports': ok(

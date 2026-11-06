@@ -7,7 +7,7 @@ import { useModalFocus } from '../lib/a11y';
 import { backgroundArt } from '../lib/backgroundArt';
 import { formatPoint } from '../lib/format';
 import { euro, iGa } from '../lib/korean';
-import { subscribeSession } from '../lib/session';
+import { sessionOwner } from '../lib/session';
 import { useAsync } from '../lib/useAsync';
 import { Button } from './Button';
 import styles from './CelebrationLayer.module.css';
@@ -77,12 +77,13 @@ function copyOf(c: Celebration): Copy {
 }
 
 /**
- * 닫은 축하. 탭을 옮겨 새로 부른 목록이 확인 기록보다 먼저 와도 다시 띄우지 않는다.
+ * 닫은 축하 ("회원 id:축하 id"). 탭을 옮겨 새로 부른 목록이 확인 기록보다 먼저 와도 다시 띄우지 않는다.
  * 확인 기록이 실패하면 빼서 다음에 부를 때 다시 띄운다.
- * 로그인·토큰 재발급·로그아웃 때 비운다 (다른 탭에서 다른 계정으로 바꿨으면 그 계정의 같은 축하 id를 숨기지 않게)
+ * 회원 id를 붙여 두어, 다른 탭에서 다른 계정으로 바꿔도 그 계정의 같은 축하 id를 숨기지 않고
+ * 이전 계정 요청의 늦은 실패가 새 계정의 기록을 지우지 않는다 (같은 계정이 토큰만 다시 받으면 그대로)
  */
 const closedIds = new Set<string>();
-subscribeSession(() => closedIds.clear());
+const closedKey = (celebrationId: string) => `${sessionOwner()}:${celebrationId}`;
 
 /** 아직 보지 않은 축하(레벨 업·티어 상승·배경·업적·시즌 결과)를 하나씩 띄운다 (CHAR-08·09) */
 export function CelebrationLayer() {
@@ -92,7 +93,7 @@ export function CelebrationLayer() {
   const [skipped, setSkipped] = useState<string[]>([]);
   const box = useRef<HTMLElement>(null);
   const current = data?.items.find(
-    (c) => !skipped.includes(c.celebrationId) && !closedIds.has(c.celebrationId),
+    (c) => !skipped.includes(c.celebrationId) && !closedIds.has(closedKey(c.celebrationId)),
   );
   useModalFocus(Boolean(current), box);
 
@@ -103,8 +104,9 @@ export function CelebrationLayer() {
   const close = (to?: string) => {
     const id = current.celebrationId;
     // 확인 기록이 실패해도 화면은 넘긴다 (다음에 다시 뜬다)
-    closedIds.add(id);
-    void markCelebrationSeen(id).catch(() => closedIds.delete(id));
+    const key = closedKey(id);
+    closedIds.add(key);
+    void markCelebrationSeen(id).catch(() => closedIds.delete(key));
     setSkipped((s) => [...s, id]);
     if (to) navigate(to);
   };

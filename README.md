@@ -252,7 +252,7 @@ pnpm add -D -w some-tool            # 루트(모노레포 공통) 개발 의존�
 | `season` | 끝난 시즌 확정(순위·티어 확정, 시즌 결과, 먹포인트·방망이 보상, 업적과 업적 보상 아이템(왕관·밤하늘 먹깨비), 알림), 다음 시즌 열기 |
 | `cleanup` | 30일 지난 알림, 만료된 로그인 토큰·카카오 결과 교환 코드 삭제, 탈퇴할 때 사진 삭제가 실패한 회원(`member.files_purged_at` 없음)의 영수증·현장·문의·프로필 사진 폴더를 다 지울 때까지 다시 지우기, 올린 지 하루가 지나도 어디에도 저장되지 않은 사진(profile·review·receipt·site·inquiry 폴더) 지우기 |
 | `saved-reminder` | 저장한 지 12일 지난 가게(알림 켬, 아직 정복 안 함)에 한 번 알림 |
-| `review-ai` | 아직 분석하지 않은 공개 리뷰 글을 Gemini로 분석(한 번에 50개, 4초 간격). 협찬·리뷰 이벤트 문구를 찾으면 `review.ad_suspected` → 운영자 마패 확인 목록(ADMIN-03 `adSuspected=true`). 결과는 `review.ai_result`(근거 문장, AI 같은 말투, 글 길이, 사진 수). 별점 계산에는 넣지 않는다. 호출 한도(429)에 걸리면 멈추고 다음 실행에서 이어서 한다. 일시적 실패(5xx·시간 초과)는 다음 실행에서 다시 하고, 200인데 답을 읽을 수 없는 글(안전 필터 등)은 `ai_result`에 `unreadable`을 남기고 다시 보내지 않는다. `GEMINI_API_KEY`가 없으면 건너뛴다 |
+| `review-ai` | 아직 분석하지 않은 공개 리뷰 글을 Gemini로 분석(한 번에 50개, 4초 간격). 협찬·리뷰 이벤트 문구를 찾으면 `review.ad_suspected` → 운영자 마패 확인 목록(ADMIN-03 `adSuspected=true`). 결과는 `review.ai_result`(근거 문장, AI 같은 말투, 글 길이, 사진 수). 별점 계산에는 넣지 않는다. 호출 한도(429)에 걸리면 멈추고 다음 실행에서 이어서 한다. 일시적 실패(5xx·시간 초과)는 다음 실행에서 다시 하고, 200인데 답을 읽을 수 없는 글(안전 필터 등)은 `ai_result`에 `unreadable`을 남기고 다시 보내지 않는다. 키·모델 설정이 틀린 응답(401·403·404, 400 `API_KEY_INVALID`)이면 바로 멈추고 실패(종료 코드 1)로 끝난다. `GEMINI_API_KEY`가 없으면 건너뛴다 |
 
 운영 VM에는 Node.js·pnpm을 설치하지 않으므로(서버는 Docker 컨테이너), 돌고 있는 `app` 컨테이너 안에서 빌드 결과를 실행한다. deploy 사용자 crontab에 넣는다. 예) 매일 새벽 4시(KST), VM 시간대가 UTC일 때
 `0 19 * * * cd ~/foonquer && /usr/bin/docker compose exec -T app node dist/src/jobs/run.js all >> ~/job.log 2>&1`

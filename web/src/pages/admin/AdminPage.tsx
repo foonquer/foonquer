@@ -72,16 +72,29 @@ export function AdminPage() {
           ).map(([value, label]) => (
             <button
               key={value}
+              id={`admin-tab-${value}`}
               type="button"
               role="tab"
               aria-selected={tab === value}
+              aria-controls={`admin-panel-${value}`}
               onClick={() => setParams({ tab: value }, { replace: true })}
             >
               {label}
             </button>
           ))}
         </div>
-        {tab === 'reports' ? <Reports /> : <Inquiries />}
+        {/* 패널 자리는 둘 다 두고(aria-controls가 가리키게) 고른 탭만 내용을 부른다 */}
+        {(['reports', 'inquiries'] as const).map((value) => (
+          <div
+            key={value}
+            id={`admin-panel-${value}`}
+            role="tabpanel"
+            aria-labelledby={`admin-tab-${value}`}
+            hidden={tab !== value}
+          >
+            {tab === value && (value === 'reports' ? <Reports /> : <Inquiries />)}
+          </div>
+        ))}
       </div>
     </Screen>
   );
@@ -114,6 +127,10 @@ function Reports() {
   const [target, setTarget] = useState<'ALL' | 'REVIEW' | 'MEMBER'>('ALL');
   const [asking, setAsking] = useState<{ report: AdminReport; action: ReportAction } | null>(null);
   const [busy, setBusy] = useState(false);
+  // 처리한 신고("report:id")와 함께 끝난 같은 대상("REVIEW:id")은 새 목록이 오기 전에도 다시 처리하지 못하게 (409)
+  const [done, setDone] = useState<string[]>([]);
+  const isDone = (r: AdminReport) =>
+    done.includes(`report:${r.reportId}`) || done.includes(`${r.targetType}:${r.targetId}`);
   const list = usePaged(
     (page) =>
       getReports({
@@ -137,6 +154,11 @@ function Reports() {
             : `${ACTIONS[asking.action].label} 처리했어요`,
         check: true,
       });
+      const r = asking.report;
+      setDone((d) => [
+        ...d,
+        result.closedCount > 1 ? `${r.targetType}:${r.targetId}` : `report:${r.reportId}`,
+      ]);
       setAsking(null);
       list.reload();
     } catch (err) {
@@ -181,7 +203,11 @@ function Reports() {
         <ul className={styles.cards}>
           {list.items.map((r) => (
             <li key={r.reportId}>
-              <ReportCard report={r} onAction={(action) => setAsking({ report: r, action })} />
+              <ReportCard
+                report={r}
+                done={isDone(r)}
+                onAction={(action) => setAsking({ report: r, action })}
+              />
             </li>
           ))}
         </ul>
@@ -216,9 +242,12 @@ function Reports() {
 
 function ReportCard({
   report: r,
+  done,
   onAction,
 }: {
   report: AdminReport;
+  /** 방금 처리해서 새 목록을 기다리는 중 */
+  done: boolean;
   onAction: (action: ReportAction) => void;
 }) {
   const actions: ReportAction[] =
@@ -269,20 +298,23 @@ function ReportCard({
           r.processedAt ? `${formatDateTime(r.processedAt)} 처리` : null,
         ])}
       </p>
-      {r.status === 'PENDING' && (
-        <div className={styles.actions}>
-          {actions.map((a) => (
-            <Button
-              key={a}
-              size="sm"
-              variant={a === 'REJECT' ? 'outline' : 'primary'}
-              onClick={() => onAction(a)}
-            >
-              {ACTIONS[a].label}
-            </Button>
-          ))}
-        </div>
-      )}
+      {r.status === 'PENDING' &&
+        (done ? (
+          <p className={styles.meta}>처리했어요</p>
+        ) : (
+          <div className={styles.actions}>
+            {actions.map((a) => (
+              <Button
+                key={a}
+                size="sm"
+                variant={a === 'REJECT' ? 'outline' : 'primary'}
+                onClick={() => onAction(a)}
+              >
+                {ACTIONS[a].label}
+              </Button>
+            ))}
+          </div>
+        ))}
     </article>
   );
 }
