@@ -17,7 +17,8 @@ export function storageMock() {
     readObjectHead: vi.fn(readHead),
     createUploadUrl: vi.fn(),
     createReadUrl: vi.fn(readUrl),
-    deleteObjectQuietly: vi.fn(() => Promise.resolve()),
+    deleteObjectQuietly: vi.fn(() => Promise.resolve(true)),
+    deletePrefixQuietly: vi.fn(() => Promise.resolve(true)),
   };
 }
 
