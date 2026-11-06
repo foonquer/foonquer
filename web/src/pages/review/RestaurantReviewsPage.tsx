@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router';
 import { getRestaurant } from '../../api/restaurants';
-import { getRestaurantReviews, type RestaurantReviewSort, type Review } from '../../api/reviews';
+import { getRestaurantReviews, type RestaurantReviewSort } from '../../api/reviews';
 import { AppHeader } from '../../components/AppHeader';
 import { Button } from '../../components/Button';
 import { FilterChips } from '../../components/Chips';
@@ -32,7 +32,7 @@ export function RestaurantReviewsPage() {
   const [filter, setFilter] = useState<Filter>('ALL');
   const [sort, setSort] = useState<RestaurantReviewSort>('LATEST');
   const { data: r } = useAsync(() => getRestaurant(restaurantId), [restaurantId]);
-  const list = usePaged<Review>(
+  const list = usePaged(
     (page) =>
       getRestaurantReviews(restaurantId, {
         sort,

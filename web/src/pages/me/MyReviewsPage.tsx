@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getMyReviews, type Review } from '../../api/reviews';
+import { getMyReviews } from '../../api/reviews';
 import { AppHeader } from '../../components/AppHeader';
 import { Button } from '../../components/Button';
 import { FilterChips } from '../../components/Chips';
@@ -13,7 +13,7 @@ import styles from '../review/Review.module.css';
 /** 내 리뷰 /me/reviews (REVIEW-05) */
 export function MyReviewsPage() {
   const [sort, setSort] = useState<'LATEST' | 'HELPFUL'>('LATEST');
-  const list = usePaged<Review>((page) => getMyReviews({ sort, page, size: 10 }), [sort]);
+  const list = usePaged((page) => getMyReviews({ sort, page, size: 10 }), [sort]);
 
   return (
     <Screen>

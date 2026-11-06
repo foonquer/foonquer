@@ -7,10 +7,11 @@ type Target = { key: string; page: number; version: number };
  * "더 보기"로 이어 붙이는 목록. deps가 바뀌면 1쪽부터 다시 부르고, 늦게 온 이전 응답은 버린다.
  * 예) const list = usePaged((page) => getMyReviews({ page }), [sort]);
  */
-export function usePaged<T, P extends PageLike<T> = PageLike<T>>(
+export function usePaged<P extends PageLike<unknown>>(
   load: (page: number) => Promise<P>,
   deps: readonly unknown[],
 ) {
+  type T = P['items'][number];
   const key = JSON.stringify(deps);
   const [want, setWant] = useState<Target>({ key, page: 1, version: 0 });
   // deps가 바뀌면 "더 보기"로 늘린 쪽 수를 버린다 (A → B → A로 돌아와도 1쪽부터)
@@ -61,7 +62,7 @@ export function usePaged<T, P extends PageLike<T> = PageLike<T>>(
               ...prev,
               pages: prev.pages.map((p) => ({
                 ...p,
-                items: p.items.map((i) => (match(i) ? next : i)),
+                items: (p.items as T[]).map((i) => (match(i) ? next : i)),
               })),
             }
           : prev,
@@ -70,7 +71,7 @@ export function usePaged<T, P extends PageLike<T> = PageLike<T>>(
   );
 
   return {
-    items: pages.flatMap((p) => p.items),
+    items: pages.flatMap((p) => p.items as T[]),
     /** 1쪽 응답 전체 (요약 등 목록 밖 값) */
     first: pages[0],
     totalCount: last?.totalCount ?? 0,

@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { AGE_LABEL, GENDER_LABEL, getMe } from '../../api/users';
+import { AGE_LABEL, GENDER_LABEL, getMe, getMySummary } from '../../api/users';
 import bellIcon from '../../assets/icons/bell.svg';
 import chevron from '../../assets/icons/chevron-right.svg';
 import { MenuList } from '../../components/MenuList';
@@ -11,9 +11,11 @@ import { joinDot } from '../../lib/format';
 import { useAsync } from '../../lib/useAsync';
 import styles from './MyPage.module.css';
 
-/** 내 정보 탭: 프로필 카드(USER-04)와 메뉴. 시즌 기록·리뷰 수 등은 담당 화면에서 채운다 */
+/** 내 정보 탭: 프로필 카드(USER-04), 시즌 나의 기록과 메뉴 숫자(USER-08) */
 export function MyPage() {
   const me = useAsync(getMe, []);
+  const summary = useAsync(getMySummary, []).data;
+  const record = summary?.seasonRecord;
   const first = me.data?.localRegions[0];
 
   return (
@@ -36,6 +38,7 @@ export function MyPage() {
             <MukkaebiAvatar size={64} />
             <span className={styles.profileText}>
               <span className={styles.nickname}>{me.data?.nickname ?? ' '}</span>
+              {summary?.title && <span className={styles.titleChip}>{summary.title}</span>}
               <span className={styles.profileSub}>
                 {me.data &&
                   joinDot([
@@ -49,15 +52,69 @@ export function MyPage() {
           </Link>
         )}
 
+        {summary?.season && record && (
+          <Link
+            to="/me/seasons"
+            className={styles.season}
+            aria-label={`${summary.season.name} 나의 기록`}
+          >
+            <span className={styles.seasonHead}>
+              <span>{summary.season.name} · 나의 기록</span>
+              <span>D-{summary.season.daysLeft}</span>
+            </span>
+            <span className={styles.seasonStats}>
+              <span>
+                <strong>{record.conquestCount}곳</strong>정복
+              </span>
+              <span>
+                <strong>{record.reviewCount}개</strong>리뷰
+              </span>
+              <span>
+                <strong>{record.helpfulReceived}</strong>도움돼요
+              </span>
+            </span>
+            {record.main && (
+              <span className={styles.seasonFoot}>
+                {record.main.sigunguName} {record.main.rank ? `${record.main.rank}위` : '순위 없음'}
+                {record.main.mukjjangGap > 0
+                  ? ` · 먹짱까지 ${record.main.mukjjangGap}곳`
+                  : record.main.rank
+                    ? ' · 먹짱'
+                    : ''}
+              </span>
+            )}
+          </Link>
+        )}
+
         <MenuList
           label="내 기록"
           items={[
-            { label: '내 먹깨비 꾸미기', to: '/me/mukkaebi' },
-            { label: '정복 기록', to: '/me/conquests' },
+            {
+              label: '내 먹깨비 꾸미기',
+              value: summary?.newItemCount ? `새 아이템 ${summary.newItemCount}` : undefined,
+              to: '/me/mukkaebi',
+            },
+            {
+              label: '정복 기록',
+              value: record ? `${record.conquestCount}곳` : undefined,
+              to: '/me/conquests',
+            },
             { label: '내 리뷰', to: '/me/reviews' },
-            { label: '시즌 기록 · 칭호', to: '/me/seasons' },
-            { label: '저장한 맛집', to: '/list' },
-            { label: '내 PICK', to: '/me/pick' },
+            {
+              label: '시즌 기록 · 칭호',
+              value: summary ? `칭호 ${summary.titleCount}개` : undefined,
+              to: '/me/seasons',
+            },
+            {
+              label: '저장한 맛집',
+              value: summary ? `${summary.savedRestaurantCount}곳` : undefined,
+              to: '/list',
+            },
+            {
+              label: '내 PICK',
+              value: summary ? `${summary.pickCount}곳` : undefined,
+              to: '/me/pick',
+            },
           ]}
         />
 

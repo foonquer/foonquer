@@ -54,3 +54,23 @@ export function formatKoreanDate(iso: string | null | undefined) {
   const m = /^\d{4}-(\d{2})-(\d{2})/.exec(iso);
   return m ? `${Number(m[1])}월 ${Number(m[2])}일` : null;
 }
+
+/** KST 날짜 "YYYY-MM-DD" */
+function kstDay(date: Date) {
+  return new Date(date.getTime() + 9 * 3600_000).toISOString().slice(0, 10);
+}
+
+/** 정복한 날: "오늘" / "어제" / "9월 20일" */
+export function formatRecentDay(iso: string | null | undefined, now = new Date()) {
+  if (!iso) return null;
+  const day = iso.slice(0, 10);
+  if (day === kstDay(now)) return '오늘';
+  if (day === kstDay(new Date(now.getTime() - 86_400_000))) return '어제';
+  return formatKoreanDate(iso);
+}
+
+/** "2026-09-01" ~ "2027-02-28" → "2026.9 ~ 2027.2" */
+export function formatSeasonRange(season: { startDate: string; endDate: string }) {
+  const ym = (d: string) => `${d.slice(0, 4)}.${Number(d.slice(5, 7))}`;
+  return `${ym(season.startDate)} ~ ${ym(season.endDate)}`;
+}
