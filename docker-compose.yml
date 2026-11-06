@@ -2,13 +2,67 @@ services:
   app:
     # deploy.yml이 올리는 이미지 이름(ghcr.io/<조직>/<저장소>-server)과 같아야 한다. 저장소 이름을 바꾸면 여기도 바꾼다.
     image: ghcr.io/foonquer/foonquer-server:latest
-    ports:
-      - '3000:${PORT:-3000}'
+    # 바깥에는 열지 않는다. caddy가 https로 받아 넘긴다
+    expose:
+      - '${PORT:-3000}'
     env_file:
       - .env
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
-    logging:
+    logging: &logging
       driver: json-file
       options:
         max-size: '10m'
         max-file: '3'
+
+  # 운영 DB (VM 안 MySQL 8, 2026-11-06 결정). 데이터는 mysql_data 볼륨, 매일 scripts/backup-db.sh로 Cloud Storage에 백업
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD가 .env에 있어야 한다}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-foonquer}
+      MYSQL_USER: ${MYSQL_USER:-foonquer}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD가 .env에 있어야 한다}
+      TZ: UTC
+    # e2-small(메모리 2GB)에서 app·caddy와 같이 돌도록 버퍼 풀을 줄인다
+    command: ['--innodb-buffer-pool-size=256M', '--max-connections=50']
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'mysqladmin ping -h 127.0.0.1 -uroot -p"$$MYSQL_ROOT_PASSWORD" --silent',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    logging: *logging
+
+  # https 앞단. API_DOMAIN(예: api.foonquer.me)의 인증서를 Let's Encrypt로 자동으로 받고 갱신한다 (80·443 열기)
+  caddy:
+    image: caddy:2.10
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?API_DOMAIN이 .env에 있어야 한다}
+      APP_PORT: ${PORT:-3000}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  mysql_data:
+  caddy_data:
+  caddy_config:

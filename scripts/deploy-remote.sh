@@ -52,6 +52,10 @@ echo '__GHCR_TOKEN__' | docker login ghcr.io -u __GHCR_ACTOR__ --password-stdin
 # --quiet: pull 진행률 로그가 길면 Actions 로그에서 뒤의 up -d/prune 결과를 찾기 어렵다.
 docker compose pull --quiet
 
+# 마이그레이션 전에 DB(같은 VM의 MySQL 컨테이너)를 띄우고 healthcheck가 통과할 때까지 기다린다.
+# 처음 배포면 이때 빈 DB와 앱용 계정(MYSQL_USER)이 만들어진다.
+docker compose up -d --wait db
+
 # < /dev/null: docker compose run은 기본적으로 컨테이너 stdin을 호출한 셸의
 # stdin에 그대로 연결한다. 이 스크립트 전체가 heredoc으로 stdin을 통해
 # 들어오기 때문에, 이게 없으면 아래 run이 자기 뒤에 남은 스크립트 줄들을
