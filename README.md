@@ -242,6 +242,20 @@ pnpm add -D -w some-tool            # 루트(모노레포 공통) 개발 의존�
 | `db:deploy` | 마이그레이션 적용만 (운영 배포용) |
 | `db:seed` | 기본 데이터 넣기 |
 | `db:studio` | DB를 브라우저에서 보기 |
+| `job <이름>` / `job:prod <이름>` | 주기 작업 한 번 실행 (개발: tsx / 운영: 빌드 결과). 이름은 아래 표, `all`이면 전부 |
+
+#### 주기 작업 (하루 1번)
+
+| 이름 | 하는 일 |
+| --- | --- |
+| `rating` | 전체 평균 별점 m 갱신(공개 리뷰 30개부터), 작성자 신뢰 온도·시간 감쇠를 반영해 리뷰 가중치·가게 가중 별점 다시 계산 |
+| `season` | 끝난 시즌 확정(순위·티어 확정, 시즌 결과, 먹포인트·방망이·왕관·밤하늘 보상, 업적, 알림), 다음 시즌 열기 |
+| `cleanup` | 30일 지난 알림, 만료된 로그인 토큰·카카오 결과 교환 코드 삭제 |
+| `saved-reminder` | 저장한 지 12일 지난 가게(알림 켬, 아직 정복 안 함)에 한 번 알림 |
+
+운영 VM에는 Node.js·pnpm을 설치하지 않으므로(서버는 Docker 컨테이너), 돌고 있는 `app` 컨테이너 안에서 빌드 결과를 실행한다. deploy 사용자 crontab에 넣는다. 예) 매일 새벽 4시(KST), VM 시간대가 UTC일 때
+`0 19 * * * cd ~/foonquer && /usr/bin/docker compose exec -T app node dist/src/jobs/run.js all >> ~/job.log 2>&1`
+(`docker`는 cron 기본 PATH인 `/usr/bin`에 있다. 작업 하나라도 실패하면 나머지는 계속 돌고 종료 코드가 1이 되니 `~/job.log`를 확인한다.)
 
 ### 웹 명령어 (`pnpm -C web ...`)
 

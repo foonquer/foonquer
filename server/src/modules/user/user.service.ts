@@ -192,6 +192,7 @@ export async function getMyProfile(userId: bigint, now = new Date()) {
     profileImageSource: member.profileImageKey ? 'CUSTOM' : 'DEFAULT',
     gender: member.gender,
     ageGroup: member.ageGroup,
+    bio: member.bio,
     status: member.status,
     localRegions,
     regDate: toKstIso(member.regDate),
@@ -200,7 +201,12 @@ export async function getMyProfile(userId: bigint, now = new Date()) {
 
 /** USER-05 프로필 수정. 보낸 필드만 바꾸고, 닉네임은 30일에 한 번 */
 export async function updateMyProfile(userId: bigint, body: ProfileUpdateBody, now = new Date()) {
-  if (body.nickname === undefined && body.gender === undefined && body.ageGroup === undefined) {
+  if (
+    body.nickname === undefined &&
+    body.gender === undefined &&
+    body.ageGroup === undefined &&
+    body.bio === undefined
+  ) {
     throw new AppError(UserError.NO_FIELDS_TO_UPDATE);
   }
 
@@ -208,6 +214,7 @@ export async function updateMyProfile(userId: bigint, body: ProfileUpdateBody, n
   const data: Prisma.MemberUpdateInput = {};
   if (body.gender !== undefined) data.gender = body.gender;
   if (body.ageGroup !== undefined) data.ageGroup = body.ageGroup;
+  if (body.bio !== undefined) data.bio = body.bio || null;
 
   // 지금과 똑같은 닉네임은 변경으로 세지 않는다.
   if (body.nickname !== undefined && body.nickname !== member.nickname) {
@@ -247,5 +254,6 @@ export async function updateMyProfile(userId: bigint, body: ProfileUpdateBody, n
     nicknameChangeableAt: toKstIsoOrNull(nicknameChangeableAt(updated.nicknameChangedAt, now)),
     gender: updated.gender,
     ageGroup: updated.ageGroup,
+    bio: updated.bio,
   };
 }
