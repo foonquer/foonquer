@@ -164,18 +164,28 @@ async function unlock(
   };
 }
 
-/** 업적 보상 아이템 (v1.3): item.required_achievement_id가 이 업적인 아이템을 준다 (방망이는 개수 +1) */
+/**
+ * 업적 보상 아이템 (v1.3): item.required_achievement_id가 이 업적인 아이템을 준다.
+ * 방망이는 개수 +1, 나머지(왕관·밤하늘)는 이미 가졌으면 그대로 둔다(개수는 항상 1)
+ */
 async function giveAchievementItems(tx: Tx, userId: bigint, achievementId: number, now: Date) {
-  const items = await tx.item.findMany({
+  const candidates = await tx.item.findMany({
     where: { requiredAchievementId: achievementId, status: 'A' },
-    select: { id: true, code: true, name: true },
+    select: { id: true, code: true, name: true, category: true },
   });
-  for (const item of items) {
+  const items: typeof candidates = [];
+  for (const item of candidates) {
+    const owned = await tx.memberItem.findUnique({
+      where: { userId_itemId: { userId, itemId: item.id } },
+      select: { quantity: true },
+    });
+    if (owned && owned.quantity > 0 && item.category !== 'CLUB') continue;
     await tx.memberItem.upsert({
       where: { userId_itemId: { userId, itemId: item.id } },
       update: { quantity: { increment: 1 }, seenAt: null },
       create: { userId, itemId: item.id, acquiredType: 'A', acquiredAt: now },
     });
+    items.push(item);
     await notify(
       tx,
       userId,
