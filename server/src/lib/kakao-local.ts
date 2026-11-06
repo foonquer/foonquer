@@ -2,7 +2,7 @@ import { env } from '../config/env';
 
 /**
  * 카카오 로컬 API (https://developers.kakao.com/docs/latest/ko/local/dev-guide)
- * REST 키는 서버 환경변수(KAKAO_REST_API_KEY)에만 둔다.
+ * REST 키는 서버 환경변수(KAKAO_LOCAL_API_KEY, 없으면 KAKAO_REST_API_KEY)에만 둔다.
  */
 
 const BASE_URL = 'https://dapi.kakao.com';
@@ -16,7 +16,8 @@ export class KakaoApiError extends Error {
 }
 
 export async function kakaoGet<T>(path: string, params: Record<string, string | number>) {
-  if (!env.KAKAO_REST_API_KEY) throw new KakaoApiError('KAKAO_REST_API_KEY 환경변수가 없습니다.');
+  const key = env.KAKAO_LOCAL_API_KEY ?? env.KAKAO_REST_API_KEY;
+  if (!key) throw new KakaoApiError('KAKAO_REST_API_KEY 환경변수가 없습니다.');
 
   const url = new URL(path, BASE_URL);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, String(value));
@@ -24,7 +25,7 @@ export async function kakaoGet<T>(path: string, params: Record<string, string | 
   let res: Response;
   try {
     res = await fetch(url, {
-      headers: { Authorization: `KakaoAK ${env.KAKAO_REST_API_KEY}` },
+      headers: { Authorization: `KakaoAK ${key}` },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (err) {

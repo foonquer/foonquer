@@ -336,6 +336,7 @@ pnpm -C server db:migrate                                       # 적용
 | `API_BASE_URL` | 이 API 서버의 바깥 주소. 카카오 로그인 redirect_uri를 만든다 | `http://localhost:3000` |
 | `KAKAO_REST_API_KEY` | 카카오 REST API 키 (카카오 로그인 client_id, 카카오 로컬 API) | 카카오 개발자 콘솔 |
 | `KAKAO_CLIENT_SECRET` | 카카오 로그인 Client Secret (콘솔에서 켰을 때만) | 비워 둔다 |
+| `KAKAO_LOCAL_API_KEY` | 카카오 로컬 API만 다른 앱의 REST 키로 부를 때 (카카오맵 무료 쿼터는 계정에서 처음 카카오맵을 켠 앱에만 있다). 비우면 `KAKAO_REST_API_KEY` | 비워 둔다 |
 
 > **카카오 로컬 API**: 지도(MAP-01)·맛집 검색(SEARCH-02)은 카카오 장소 검색으로 우리 DB에 없는 가게를 저장한 뒤 DB 기준으로 응답한다. 같은 영역·같은 검색어는 24시간 동안 서버 메모리에 캐시해 카카오를 다시 부르지 않는다(하루 호출 한도). 카카오가 실패해도 에러 대신 DB 결과만 준다. 카카오는 한 번 검색에 분류(음식점·카페)마다 최대 45곳까지만 주므로, 가게가 아주 많은 동네에서 지도를 넓게 보면 일부 가게는 지도를 확대해 그 영역을 다시 볼 때 저장된다. 카카오 개발자 콘솔에서 이 앱의 **카카오맵 API(지도·로컬)를 활성화**해야 로컬 API가 응답한다.
 
@@ -620,7 +621,8 @@ GCP에서 준비할 것:
 | `TRUST_PROXY` | `1` (caddy 한 단계) |
 | `COOKIE_SECURE` | `true` |
 | `JWT_ACCESS_SECRET` | 32자 이상 임의 문자열 (로컬과 다르게) |
-| `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET` | 카카오 개발자 콘솔 값. Redirect URI `https://api.foonquer.me/api/v1/auth/oauth/kakao/callback` 등록 |
+| `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET` | 카카오 개발자 콘솔 먹짱깨기 앱의 REST API 키와 카카오 로그인 Client Secret. 그 키에 카카오 로그인 리다이렉트 URI `https://api.foonquer.me/api/v1/auth/oauth/kakao/callback` 등록 |
+| `KAKAO_LOCAL_API_KEY` | 카카오맵 무료 쿼터가 있는 앱의 REST API 키 `foonquer-server` (먹짱깨기 앱은 카카오맵을 켜면 유료라서) |
 | `GCS_BUCKET`, `GCS_PRIVATE_BUCKET`, `IMAGE_BASE_URL` | 버킷 이름, `https://storage.googleapis.com/<공개 버킷>` |
 | `CLOVA_OCR_URL`, `CLOVA_OCR_SECRET`, `GEMINI_API_KEY` | 각 콘솔 값 (비우면 그 기능만 꺼진다) |
 
@@ -645,8 +647,8 @@ deploy 사용자 crontab에 넣는다. 예) 매일 새벽 3시 30분(KST)
 `web/`을 Vercel 프로젝트로 연결한다.
 
 - Vercel에서 이 저장소를 가져오고 **Root Directory를 `web`** 으로 지정한다. pnpm 모노레포는 Vercel이 알아서 인식한다. Production Branch는 `develop`.
-- 환경변수 `VITE_API_BASE_URL`=`https://api.foonquer.me`, `VITE_KAKAO_MAP_KEY`=카카오 JavaScript 키.
-- 도메인 `foonquer.me`(와 `www.foonquer.me`)를 연결한다. 카카오 개발자 콘솔 > 플랫폼 > Web 사이트 도메인에 `https://foonquer.me`를 추가해야 지도가 뜬다.
+- 환경변수 `VITE_API_BASE_URL`=`https://api.foonquer.me`, `VITE_KAKAO_MAP_KEY`=카카오맵 무료 쿼터가 있는 앱의 JavaScript 키 `foonquer-web`.
+- 도메인 `foonquer.me`(와 `www.foonquer.me`)를 연결한다. 카카오 개발자 콘솔 > 앱 > 플랫폼 키 > 그 JavaScript 키 > JavaScript SDK 도메인에 `https://foonquer.me`·`https://www.foonquer.me`가 있어야 지도가 뜬다.
 - `web/vercel.json`이 모든 경로를 `index.html`로 보내서, `/restaurants/1` 같은 주소로 바로 들어와도 화면이 뜬다.
 
 ### 배포가 실패했거나 잘못 배포됐을 때
