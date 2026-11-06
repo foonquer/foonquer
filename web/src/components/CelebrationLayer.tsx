@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import { type Celebration, getCelebrations, markCelebrationSeen } from '../api/mukkaebi';
 import mukkaebi from '../assets/illust/mukkaebi.svg';
 import { useModalFocus } from '../lib/a11y';
+import { backgroundArt } from '../lib/backgroundArt';
 import { formatPoint } from '../lib/format';
 import { euro, iGa } from '../lib/korean';
 import { useAsync } from '../lib/useAsync';
@@ -85,6 +86,8 @@ export function CelebrationLayer() {
 
   if (!current) return null;
   const copy = copyOf(current);
+  // 배경을 얻었으면 먹깨비 대신 그 구 배경 그림
+  const bgArt = current.type === 'BACKGROUND' ? backgroundArt(current.data.bgKey) : undefined;
   const close = (to?: string) => {
     // 확인 기록이 실패해도 화면은 넘긴다 (다음에 다시 뜬다)
     void markCelebrationSeen(current.celebrationId).catch(() => undefined);
@@ -107,7 +110,11 @@ export function CelebrationLayer() {
         <p className={styles.label}>{copy.label}</p>
         <h2 className={styles.title}>{copy.title}</h2>
         <p className={styles.sub}>{copy.sub}</p>
-        <img src={mukkaebi} alt="" className={styles.mukkaebi} />
+        {bgArt ? (
+          <img src={bgArt} alt="" className={styles.bgArt} />
+        ) : (
+          <img src={mukkaebi} alt="" className={styles.mukkaebi} />
+        )}
         {copy.reward && <p className={styles.reward}>{copy.reward}</p>}
         <div className={styles.buttons}>
           <Button onClick={() => close(copy.to)}>{copy.action}</Button>

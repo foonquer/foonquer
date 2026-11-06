@@ -338,6 +338,7 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--mk-forest);
+  object-fit: cover;
 }
 
 .reset {

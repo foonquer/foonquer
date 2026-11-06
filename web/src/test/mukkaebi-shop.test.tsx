@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { MyMukkaebi, ShopItem } from '../api/mukkaebi';
 import nightsky from '../assets/illust/mukkaebi-nightsky.svg';
 import { MukkaebiFigure } from '../components/MukkaebiFigure';
+import { backgroundArt } from '../lib/backgroundArt';
 import { itemArt } from '../lib/itemArt';
 import { mockApi, ok } from './http';
 import { renderRoute } from './render';
@@ -109,6 +110,36 @@ describe('먹깨비 꾸미기', () => {
     fireEvent.click(screen.getByRole('button', { name: '저장하기' }));
     await waitFor(() =>
       expect(server.calls('PUT /characters/me/appearance')[0]?.body).toEqual({ skinItemId: 11 }),
+    );
+  });
+
+  it('배경 탭: 얻은 구 배경을 그림으로 보여 주고, 고르면 미리보기 바탕이 그 구 그림이 된다', async () => {
+    const gangseo = backgroundArt('BG_1150000000');
+    const server = mockApi({
+      'GET /characters/me': ok(mukkaebi()),
+      'GET /characters/me/items': ok({
+        items: [],
+        backgrounds: [
+          { sigunguId: 3, sigunguName: '강서구', bgKey: 'BG_1150000000', isSelected: false },
+          { sigunguId: 9, sigunguName: '새로운구', bgKey: null, isSelected: false },
+        ],
+      }),
+      'PUT /characters/me/appearance': ok({ equipped: {}, background: null }),
+    });
+    const { container } = renderRoute('/me/mukkaebi/decorate?tab=BACKGROUND');
+
+    const tile = await screen.findByRole('radio', { name: /강서구/ });
+    expect(tile.querySelector('img')).toHaveAttribute('src', gangseo);
+    // 그림이 없는 구는 이름 두 글자
+    expect(screen.getByRole('radio', { name: /새로운구/ })).toHaveTextContent('새로');
+    fireEvent.click(tile);
+    expect(screen.getByText('미리보기').parentElement).toHaveTextContent('미리보기강서구 배경');
+    expect(
+      [...container.querySelectorAll('img')].filter((img) => img.src === gangseo),
+    ).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: '저장하기' }));
+    await waitFor(() =>
+      expect(server.calls('PUT /characters/me/appearance')[0]?.body).toEqual({ bgSigunguId: 3 }),
     );
   });
 });
@@ -325,7 +356,7 @@ describe('아이템 상자·축하·먹포인트', () => {
             celebrationId: 'BACKGROUND:3',
             type: 'BACKGROUND',
             occurredAt: '2026-09-25T12:00:00+09:00',
-            data: { sigunguId: 3, sigunguName: '강서구', bgKey: null },
+            data: { sigunguId: 3, sigunguName: '강서구', bgKey: 'BG_1150000000' },
           },
         ],
       }),
@@ -333,6 +364,7 @@ describe('아이템 상자·축하·먹포인트', () => {
     });
     const { router } = renderRoute('/list');
     const dialog = await screen.findByRole('dialog', { name: '강서구 배경을 얻었어요!' });
+    expect(dialog.querySelector('img')).toHaveAttribute('src', backgroundArt('BG_1150000000'));
     fireEvent.click(within(dialog).getByRole('button', { name: '배경 바꾸러 가기' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/me/mukkaebi/decorate'));
   });

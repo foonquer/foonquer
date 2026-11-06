@@ -60,7 +60,7 @@ export function MukkaebiPage() {
             wearing={wearing}
             sizePercent={m.sizePercent}
             stage={m.stage}
-            background={m.background?.sigunguName}
+            background={m.background}
             badge={`LV.${m.level} ${m.stageName} 먹깨비`}
             height={290}
           />

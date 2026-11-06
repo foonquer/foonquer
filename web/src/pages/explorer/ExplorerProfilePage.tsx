@@ -130,7 +130,7 @@ function Profile({ p, onBlocked }: { p: MemberProfile; onBlocked: (blocked: bool
           <MukkaebiFigure
             wearing={wearing}
             stage={m.stage}
-            background={m.background?.sigunguName}
+            background={m.background}
             height={240}
           />
           <p className={styles.worn}>
