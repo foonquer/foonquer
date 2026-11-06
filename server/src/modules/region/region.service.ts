@@ -21,6 +21,8 @@ interface RegionIndex {
   byCode: Map<string, RegionNode>;
   /** 서울 법정동(level 3) 목록 */
   seoulDongs: RegionNode[];
+  /** '강서구 가양동' → 서울 법정동 (카카오 지번 주소로 동을 찾을 때) */
+  seoulDongByName: Map<string, RegionNode>;
 }
 
 // 서울 구·동(약 500행)은 거의 바뀌지 않아 서버 메모리에 한 번 읽어 둔다 (REGION-01 명세 비고).
@@ -41,10 +43,18 @@ async function loadIndex(): Promise<RegionIndex> {
     centerLat: r.centerLat === null ? null : Number(r.centerLat),
     centerLng: r.centerLng === null ? null : Number(r.centerLng),
   }));
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const seoulDongs = nodes.filter((n) => n.level === 3 && isSeoulCode(n.code));
+  const seoulDongByName = new Map<string, RegionNode>();
+  for (const dong of seoulDongs) {
+    const gu = dong.parentId === null ? undefined : byId.get(dong.parentId);
+    if (gu) seoulDongByName.set(`${gu.name} ${dong.name}`, dong);
+  }
   const index: RegionIndex = {
-    byId: new Map(nodes.map((n) => [n.id, n])),
+    byId,
     byCode: new Map(nodes.map((n) => [n.code, n])),
-    seoulDongs: nodes.filter((n) => n.level === 3 && isSeoulCode(n.code)),
+    seoulDongs,
+    seoulDongByName,
   };
   // 아직 seed 전이면 캐시하지 않는다.
   if (nodes.length > 0) cache = { index, loadedAt: Date.now() };
@@ -70,6 +80,51 @@ export async function requireSeoulDong(regionId: number): Promise<DongWithSigung
   const sigungu = region.parentId === null ? undefined : index.byId.get(region.parentId);
   if (!sigungu) throw new AppError(RegionError.REGION_NOT_FOUND);
   return { dong: region, sigungu };
+}
+
+/** 구·동 이름으로 서울 법정동 찾기. 예) ('강서구', '가양동'). 없으면 null */
+export async function findSeoulDongByName(sigunguName: string, dongName: string) {
+  const index = await loadIndex();
+  const dong = index.seoulDongByName.get(`${sigunguName} ${dongName}`);
+  return dong ? withSigungu(index, dong) : null;
+}
+
+/** 법정동 코드(카카오 B 코드)로 서울 법정동 찾기. 없거나 동이 아니면 null */
+export async function findSeoulDongByCode(code: string) {
+  const index = await loadIndex();
+  const dong = index.byCode.get(code);
+  if (!dong || dong.level !== 3 || !isSeoulCode(dong.code)) return null;
+  return withSigungu(index, dong);
+}
+
+function withSigungu(index: RegionIndex, dong: RegionNode): DongWithSigungu | null {
+  const sigungu = dong.parentId === null ? undefined : index.byId.get(dong.parentId);
+  return sigungu ? { dong, sigungu } : null;
+}
+
+/** 동(level 3) 또는 구(level 2)인 서울 지역 (RECO-01) */
+export type SeoulArea =
+  | { level: 3; dong: RegionNode; sigungu: RegionNode }
+  | { level: 2; dong: null; sigungu: RegionNode };
+
+/**
+ * 동 또는 구 id를 확인한다. 없으면 404 REGION_NOT_FOUND,
+ * 서울 밖이거나 시·도 단위면 400 REGION_NOT_SUPPORTED (메시지는 부르는 쪽에서 정할 수 있다).
+ */
+export async function requireSeoulArea(
+  regionId: number,
+  notSupportedMessage?: string,
+): Promise<SeoulArea> {
+  const index = await loadIndex();
+  const region = index.byId.get(regionId);
+  if (!region) throw new AppError(RegionError.REGION_NOT_FOUND);
+  if (!isSeoulCode(region.code) || (region.level !== 2 && region.level !== 3)) {
+    throw new AppError(RegionError.REGION_NOT_SUPPORTED, notSupportedMessage);
+  }
+  if (region.level === 2) return { level: 2, dong: null, sigungu: region };
+  const found = withSigungu(index, region);
+  if (!found) throw new AppError(RegionError.REGION_NOT_FOUND);
+  return { level: 3, ...found };
 }
 
 /** REGION-01·02 응답 한 줄 */

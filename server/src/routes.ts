@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { authRouter } from './modules/auth/auth.router';
 import { healthRouter } from './modules/health/health.router';
+import { mapRouter } from './modules/map/map.router';
 import { regionRouter } from './modules/region/region.router';
+import { restaurantRouter } from './modules/restaurant/restaurant.router';
+import { recommendationRouter, searchRouter } from './modules/search/search.router';
 import { userRouter } from './modules/user/user.router';
 
 /**
@@ -14,3 +17,7 @@ router.use('/health', healthRouter);
 router.use('/auth', authRouter);
 router.use('/users', userRouter);
 router.use('/regions', regionRouter);
+router.use('/map', mapRouter);
+router.use('/restaurants', restaurantRouter);
+router.use('/search', searchRouter);
+router.use('/recommendations', recommendationRouter);
