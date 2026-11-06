@@ -1,0 +1,601 @@
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px var(--mk-side) 24px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--mk-ink);
+  white-space: pre-line;
+}
+
+.description {
+  margin-top: -6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+  white-space: pre-line;
+}
+
+/* 인증 방식 카드 */
+.method {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px 44px 20px 18px;
+  border-radius: 22px;
+  background: var(--mk-white);
+}
+
+.method::after {
+  content: '›';
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  font-size: 26px;
+  color: var(--mk-forest);
+  transform: translateY(-50%);
+}
+
+.recommend {
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: var(--mk-green-100);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.methodTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.methodSub {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.methodText {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.info {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--mk-white);
+}
+
+.infoTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.infoText {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+}
+
+/* 현장인증 미션 진행 */
+.mission {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.missionText {
+  margin-top: -10px;
+  font-size: 13px;
+  color: var(--mk-muted);
+}
+
+.progress {
+  display: flex;
+  gap: 8px;
+}
+
+.progress span {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--mk-line);
+}
+
+.progress span[data-done='true'] {
+  background: var(--mk-green);
+}
+
+.shop {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--mk-white);
+}
+
+.shopIcon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--mk-cream);
+  font-size: 22px;
+}
+
+.shopName {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.shopMeta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+/* 매장 반경 그림 */
+.map {
+  position: relative;
+  height: 190px;
+  border-radius: 20px;
+  background:
+    linear-gradient(90deg, transparent 46%, #f8faf6 46% 54%, transparent 54%),
+    linear-gradient(0deg, transparent 38%, #f8faf6 38% 46%, transparent 46%), #e6eee1;
+  overflow: hidden;
+}
+
+.radius {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(89, 168, 100, 0.25);
+  transform: translate(-50%, -50%);
+}
+
+.shopPin {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mk-forest);
+  transform: translate(-12px, -50%);
+}
+
+.shopPin::before {
+  content: '✓';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--mk-green);
+  font-size: 13px;
+  color: var(--mk-white);
+}
+
+.me {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mk-ink);
+  transform: translate(-8px, -50%);
+}
+
+.me::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--mk-white);
+  border-radius: 50%;
+  background: #e08a3c;
+}
+
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: var(--mk-white);
+}
+
+.statusTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.statusTitle[data-tone='ok']::before {
+  content: '✓ ';
+  color: var(--mk-green);
+}
+
+.statusTitle[data-tone='warn'] {
+  color: var(--mk-coral-text);
+}
+
+.statusText {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+}
+
+/* 사진 고르기 */
+.picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 320px;
+  border: 1.5px dashed var(--mk-line-strong);
+  border-radius: 22px;
+  background: var(--mk-white);
+  font-size: 13px;
+  color: var(--mk-muted);
+  cursor: pointer;
+}
+
+.picker span:first-child {
+  font-size: 34px;
+  color: var(--mk-green);
+}
+
+.preview {
+  width: 100%;
+  max-height: 340px;
+  border-radius: 22px;
+  object-fit: cover;
+  background: var(--mk-white);
+}
+
+.caption {
+  font-size: 11px;
+  text-align: center;
+  color: var(--mk-subtle);
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: var(--mk-white);
+  list-style: none;
+}
+
+.steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.stepNo {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--mk-green);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-white);
+}
+
+.stepTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.stepText {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.ready {
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-radius: 18px;
+  background: var(--mk-green-info);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+/* 영수증 */
+.frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 360px;
+  border: 2px solid var(--mk-green);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  color: var(--mk-muted);
+}
+
+.frame img {
+  width: 92px;
+  opacity: 0.6;
+}
+
+.captureButtons {
+  display: flex;
+  gap: 10px;
+}
+
+.fileButton {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  border-radius: 18px;
+  background: var(--mk-green);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--mk-white);
+  cursor: pointer;
+}
+
+.fileButton[data-variant='white'] {
+  flex: 0 0 96px;
+  background: var(--mk-white);
+  color: var(--mk-forest);
+}
+
+.fileButton input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.fileButton:focus-within {
+  outline: 2px solid var(--mk-forest);
+  outline-offset: 2px;
+}
+
+.reading {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 18px;
+  border-radius: 20px;
+  background: var(--mk-white);
+  list-style: none;
+  font-size: 13px;
+  color: var(--mk-ink);
+}
+
+.reading li {
+  display: flex;
+  justify-content: space-between;
+}
+
+.reading li span:last-child {
+  color: var(--mk-muted);
+}
+
+.reading li[data-state='done'] span:last-child {
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+.spinner {
+  width: 44px;
+  height: 44px;
+  margin: 18px auto 0;
+  border: 4px solid var(--mk-green-100);
+  border-top-color: var(--mk-green);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
+
+/* 이 가게가 맞나요? */
+.receiptInfo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: var(--mk-white);
+}
+
+.receiptInfo p {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  color: var(--mk-muted);
+}
+
+.receiptInfo strong {
+  font-size: 14px;
+  color: var(--mk-ink);
+}
+
+.receiptInfoTitle {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.candidate {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1.5px solid transparent;
+  border-radius: 18px;
+  background: var(--mk-white);
+  text-align: left;
+}
+
+.candidate[aria-checked='true'] {
+  border-color: var(--mk-green);
+}
+
+.candidateName {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.candidate[aria-checked='true'] .candidateName::after {
+  content: ' ✓';
+  color: var(--mk-green);
+}
+
+.candidateMeta {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.match {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--mk-green-50);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.searchLink {
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--mk-white);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+/* 먹깨비 따라가기 */
+.road {
+  position: relative;
+  height: 220px;
+  border-radius: 22px;
+  background: #e6eee1;
+  overflow: hidden;
+}
+
+.road::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 12%;
+  right: 12%;
+  border-top: 3px dashed var(--mk-green-soft);
+}
+
+.walker {
+  position: absolute;
+  top: 50%;
+  left: 8%;
+  width: 64px;
+  transform: translate(0, -60%);
+  animation: walk 2.4s ease-in-out forwards;
+}
+
+.walker[data-arrived='true'] {
+  left: calc(92% - 64px);
+  animation: none;
+}
+
+@keyframes walk {
+  to {
+    left: calc(92% - 64px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .walker {
+    left: calc(92% - 64px);
+    animation: none;
+  }
+}
+
+.goal {
+  position: absolute;
+  top: 50%;
+  right: 6%;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: var(--mk-white);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mk-forest);
+  transform: translateY(30px);
+}

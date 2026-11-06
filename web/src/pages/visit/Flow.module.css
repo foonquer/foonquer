@@ -1,0 +1,212 @@
+/* 방문 인증·정복·적립 결과 화면 공통 (먹깨비 그림 + 제목 + 카드) */
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px var(--mk-side) 24px;
+}
+
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.mukkaebi {
+  display: block;
+  width: 108px;
+  margin: 8px auto 0;
+}
+
+.title {
+  margin-top: 14px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--mk-ink);
+  word-break: keep-all;
+}
+
+.subtitle {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+  white-space: pre-line;
+}
+
+.card {
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: var(--mk-white);
+}
+
+.cardName {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.cardMeta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--mk-muted);
+}
+
+.row strong {
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--mk-divider);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.total strong {
+  font-size: 18px;
+  color: var(--mk-green);
+}
+
+.balance {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f4f6f2;
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.balance strong {
+  color: var(--mk-ink);
+}
+
+.tip {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--mk-green-info);
+}
+
+.tipTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.tipText {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #4d6b55;
+}
+
+.warn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin: 24px auto 0;
+  border-radius: 50%;
+  background: var(--mk-cream);
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--mk-star);
+}
+
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 8px 0 0;
+  padding: 18px;
+  border-radius: 20px;
+  background: var(--mk-white);
+  list-style: none;
+  font-size: 13px;
+  color: var(--mk-ink);
+}
+
+.celebrate {
+  position: relative;
+  padding: 18px 18px 22px;
+  border-radius: 24px;
+  background: var(--mk-cream);
+  text-align: center;
+}
+
+.badge {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 14px;
+  background: var(--mk-forest);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mk-white);
+}
+
+.celebrateTitle {
+  margin-top: 10px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.celebrateSub {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--mk-ink);
+}
+
+.list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.list li strong {
+  color: var(--mk-green);
+}
+
+.sectionLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
