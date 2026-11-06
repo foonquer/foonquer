@@ -138,21 +138,31 @@ describe('주기 작업', () => {
     expect(stat.scoreSum.toNumber()).toBe(6);
   });
 
-  it('cleanup: 7일 안에 탈퇴한 회원의 비공개 사진·프로필 사진 폴더를 다시 지운다 (리뷰 사진은 남긴다)', async () => {
-    const recent = await createMember();
-    const old = await createMember();
-    await prisma.member.update({
-      where: { id: recent.id },
-      data: { status: 'D', deleteDate: addDays(new Date(), -1) },
+  it('cleanup: 사진 삭제가 끝나지 않은 탈퇴 회원(files_purged_at 없음)의 폴더를 다 지울 때까지 다시 지운다', async () => {
+    const [left, done, failing] = await Promise.all([
+      createMember(),
+      createMember(),
+      createMember(),
+    ]);
+    const longAgo = addDays(new Date(), -30);
+    await prisma.member.updateMany({
+      where: { id: { in: [left.id, failing.id] } },
+      data: { status: 'D', deleteDate: longAgo },
     });
     await prisma.member.update({
-      where: { id: old.id },
-      data: { status: 'D', deleteDate: addDays(new Date(), -8) },
+      where: { id: done.id },
+      data: { status: 'D', deleteDate: longAgo, filesPurgedAt: longAgo },
     });
-    vi.mocked(deletePrefixQuietly).mockResolvedValueOnce(false);
-    expect(await runCleanupJob()).toMatchObject({ withdrawnFileMembers: 1, failed: 1 });
-    const id = recent.id.toString();
-    expect(vi.mocked(deletePrefixQuietly).mock.calls.sort()).toEqual(
+    // failing의 첫 폴더 삭제만 실패 (left → failing 순서로 지운다)
+    vi.mocked(deletePrefixQuietly)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    expect(await runCleanupJob()).toMatchObject({ withdrawnFileMembers: 2, failed: 1 });
+    const id = left.id.toString();
+    expect(vi.mocked(deletePrefixQuietly).mock.calls.slice(0, 4).sort()).toEqual(
       [
         [`inquiry/${id}/`, 'private'],
         [`profile/${id}/`, 'public'],
@@ -160,5 +170,17 @@ describe('주기 작업', () => {
         [`site/${id}/`, 'private'],
       ].sort(),
     );
+    const after = await prisma.member.findMany({
+      where: { id: { in: [left.id, failing.id] } },
+      orderBy: { id: 'asc' },
+    });
+    expect(after.map((m) => m.filesPurgedAt !== null)).toEqual([true, false]);
+
+    // 다음 날 다시 돌면 실패했던 회원만 다시 지운다
+    vi.mocked(deletePrefixQuietly).mockClear();
+    expect(await runCleanupJob()).toMatchObject({ withdrawnFileMembers: 1, failed: 0 });
+    expect(
+      (await prisma.member.findUniqueOrThrow({ where: { id: failing.id } })).filesPurgedAt,
+    ).not.toBeNull();
   });
 });

@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app';
 import { toKstIso } from '../../src/common/time';
 import { prisma } from '../../src/lib/prisma';
-import { deleteObjectQuietly } from '../../src/lib/storage';
-import { resetDb } from '../helpers/db';
+import { deletePrefixQuietly } from '../../src/lib/storage';
+import { resetDb, waitForRunningQueries } from '../helpers/db';
 import {
   agreeConsents,
   bearer,
@@ -18,7 +18,8 @@ import { refreshCookieHeader } from '../helpers/http';
 vi.mock('../../src/lib/storage', () => ({
   readObjectHead: vi.fn(() => Promise.resolve(null)),
   createUploadUrl: vi.fn(),
-  deleteObjectQuietly: vi.fn(() => Promise.resolve()),
+  deleteObjectQuietly: vi.fn(() => Promise.resolve(true)),
+  deletePrefixQuietly: vi.fn(() => Promise.resolve(true)),
 }));
 
 const app = createApp();
@@ -323,7 +324,6 @@ describe('SET-04 DELETE /users/me', () => {
       pointBalance: 0,
     });
     expect(member.deleteDate).not.toBeNull();
-    expect(deleteObjectQuietly).toHaveBeenCalledWith(profileKey);
 
     const reason = await prisma.memberWithdrawal.findFirstOrThrow({ where: { userId: me.id } });
     expect(reason).toMatchObject({
@@ -363,9 +363,15 @@ describe('SET-04 DELETE /users/me', () => {
     });
     expect(await prisma.visitReceiptItem.count()).toBe(0);
     expect(await prisma.inquiry.count({ where: { userId: me.id } })).toBe(0);
-    for (const key of [`receipt/${me.id}/r.jpg`, `site/${me.id}/s.jpg`, `inquiry/${me.id}/q.jpg`]) {
-      expect(deleteObjectQuietly).toHaveBeenCalledWith(key, 'private');
+    // 사진은 폴더째 지운다 (올리고 저장하지 않은 사진까지). 리뷰 사진 폴더는 리뷰가 남아서 그대로
+    for (const folder of ['receipt', 'site', 'inquiry']) {
+      expect(deletePrefixQuietly).toHaveBeenCalledWith(`${folder}/${me.id}/`, 'private');
     }
+    expect(deletePrefixQuietly).toHaveBeenCalledWith(`profile/${me.id}/`, 'public');
+    expect(deletePrefixQuietly).not.toHaveBeenCalledWith(`review/${me.id}/`, expect.anything());
+    expect(
+      (await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).filesPurgedAt,
+    ).not.toBeNull();
 
     // 동의 중이던 항목은 철회 이력이 남는다
     const latest = await prisma.memberConsent.findMany({
@@ -429,5 +435,44 @@ describe('SET-04 DELETE /users/me', () => {
     expect(statuses[0]).toBe(200);
     expect([401, 409]).toContain(statuses[1]);
     expect(await prisma.memberWithdrawal.count({ where: { userId: me.id } })).toBe(1);
+  });
+
+  it('사진 삭제가 실패해도 탈퇴는 성공하고 files_purged_at이 비어 cleanup이 다시 지운다', async () => {
+    const me = await createMember();
+    vi.mocked(deletePrefixQuietly).mockResolvedValueOnce(false);
+    expect((await withdraw(me.id, { confirmed: true })).status).toBe(200);
+    expect(
+      (await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).filesPurgedAt,
+    ).toBeNull();
+  });
+
+  it('영수증 처리와 겹쳐도 교착되지 않는다 (방문 → 회원 순서로 잠근다)', async () => {
+    const me = await createMember();
+    const restaurant = await createRestaurant();
+    const visit = await prisma.visit.create({
+      data: {
+        userId: me.id,
+        restaurantId: restaurant.id,
+        method: 'R',
+        status: 'P',
+        receiptImageKey: `receipt/${me.id}/r.jpg`,
+      },
+    });
+    // processReceipt처럼 방문 행을 잠근 채 탈퇴를 보내고, 탈퇴가 잠금을 기다리는 것을 확인한 뒤 회원 행을 잠근다.
+    // 탈퇴가 회원 행을 먼저 잠그면 여기서 교착(deadlock)이 나서 한쪽이 실패한다
+    let withdrawing: Promise<request.Response> | undefined;
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM visit WHERE id = ${visit.id} FOR UPDATE`;
+        withdrawing = Promise.resolve(withdraw(me.id, { confirmed: true }));
+        await waitForRunningQueries('SELECT id FROM visit WHERE user_id');
+        await tx.$queryRaw`SELECT id FROM member WHERE id = ${me.id} FOR UPDATE`;
+      },
+      { timeout: 10_000 },
+    );
+    expect((await withdrawing)?.status).toBe(200);
+    expect(
+      (await prisma.visit.findUniqueOrThrow({ where: { id: visit.id } })).purgedAt,
+    ).not.toBeNull();
   });
 });

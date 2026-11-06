@@ -42,3 +42,20 @@ export async function resetDb() {
   });
   await resetRateLimits();
 }
+
+/**
+ * 다른 연결 count개가 sqlPrefix로 시작하는 쿼리를 실행 중(잠금 대기 포함)일 때까지 기다린다.
+ * 동시성 테스트에서 "요청이 잠금 앞에 도착했다"를 시간(sleep) 대신 이 신호로 확인한다 (테스트 파일은 하나씩 돈다)
+ */
+export async function waitForRunningQueries(sqlPrefix: string, count = 1, timeoutMs = 5_000) {
+  const until = Date.now() + timeoutMs;
+  for (;;) {
+    const [row] = await prisma.$queryRaw<{ n: bigint }[]>`
+      SELECT COUNT(*) AS n FROM information_schema.processlist
+      WHERE db = DATABASE() AND id <> CONNECTION_ID() AND info LIKE CONCAT(${sqlPrefix}, '%')`;
+    if (Number(row?.n ?? 0) >= count) return;
+    if (Date.now() > until)
+      throw new Error(`"${sqlPrefix}" 쿼리 ${count}개가 ${timeoutMs}ms 안에 실행되지 않았어요`);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}

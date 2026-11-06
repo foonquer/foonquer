@@ -326,10 +326,12 @@ function receiptMatch(restaurant: { name: string; businessNo: string | null }, o
 
 /** 후보를 찾을 때 이름 검색에 쓰는 앞부분 ("(주)옛날손칼국수 가양점" → "옛날손칼") */
 function nameSearchToken(storeName: string) {
-  const first = storeName
-    .replace(/\(주\)|㈜|주식회사/g, '')
-    .trim()
-    .split(/\s+/)[0];
+  const first = normalizeStoreName(
+    storeName
+      .replace(/\(주\)|㈜|주식회사/g, '')
+      .trim()
+      .split(/\s+/)[0],
+  );
   return first.length >= 2 ? first.slice(0, 4) : null;
 }
 
@@ -337,14 +339,20 @@ function nameSearchToken(storeName: string) {
  * 이름에 token이 들어간 가게 id 300개. 프랜차이즈처럼 많으면 가까운 순(위치가 없으면 id 순)으로 자른다 —
  * 집에서 올린 영수증이라 현재 위치 범위로 거르지는 않는다
  */
+/** normalizeStoreName이 빼는 공백·기호 (MySQL REGEXP_REPLACE용) */
+const STORE_NAME_SYMBOLS = '[[:space:]()\\[\\]{}·.,_\'"&/-]';
+
 async function nameCandidateIds(token: string, near: { lat: number; lng: number } | null) {
   const pattern = `%${token.replace(/[\\%_]/g, '\\$&')}%`;
   // 경도 1도는 서울(북위 37.5도)에서 위도 1도의 약 0.8배 길이
   const order = near
     ? Prisma.sql`(POW(lat - ${near.lat}, 2) + POW((lng - ${near.lng}) * 0.8, 2)), id`
     : Prisma.sql`id`;
+  // 가게명도 normalizeStoreName처럼 공백·기호를 빼고 비교한다 ("옛날 손칼국수" ↔ 영수증 "옛날손칼국수")
   const rows = await prisma.$queryRaw<{ id: bigint }[]>`
-    SELECT id FROM restaurant WHERE status = 'A' AND name LIKE ${pattern} ORDER BY ${order} LIMIT 300`;
+    SELECT id FROM restaurant
+    WHERE status = 'A' AND REGEXP_REPLACE(name, ${STORE_NAME_SYMBOLS}, '') LIKE ${pattern}
+    ORDER BY ${order} LIMIT 300`;
   return rows.map((r) => r.id);
 }
 

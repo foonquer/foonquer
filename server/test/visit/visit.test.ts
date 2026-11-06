@@ -508,6 +508,14 @@ describe('VISIT-03·04·05 홈에서 바로 찍은 영수증', () => {
       status: 'F',
       failReason: 'DUPLICATE',
     });
+    const dupResult = await request(app)
+      .get(`/api/v1/visit-verifications/${dup}`)
+      .set('Authorization', bearer(me.id));
+    expect(dupResult.body.data).toMatchObject({
+      status: 'FAILED',
+      failReason: 'DUPLICATE',
+      failMessage: '이미 인증한 영수증이에요.',
+    });
     expect(await prisma.visitReceiptItem.count({ where: { visitId: BigInt(dup) } })).toBe(0);
 
     const peek = await request(app)
@@ -517,6 +525,7 @@ describe('VISIT-03·04·05 홈에서 바로 찍은 영수증', () => {
     expect(peek.body.code).toBe('VISIT_NOT_FOUND');
     const steal = await confirm(other.id, id, restaurant.id);
     expect(steal.status).toBe(404);
+    expect(steal.body.code).toBe('VISIT_NOT_FOUND');
     expect((await prisma.visit.findUniqueOrThrow({ where: { id: BigInt(id) } })).status).toBe('R');
   });
 
@@ -530,6 +539,11 @@ describe('VISIT-03·04·05 홈에서 바로 찍은 영수증', () => {
       status: 'F',
       failReason: 'EXPIRED',
     });
+    const oldResult = await request(app)
+      .get(`/api/v1/visit-verifications/${old}`)
+      .set('Authorization', bearer(me.id));
+    expect(oldResult.body.data).toMatchObject({ status: 'FAILED', failReason: 'EXPIRED' });
+    expect(oldResult.body.data.failMessage).toContain('7일');
 
     vi.mocked(readReceipt).mockResolvedValue(receipt({ approvalNo: '22222222' }));
     const id = await submitHome(me.id);
@@ -561,6 +575,20 @@ describe('VISIT-03·04·05 홈에서 바로 찍은 영수증', () => {
       status: 'R',
       restaurantId: null,
     });
+  });
+
+  it('가게명의 공백·기호가 달라도 후보로 찾는다 ("옛날 손칼국수" ↔ 영수증 "옛날손칼국수")', async () => {
+    const { me } = await setup();
+    const spaced = await createRestaurant({ name: '옛날 손칼국수 가양점' });
+    vi.mocked(readReceipt).mockResolvedValue(receipt({ businessNo: null }));
+    const id = await submitHome(me.id);
+    expect((await prisma.visit.findUniqueOrThrow({ where: { id: BigInt(id) } })).status).toBe('R');
+    const check = await request(app)
+      .get(`/api/v1/visit-verifications/${id}`)
+      .set('Authorization', bearer(me.id));
+    expect(
+      (check.body.data.candidates as { restaurantId: number }[]).map((c) => c.restaurantId),
+    ).toContain(Number(spaced.id));
   });
 
   it('사업자번호가 같은 가게가 있으면 이름만 맞는 다른 가게는 고를 수 없다', async () => {

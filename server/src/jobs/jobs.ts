@@ -1,11 +1,10 @@
 import { MemberStatus } from '../common/auth/member-status';
 import { addDays } from '../common/time';
 import { prisma } from '../lib/prisma';
-import { deletePrefixQuietly } from '../lib/storage';
 import { KEEP_DAYS } from '../modules/notification/notification.service';
 import { notify } from '../modules/notification/notify';
 import { runSeasonJob } from '../modules/ranking/season-job';
-import { UPLOAD_PURPOSES } from '../modules/upload/upload-purpose';
+import { purgeMemberFiles } from '../modules/user/member-files';
 import {
   loadRatingParams,
   refreshRestaurantStat,
@@ -61,34 +60,19 @@ export async function runRatingJob(now = new Date()) {
   return { restaurants: restaurants.length, reviewCount: agg._count, failed };
 }
 
-/** 탈퇴하고 이 기간 안이면 cleanup이 남은 파일을 다시 지운다 (탈퇴 때 스토리지 삭제가 실패했을 수 있어서) */
-export const WITHDRAWN_FILE_SWEEP_DAYS = 7;
+/** cleanup이 한 번에 다시 지울 탈퇴 회원 수 (파일 삭제가 실패했던 회원) */
+const FILE_SWEEP_BATCH = 100;
 
-/**
- * 탈퇴 회원의 비공개 사진(영수증·현장·문의)과 프로필 사진 폴더를 다시 지운다. 리뷰 사진은 리뷰가 남아서 지우지 않는다.
- * key가 {폴더}/{회원 id}/... 라서 DB에 key가 없어도 폴더째 지울 수 있다
- */
+/** 탈퇴할 때 사진 폴더 삭제가 실패한 회원(files_purged_at이 비어 있음)의 폴더를 다시 지운다. 다 지울 때까지 매일 다시 한다 */
 async function sweepWithdrawnFiles(now: Date) {
   const members = await prisma.member.findMany({
-    where: {
-      status: MemberStatus.WITHDRAWN,
-      deleteDate: { gte: addDays(now, -WITHDRAWN_FILE_SWEEP_DAYS) },
-    },
+    where: { status: MemberStatus.WITHDRAWN, filesPurgedAt: null },
+    orderBy: { id: 'asc' },
+    take: FILE_SWEEP_BATCH,
     select: { id: true },
   });
-  const privateFolders = Object.values(UPLOAD_PURPOSES)
-    .filter((p) => p.bucket === 'private')
-    .map((p) => p.folder);
   let failed = 0;
-  for (const { id } of members) {
-    const results = await Promise.all([
-      ...privateFolders.map((folder) =>
-        deletePrefixQuietly(`${folder}/${id.toString()}/`, 'private'),
-      ),
-      deletePrefixQuietly(`profile/${id.toString()}/`, 'public'),
-    ]);
-    if (results.includes(false)) failed += 1;
-  }
+  for (const { id } of members) if (!(await purgeMemberFiles(id, now))) failed += 1;
   return { withdrawnMembers: members.length, failed };
 }
 
