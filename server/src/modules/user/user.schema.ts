@@ -31,7 +31,7 @@ export const profileSetupBody = z.object({
   localRegionIds: z
     .array(z.number().int().positive(), { error: 'LOCAL_REGION_COUNT_INVALID' })
     .min(1, { error: 'LOCAL_REGION_COUNT_INVALID' })
-    .max(3, { error: 'LOCAL_REGION_COUNT_INVALID' })
+    .max(2, { error: 'LOCAL_REGION_COUNT_INVALID' }) // LOCAL_REGION_MAX와 같다
     .refine((ids) => new Set(ids).size === ids.length, { error: 'LOCAL_REGION_DUPLICATE' }),
 });
 export type ProfileSetupBody = z.infer<typeof profileSetupBody>;

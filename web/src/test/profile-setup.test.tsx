@@ -211,7 +211,7 @@ describe('프로필 설정 (S-04 ~ S-07)', () => {
     expect(screen.queryByRole('status', { name: '동네를 찾는 중' })).not.toBeInTheDocument();
   });
 
-  it('내 동네는 3곳까지 고를 수 있고, 고른 동네를 다시 누르면 빠진다', async () => {
+  it('내 동네는 2곳까지 고를 수 있고, 고른 동네를 다시 누르면 빠진다', async () => {
     profileApi();
     renderRoute('/profile/setup', { session });
     await goToRegionStep();
@@ -219,13 +219,12 @@ describe('프로필 설정 (S-04 ~ S-07)', () => {
     await searchAndPick('가양', '가양동');
     await searchAndPick('망원', '망원동');
     await searchAndPick('성수', '성수동');
-    await searchAndPick('역삼', '역삼동');
 
-    expect(await screen.findByText('내 동네는 최대 3곳까지 고를 수 있어요.')).toBeInTheDocument();
-    expect(screen.getByText('고른 동네 3 / 3')).toBeInTheDocument();
+    expect(await screen.findByText('내 동네는 최대 2곳까지 고를 수 있어요.')).toBeInTheDocument();
+    expect(screen.getByText('고른 동네 2 / 2')).toBeInTheDocument();
 
     await searchAndPick('망원', '망원동');
-    expect(screen.getByText('고른 동네 2 / 3')).toBeInTheDocument();
+    expect(screen.getByText('고른 동네 1 / 2')).toBeInTheDocument();
   });
 
   it('위치 권한이 꺼져 있으면 안내 시트를 띄우고, 구·동 목록에서 직접 고를 수 있다', async () => {

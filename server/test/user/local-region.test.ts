@@ -72,7 +72,7 @@ describe('LOCAL-01 GET /users/me/local-regions', () => {
         },
       ],
       minCount: 1,
-      maxCount: 3,
+      maxCount: 2,
       canChange: true,
       nextChangeAvailableAt: null,
     });
@@ -170,9 +170,9 @@ describe('LOCAL-02 POST /users/me/local-regions', () => {
 
   it('이번 시즌에 이미 바꿨으면 409 LOCAL_REGION_CHANGE_LIMITED', async () => {
     const season = await createActiveSeason();
-    const me = await createMember();
+    // 이번 시즌에 이미 1곳을 뺀 회원 (최대 2곳이라 추가를 두 번 해 볼 수 없다)
+    const me = await createMember({ localChangedAt: new Date() });
     await giveLocalRegions(me.id, [GAYANG]);
-    expect((await add(me.id, { regionId: (await region(SINDANG)).id })).status).toBe(201);
 
     const res = await add(me.id, { regionId: (await region(YEOKSAM)).id });
     expect(res.status).toBe(409);
@@ -194,13 +194,13 @@ describe('LOCAL-02 POST /users/me/local-regions', () => {
     expect(res.body.message).toBe('이미 내 동네에 있는 동네예요.');
   });
 
-  it('이미 3곳이면 409 LOCAL_REGION_LIMIT_EXCEEDED', async () => {
+  it('이미 2곳이면 409 LOCAL_REGION_LIMIT_EXCEEDED', async () => {
     const me = await createMember();
-    await giveLocalRegions(me.id, [GAYANG, YEOKSAM, SINDANG]);
+    await giveLocalRegions(me.id, [GAYANG, YEOKSAM]);
     const res = await add(me.id, { regionId: (await region(EULJIRO1)).id });
     expect(res.status).toBe(409);
     expect(res.body.code).toBe('LOCAL_REGION_LIMIT_EXCEEDED');
-    expect(res.body.message).toBe('내 동네는 최대 3곳까지 고를 수 있어요.');
+    expect(res.body.message).toBe('내 동네는 최대 2곳까지 고를 수 있어요.');
   });
 
   it('동시에 두 번 보내도 한 번만 추가된다', async () => {
@@ -255,7 +255,7 @@ describe('LOCAL-03 DELETE /users/me/local-regions/{localRegionId}', () => {
   it('지우고 남은 동네 순서를 0부터 다시 매긴다 (0번을 지우면 다음 동네가 기본)', async () => {
     const season = await createActiveSeason();
     const me = await createMember();
-    await giveLocalRegions(me.id, [GAYANG, YEOKSAM, SINDANG]);
+    await giveLocalRegions(me.id, [GAYANG, YEOKSAM]);
 
     const res = await remove(me.id, await localRegionIdOf(me.id, GAYANG));
 
@@ -266,15 +266,13 @@ describe('LOCAL-03 DELETE /users/me/local-regions/{localRegionId}', () => {
         i.dongName,
         i.sortOrder,
       ]),
-    ).toEqual([
-      ['역삼동', 0],
-      ['신당동', 1],
-    ]);
+    ).toEqual([['역삼동', 0]]);
     expect(res.body.data.canChange).toBe(false);
     expect(res.body.data.nextChangeAvailableAt).toBe(formatDbDate(addDays(season.endDate, 1)));
   });
 
-  it('가운데 동네를 지워도 순서가 이어진다', async () => {
+  // 최대 2곳으로 줄기 전(2026-11-04)에 3곳을 고른 회원도 뺄 수 있어야 한다
+  it('3곳이던 회원이 가운데 동네를 지워도 순서가 이어진다', async () => {
     const me = await createMember();
     await giveLocalRegions(me.id, [GAYANG, YEOKSAM, SINDANG]);
     const res = await remove(me.id, await localRegionIdOf(me.id, YEOKSAM));
@@ -311,13 +309,13 @@ describe('LOCAL-03 DELETE /users/me/local-regions/{localRegionId}', () => {
 
   it('같은 동네를 동시에 두 번 빼면 한 번만 빠지고 다른 요청은 404', async () => {
     const me = await createMember();
-    await giveLocalRegions(me.id, [GAYANG, YEOKSAM, SINDANG]);
+    await giveLocalRegions(me.id, [GAYANG, YEOKSAM]);
     const id = await localRegionIdOf(me.id, YEOKSAM);
 
     const results = await Promise.all([remove(me.id, id), remove(me.id, id)]);
 
     expect(results.map((r) => r.status).sort()).toEqual([200, 404]);
-    expect(await prisma.memberLocalRegion.count({ where: { userId: me.id } })).toBe(2);
+    expect(await prisma.memberLocalRegion.count({ where: { userId: me.id } })).toBe(1);
   });
 
   it('이번 시즌에 이미 바꿨으면 409 LOCAL_REGION_CHANGE_LIMITED', async () => {

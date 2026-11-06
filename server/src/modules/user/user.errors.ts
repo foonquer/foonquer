@@ -18,7 +18,7 @@ export const UserError = defineErrors({
   LOCAL_REGION_COUNT_INVALID: {
     status: 400,
     code: 'LOCAL_REGION_COUNT_INVALID',
-    message: '내 동네는 1~3곳 골라 주세요.',
+    message: '내 동네는 1~2곳 골라 주세요.',
   },
   LOCAL_REGION_DUPLICATE_INPUT: {
     status: 400,
@@ -56,7 +56,7 @@ export const UserError = defineErrors({
   LOCAL_REGION_LIMIT_EXCEEDED: {
     status: 409,
     code: 'LOCAL_REGION_LIMIT_EXCEEDED',
-    message: '내 동네는 최대 3곳까지 고를 수 있어요.',
+    message: '내 동네는 최대 2곳까지 고를 수 있어요.',
   },
   LOCAL_REGION_CHANGE_LIMITED: {
     status: 409,
