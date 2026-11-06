@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { addDays } from '../../src/common/time';
 import { runCleanupJob, runRatingJob, runSavedReminderJob } from '../../src/jobs/jobs';
 import { prisma } from '../../src/lib/prisma';
+import { deletePrefixQuietly } from '../../src/lib/storage';
 import { notify } from '../../src/modules/notification/notify';
 import { resetDb } from '../helpers/db';
 import {
@@ -12,8 +13,14 @@ import {
   createVisit,
 } from '../helpers/fixtures';
 
+vi.mock('../../src/lib/storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/lib/storage')>()),
+  deletePrefixQuietly: vi.fn(() => Promise.resolve(true)),
+}));
+
 beforeEach(async () => {
   await resetDb();
+  vi.mocked(deletePrefixQuietly).mockClear();
 });
 
 describe('주기 작업', () => {
@@ -89,6 +96,8 @@ describe('주기 작업', () => {
       notifications: 1,
       refreshTokens: 2,
       temporaryTokens: 1,
+      withdrawnFileMembers: 0,
+      failed: 0,
     });
     const left = await prisma.notification.findMany({ where: { userId: me.id } });
     expect(left.map((n) => n.title)).toEqual(['새']);
@@ -127,5 +136,29 @@ describe('주기 작업', () => {
     expect(stat.weightSum.toNumber()).toBeCloseTo(1.49, 2);
     expect(stat.displayScore?.toNumber()).toBe(3.8);
     expect(stat.scoreSum.toNumber()).toBe(6);
+  });
+
+  it('cleanup: 7일 안에 탈퇴한 회원의 비공개 사진·프로필 사진 폴더를 다시 지운다 (리뷰 사진은 남긴다)', async () => {
+    const recent = await createMember();
+    const old = await createMember();
+    await prisma.member.update({
+      where: { id: recent.id },
+      data: { status: 'D', deleteDate: addDays(new Date(), -1) },
+    });
+    await prisma.member.update({
+      where: { id: old.id },
+      data: { status: 'D', deleteDate: addDays(new Date(), -8) },
+    });
+    vi.mocked(deletePrefixQuietly).mockResolvedValueOnce(false);
+    expect(await runCleanupJob()).toMatchObject({ withdrawnFileMembers: 1, failed: 1 });
+    const id = recent.id.toString();
+    expect(vi.mocked(deletePrefixQuietly).mock.calls.sort()).toEqual(
+      [
+        [`inquiry/${id}/`, 'private'],
+        [`profile/${id}/`, 'public'],
+        [`receipt/${id}/`, 'private'],
+        [`site/${id}/`, 'private'],
+      ].sort(),
+    );
   });
 });
