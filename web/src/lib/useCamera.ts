@@ -90,7 +90,10 @@ export function useCamera() {
         const canvas = document.createElement('canvas');
         canvas.width = v.videoWidth;
         canvas.height = v.videoHeight;
-        canvas.getContext('2d')?.drawImage(v, 0, 0);
+        const ctx = canvas.getContext('2d');
+        // 그릴 수 없으면 빈 사진을 올리지 않게 실패로 (찍는 화면이 다시 찍어 달라고 알린다)
+        if (!ctx) return resolve(null);
+        ctx.drawImage(v, 0, 0);
         canvas.toBlob(
           (blob) => resolve(blob ? new File([blob], 'receipt.jpg', { type: 'image/jpeg' }) : null),
           'image/jpeg',
