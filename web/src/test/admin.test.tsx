@@ -166,6 +166,76 @@ describe('운영 관리', () => {
     expect(screen.getByText('0건 · 오래된 순')).toBeInTheDocument();
   });
 
+  it('더 보기가 실패하면 목록 아래에 알리고, 다시 시도하면 실패한 쪽을 다시 부른다', async () => {
+    let failOnce = true;
+    const server = mockApi({
+      'GET /admin/inquiries': (call) => {
+        if (call.query.get('page') === '2' && failOnce) {
+          failOnce = false;
+          return fail(500, 'INTERNAL_SERVER_ERROR', '잠시 후 다시 시도해 주세요.');
+        }
+        return ok({
+          items: [inquiry({ inquiryId: call.query.get('page') === '2' ? 22 : 21 })],
+          page: Number(call.query.get('page')),
+          size: 20,
+          totalCount: 2,
+          hasNext: call.query.get('page') === '1',
+        });
+      },
+    });
+    renderRoute('/admin?tab=inquiries');
+    await screen.findByRole('article', { name: '문의 21' });
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('잠시 후 다시 시도해 주세요.');
+    // 같은 "더 보기"를 다시 눌러도 실패한 2쪽을 다시 보낸다
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+    expect(await screen.findByRole('article', { name: '문의 22' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(server.calls('GET /admin/inquiries').map((c) => c.query.get('page'))).toEqual([
+      '1',
+      '2',
+      '2',
+    ]);
+  });
+
+  it('답한 뒤 다시 불러오기가 실패하면 알리고, 다시 시도는 1쪽부터', async () => {
+    let calls = 0;
+    const server = mockApi({
+      'GET /admin/inquiries': () => {
+        calls += 1;
+        if (calls === 2) return fail(500, 'INTERNAL_SERVER_ERROR', '잠시 후 다시 시도해 주세요.');
+        return ok({
+          items: calls === 1 ? [inquiry()] : [inquiry({ inquiryId: 22 })],
+          page: 1,
+          size: 20,
+          totalCount: calls === 1 ? 22 : 21,
+          hasNext: true,
+        });
+      },
+      'PATCH /admin/inquiries/:id/answer': ok({
+        inquiryId: 21,
+        status: 'ANSWERED',
+        answeredAt: '',
+        notified: true,
+      }),
+    });
+    renderRoute('/admin?tab=inquiries');
+    const card = await screen.findByRole('article', { name: '문의 21' });
+    fireEvent.change(within(card).getByRole('textbox', { name: '답변' }), {
+      target: { value: '확인했어요' },
+    });
+    fireEvent.click(within(card).getByRole('button', { name: '답변 보내기' }));
+    const alert = await screen.findByRole('alert');
+    fireEvent.click(within(alert).getByRole('button', { name: '다시 시도' }));
+    expect(await screen.findByRole('article', { name: '문의 22' })).toBeInTheDocument();
+    expect(server.calls('GET /admin/inquiries').map((c) => c.query.get('page'))).toEqual([
+      '1',
+      '1',
+      '1',
+    ]);
+  });
+
   it('답변 전 문의가 다음 쪽까지 있으면 답한 뒤 1쪽부터 다시 불러 "더 보기"에서 건너뛰지 않는다', async () => {
     let answered = false;
     const server = mockApi({
