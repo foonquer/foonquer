@@ -6,6 +6,7 @@ import bellIcon from '../../assets/icons/bell.svg';
 import flagIcon from '../../assets/icons/flag.svg';
 import gearIcon from '../../assets/icons/gear.svg';
 import searchIcon from '../../assets/icons/search.svg';
+import { CelebrationLayer } from '../../components/CelebrationLayer';
 import { MapView } from '../../components/MapView';
 import { MukkaebiAvatar } from '../../components/Mukkaebi';
 import { RegionChip } from '../../components/RegionChip';
@@ -127,6 +128,7 @@ export function HomePage() {
       </section>
 
       <PreviewSheet restaurantId={selectedId} coords={coords} onClose={closePreview} />
+      <CelebrationLayer />
       <RegionSelectSheet open={regionOpen} onClose={() => setRegionOpen(false)} />
     </div>
   );
