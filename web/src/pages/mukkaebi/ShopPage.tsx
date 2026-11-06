@@ -131,7 +131,12 @@ export function ShopPage() {
                 onClick={() => setSheet({ kind: 'item', item })}
               >
                 {item.badge && !item.owned && <span className={styles.newTag}>{item.badge}</span>}
-                <ItemIcon category={item.category} rarity={item.rarity} size={52} />
+                <ItemIcon
+                  category={item.category}
+                  rarity={item.rarity}
+                  code={item.code}
+                  size={52}
+                />
                 <span className={styles.tileName}>{item.name}</span>
                 <span className={styles.tileSub}>
                   {item.equipped
@@ -256,9 +261,18 @@ function PurchaseSheet({
         wearing={
           isSet
             ? Object.fromEntries(
-                sheet.set.items.map((i) => [i.category, { name: i.name, rarity: i.rarity }]),
+                sheet.set.items.map((i) => [
+                  i.category,
+                  { code: i.code, name: i.name, rarity: i.rarity },
+                ]),
               )
-            : { [sheet.item.category]: { name: sheet.item.name, rarity: sheet.item.rarity } }
+            : {
+                [sheet.item.category]: {
+                  code: sheet.item.code,
+                  name: sheet.item.name,
+                  rarity: sheet.item.rarity,
+                },
+              }
         }
         badge="입어보는 중"
         height={200}

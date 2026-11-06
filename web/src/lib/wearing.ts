@@ -1,8 +1,10 @@
-// 먹깨비 그림에 쓸 착용 아이템 (칸 → 이름·등급)
+// 먹깨비 그림에 쓸 착용 아이템 (칸 → 코드·이름·등급)
 
 import type { ItemCategory, MyMukkaebi, Rarity } from '../api/mukkaebi';
 
-export type Wearing = Partial<Record<ItemCategory, { name: string; rarity?: Rarity } | null>>;
+export type Wearing = Partial<
+  Record<ItemCategory, { code?: string; name: string; rarity?: Rarity } | null>
+>;
 
 /** CHAR-01 착용 정보 → 그림에 쓸 값 */
 export function wearingOf(m: Pick<MyMukkaebi, 'equipped'>): Wearing {

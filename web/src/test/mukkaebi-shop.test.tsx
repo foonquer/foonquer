@@ -1,6 +1,9 @@
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { MyMukkaebi, ShopItem } from '../api/mukkaebi';
+import nightsky from '../assets/illust/mukkaebi-nightsky.svg';
+import { MukkaebiFigure } from '../components/MukkaebiFigure';
+import { itemArt } from '../lib/itemArt';
 import { fail, mockApi, ok } from './http';
 import { signIn } from '../lib/session';
 import { renderRoute } from './render';
@@ -76,6 +79,65 @@ describe('먹깨비 꾸미기', () => {
     fireEvent.click(save);
     await waitFor(() => expect(router.state.location.pathname).toBe('/me/mukkaebi'));
     expect(server.calls('PUT /characters/me/appearance')[0].body).toEqual({ hatItemId: 5 });
+  });
+
+  it('종류 탭: 기본 먹깨비와 가진 밤하늘 중에 고르고, 밤하늘을 고르면 미리보기 몸이 바뀐다', async () => {
+    const server = mockApi({
+      'GET /characters/me': ok(mukkaebi()),
+      'GET /characters/me/items': ok({
+        items: [
+          {
+            ...owned(11, '밤하늘'),
+            code: 'SKIN_NIGHTSKY',
+            category: 'SKIN',
+            rarity: 'H',
+          },
+        ],
+        backgrounds: [],
+      }),
+      'PUT /characters/me/appearance': ok({ equipped: {}, background: null }),
+    });
+    const { container } = renderRoute('/me/mukkaebi/decorate?tab=SKIN');
+
+    const tabs = await screen.findByRole('tablist', { name: '꾸미기 칸' });
+    expect(within(tabs).getAllByRole('tab')[0]).toHaveTextContent('종류');
+    expect(screen.getByRole('radio', { name: /기본 먹깨비/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    fireEvent.click(screen.getByRole('radio', { name: /밤하늘/ }));
+    // img.src는 절대 주소로 바뀔 수 있어 속성 값 그대로 비교한다
+    expect(
+      [...container.querySelectorAll('img')].some((img) => img.getAttribute('src') === nightsky),
+    ).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: '저장하기' }));
+    await waitFor(() =>
+      expect(server.calls('PUT /characters/me/appearance')[0]?.body).toEqual({ skinItemId: 11 }),
+    );
+  });
+});
+
+describe('꾸민 먹깨비 그림', () => {
+  it('그림이 있는 아이템은 몸 위에 입히고, 없는 아이템은 둘레에 이름을 단다', () => {
+    const { container } = render(
+      <MukkaebiFigure
+        wearing={{
+          HAT: { code: 'HAT_CROWN', name: '왕관' },
+          CLUB: { code: 'CLUB_GOLD', name: '황금 방망이' },
+          PROP: { code: 'PROP_NEW', name: '새 소품' },
+        }}
+      />,
+    );
+    const layers = [...container.querySelectorAll('img[data-layer]')].map((img) => [
+      img.getAttribute('data-layer'),
+      img.getAttribute('src'),
+    ]);
+    expect(layers).toEqual([
+      ['CLUB', itemArt('CLUB_GOLD')],
+      ['HAT', itemArt('HAT_CROWN')],
+    ]);
+    expect(screen.getByText('새 소품')).toBeInTheDocument();
+    expect(screen.queryByText('왕관')).not.toBeInTheDocument();
   });
 });
 
