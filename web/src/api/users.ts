@@ -131,3 +131,33 @@ export const getTasteWeights = () => api.get<TasteWeightsView>('/users/me/taste-
 /** USER-10 내 취향 저장 (다섯 항목을 한 번에) */
 export const saveTasteWeights = (weights: TasteWeights) =>
   api.call<TasteWeightsView>('PUT', '/users/me/taste-weights', { body: weights });
+
+/** USER-08 내 정보 메인 요약 (시즌 기록·메뉴 숫자) */
+export type MySummary = {
+  nickname: string | null;
+  title: string | null;
+  homeRegion: string | null;
+  trustTemp: number;
+  pointBalance: number;
+  mukkaebi: { level: number; stage: string; stageName: string };
+  season: { seasonNo: number; name: string; daysLeft: number } | null;
+  seasonRecord: {
+    conquestCount: number;
+    reviewCount: number;
+    helpfulReceived: number;
+    main: {
+      sigunguId: number;
+      sigunguName: string;
+      conquestCount: number;
+      rank: number | null;
+      tierTitle: string;
+      nextTier: { tierName: string; remaining: number } | null;
+      mukjjangGap: number;
+    } | null;
+  };
+  newItemCount: number;
+  titleCount: number;
+  savedRestaurantCount: number;
+  pickCount: number;
+};
+export const getMySummary = () => api.get<MySummary>('/users/me/summary');

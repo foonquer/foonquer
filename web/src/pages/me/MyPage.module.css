@@ -81,3 +81,63 @@
   font-weight: 500;
   color: var(--mk-muted);
 }
+
+/* 대표 칭호 (강서구 단골) */
+.titleChip {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--mk-green-100);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+/* 시즌 · 나의 기록 */
+.season {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 22px;
+  background: var(--mk-forest);
+  color: var(--mk-white);
+}
+
+.seasonHead {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.seasonHead span:last-child {
+  color: var(--mk-gold-light);
+}
+
+.seasonStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  text-align: center;
+}
+
+.seasonStats span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.seasonStats strong {
+  font-size: 20px;
+}
+
+.seasonFoot {
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--mk-gold-light);
+}

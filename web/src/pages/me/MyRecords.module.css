@@ -1,0 +1,357 @@
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px var(--mk-side) 24px;
+}
+
+.summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--mk-muted);
+}
+
+.summary strong {
+  font-size: 15px;
+  color: var(--mk-ink);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.month {
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row,
+.candidate {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: var(--mk-white);
+  text-align: left;
+}
+
+.day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 28px;
+  font-size: 11px;
+  color: var(--mk-muted);
+}
+
+.day strong {
+  font-size: 18px;
+  color: var(--mk-ink);
+}
+
+.rowText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rowName {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.rowMeta {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--mk-muted);
+}
+
+.score {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.star {
+  color: var(--mk-star);
+}
+
+.note {
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--mk-muted);
+}
+
+/* 시즌 기록 */
+.current {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 20px;
+  border-radius: 22px;
+  background: var(--mk-forest);
+  color: var(--mk-white);
+}
+
+.currentHead {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+}
+
+.currentHead span:first-child {
+  font-weight: 700;
+  color: var(--mk-gold-light);
+}
+
+.currentTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.rankBadge {
+  padding: 2px 10px;
+  border-radius: 12px;
+  background: var(--mk-gold-light);
+  font-size: 12px;
+  color: #5c380d;
+}
+
+.gold {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.gold span {
+  display: block;
+  height: 100%;
+  background: var(--mk-gold);
+}
+
+.currentSub {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.sectionTitle {
+  margin-top: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.count {
+  margin-left: 4px;
+  color: var(--mk-green);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 4px 16px;
+  border-radius: 20px;
+  background: var(--mk-white);
+  list-style: none;
+}
+
+.seasonRow,
+.achievement {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 60px;
+  border-bottom: 1px solid var(--mk-divider);
+  font-size: 14px;
+  color: var(--mk-ink);
+}
+
+.seasonRow:last-child,
+.achievement:last-child {
+  border-bottom: 0;
+}
+
+.seasonRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.tierChip {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--mk-green-100);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.titles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 76px;
+  padding: 10px 6px;
+  border: 1.5px solid transparent;
+  border-radius: 14px;
+  background: var(--mk-white);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-ink);
+  word-break: keep-all;
+}
+
+.title span {
+  color: var(--mk-gold);
+}
+
+.title small {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.title[aria-pressed='true'] {
+  border-color: var(--mk-green);
+  background: var(--mk-green-50);
+}
+
+.achievement[data-done='false'] strong {
+  color: var(--mk-muted);
+}
+
+.achievementText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.achievementRight {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+.achievement[data-done='false'] .achievementRight {
+  color: var(--mk-muted);
+}
+
+/* 내 PICK */
+.picks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--mk-green);
+  border-radius: 16px;
+  background: var(--mk-white);
+}
+
+.pickHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pickHead button {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #f4f6f2;
+  font-size: 14px;
+  color: var(--mk-forest);
+}
+
+.pickHead button:disabled {
+  color: var(--mk-disabled-text);
+}
+
+.pickOrder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--mk-green);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-white);
+}
+
+.comment {
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: #f4f6f2;
+  font: inherit;
+  font-size: 12px;
+}
+
+.candidate[aria-checked='true'] {
+  outline: 1.5px solid var(--mk-green);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1.5px solid var(--mk-line-strong);
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-white);
+}
+
+.candidate[aria-checked='true'] .check {
+  border-color: var(--mk-green);
+  background: var(--mk-green);
+}

@@ -8,14 +8,22 @@ import { OnboardingPage } from './pages/auth/OnboardingPage';
 import { TermsPage } from './pages/auth/TermsPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
 import { HomePage } from './pages/home/HomePage';
+import { ListAddPage } from './pages/list/ListAddPage';
+import { ListPage } from './pages/list/ListPage';
 import { AddLocalRegionPage } from './pages/me/AddLocalRegionPage';
+import { ConquestsPage } from './pages/me/ConquestsPage';
 import { LocalRegionsPage } from './pages/me/LocalRegionsPage';
 import { MyPage } from './pages/me/MyPage';
 import { MyReviewsPage } from './pages/me/MyReviewsPage';
+import { PickEditPage } from './pages/me/PickEditPage';
 import { ProfileEditPage } from './pages/me/ProfileEditPage';
+import { SeasonsPage } from './pages/me/SeasonsPage';
 import { SettingsPage } from './pages/me/SettingsPage';
 import { TasteWeightsPage } from './pages/me/TasteWeightsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { RankingPage } from './pages/ranking/RankingPage';
+import { SigunguRankingPage } from './pages/ranking/SigunguRankingPage';
+import { SigunguStatusPage } from './pages/ranking/SigunguStatusPage';
 import { ProfileSetupPage } from './pages/profile-setup/ProfileSetupPage';
 import { RecommendationListPage } from './pages/recommendations/RecommendationListPage';
 import { RecommendationsPage } from './pages/recommendations/RecommendationsPage';
@@ -41,9 +49,6 @@ import { VisitNewPage } from './pages/visit/VisitNewPage';
 const placeholders: RouteObject[] = [
   { path: '/notifications', element: <ComingSoonPage title="알림" /> },
   { path: '/me/mukkaebi', element: <ComingSoonPage title="내 먹깨비 꾸미기" /> },
-  { path: '/me/conquests', element: <ComingSoonPage title="정복 기록" /> },
-  { path: '/me/seasons', element: <ComingSoonPage title="시즌 기록 · 칭호" /> },
-  { path: '/me/pick', element: <ComingSoonPage title="내 PICK" /> },
   { path: '/me/withdraw', element: <ComingSoonPage title="회원 탈퇴" /> },
   { path: '/notices', element: <ComingSoonPage title="공지사항" /> },
   { path: '/support', element: <ComingSoonPage title="고객센터" /> },
@@ -87,9 +92,9 @@ export const routes: RouteObject[] = [
             element: <TabLayout />,
             children: [
               { path: '/', element: <HomePage /> },
-              { path: '/ranking', element: <ComingSoonPage title="랭킹/현황" tab /> },
+              { path: '/ranking', element: <RankingPage /> }, // ?tab=status|rank&seasonId=
               { path: '/recommendations', element: <RecommendationsPage /> }, // ?type=
-              { path: '/list', element: <ComingSoonPage title="맛집 리스트" tab /> },
+              { path: '/list', element: <ListPage /> }, // ?tab=WANT|CONQUERED
               { path: '/me', element: <MyPage /> },
             ],
           },
@@ -102,6 +107,12 @@ export const routes: RouteObject[] = [
           { path: '/me/regions/add', element: <AddLocalRegionPage /> },
           { path: '/me/taste', element: <TasteWeightsPage /> },
           { path: '/me/reviews', element: <MyReviewsPage /> },
+          { path: '/me/conquests', element: <ConquestsPage /> }, // ?seasonId=
+          { path: '/me/seasons', element: <SeasonsPage /> },
+          { path: '/me/pick', element: <PickEditPage /> },
+          { path: '/list/add', element: <ListAddPage /> },
+          { path: '/ranking/sigungus/:sigunguId', element: <SigunguRankingPage /> }, // ?seasonId=
+          { path: '/ranking/sigungus/:sigunguId/status', element: <SigunguStatusPage /> },
 
           // 방문 인증 → 별점 → 정복 → 세부평가 → 적립
           { path: '/visits/new', element: <VisitNewPage /> }, // ?restaurantId= (없으면 홈 영수증)
