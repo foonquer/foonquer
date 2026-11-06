@@ -53,7 +53,7 @@ export async function checkNicknameAvailability(userId: bigint, nickname: string
   };
 }
 
-/** 프로필 사진 key는 profile/{내 id}/{uuid}.{jpg|png|webp} 형식이고 S3에 실제로 있어야 한다 (USER-02 규칙) */
+/** 프로필 사진 key는 profile/{내 id}/{uuid}.{jpg|png|webp} 형식이고 스토리지(Cloud Storage)에 실제로 있어야 한다 (USER-02 규칙) */
 async function assertProfileImage(userId: bigint, key: string) {
   const pattern = new RegExp(`^profile/${userId.toString()}/[0-9a-fA-F-]{36}\\.(jpg|png|webp)$`);
   if (!pattern.test(key) || !(await objectExists(key))) {

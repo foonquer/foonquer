@@ -38,7 +38,7 @@
 | **DB · ORM** | ![MySQL](https://img.shields.io/badge/MySQL_8-4479A1?style=for-the-badge&logo=mysql&logoColor=white) ![Prisma](https://img.shields.io/badge/Prisma_7-2D3748?style=for-the-badge&logo=prisma&logoColor=white) | 랭킹·집계 쿼리가 많아 관계형 DB, 타입 안전한 쿼리와 마이그레이션 관리를 위해 Prisma |
 | **Web** | ![React](https://img.shields.io/badge/React_19-61DAFB?style=for-the-badge&logo=react&logoColor=black) ![Vite](https://img.shields.io/badge/Vite_PWA-646CFF?style=for-the-badge&logo=vite&logoColor=white) ![Kakao](https://img.shields.io/badge/Kakao_Map_SDK-FFCD00?style=for-the-badge&logo=kakao&logoColor=black) | 앱 설치 없이 모바일 웹으로 카메라·위치를 쓰기 위해 PWA, 지도는 카카오맵 |
 | **외부 API** | ![Kakao](https://img.shields.io/badge/Kakao_Local_API-FFCD00?style=for-the-badge&logo=kakao&logoColor=black) ![Naver](https://img.shields.io/badge/CLOVA_OCR-03C75A?style=for-the-badge&logo=naver&logoColor=white) ![Gemini](https://img.shields.io/badge/Gemini_API-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white) | 가게 검색, 영수증 인식(영수증 특화 모델), AI 리뷰 분석(무료 티어) |
-| **Infra** | ![AWS](https://img.shields.io/badge/AWS_EC2·S3·CloudFront-232F3E?style=for-the-badge&logo=amazonwebservices&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white) | 서버는 EC2에 Docker로, 웹은 Vercel로 배포. 이미지는 S3 + CloudFront |
+| **Infra** | ![GCP](https://img.shields.io/badge/GCP_Compute_Engine·Cloud_Storage-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white) | 서버는 GCP Compute Engine에 Docker로, 웹은 Vercel로 배포. 이미지는 Cloud Storage |
 | **Tooling** | ![pnpm](https://img.shields.io/badge/pnpm_10.12.1-F69220?style=for-the-badge&logo=pnpm&logoColor=white) ![ESLint](https://img.shields.io/badge/ESLint-4B32C3?style=for-the-badge&logo=eslint&logoColor=white) ![Prettier](https://img.shields.io/badge/Prettier-F7B93E?style=for-the-badge&logo=prettier&logoColor=black) ![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white) | 모노레포(pnpm workspace), 커밋 전 husky + lint-staged로 자동 검사 |
 
 <br>
@@ -99,8 +99,8 @@ foonquer/
 │   ├── vite.config.ts       # PWA 설정, /api 개발 프록시
 │   └── vercel.json          # Vercel 배포 설정
 ├── docs/                    # ERD, API 명세 등 기획 문서
-├── scripts/deploy-remote.sh # EC2에서 실행되는 배포 스크립트
-├── docker-compose.yml       # EC2에서 서버 컨테이너 실행
+├── scripts/deploy-remote.sh # Compute Engine VM에서 실행되는 배포 스크립트
+├── docker-compose.yml       # VM에서 서버 컨테이너 실행
 └── package.json             # 루트: husky, lint-staged (pnpm workspace)
 ```
 
@@ -302,9 +302,8 @@ pnpm -C server db:migrate                                       # 적용
 | `COOKIE_SECURE` | 쿠키 Secure 속성 (`true`/`false`) | `true` |
 | `TEST_DATABASE_URL` | 테스트 DB 주소. 이름이 `_test`로 끝나야 한다 | 비워 두면 `mysql://root:password@localhost:3307/foonquer_test` |
 | `FRONTEND_URL` | 웹 주소. 카카오 로그인이 끝나면 `{FRONTEND_URL}/oauth/callback`으로 보낸다 | `http://localhost:5173` |
-| `AWS_REGION` | S3 리전 | `ap-northeast-2` |
-| `IMAGE_BASE_URL` | 프로필·리뷰 사진 공개 주소(CloudFront). 비우면 사진 URL을 `null`로 준다 | 비워 둔다 |
-| `AWS_S3_BUCKET` | 사진을 두는 S3 버킷. 올린 사진 key가 실제로 있는지 확인한다. 비우면 사진 key를 받지 않는다(`PROFILE_IMAGE_NOT_FOUND`) | 비워 둔다 |
+| `IMAGE_BASE_URL` | 프로필·리뷰 사진 공개 주소(`https://storage.googleapis.com/<버킷>` 또는 Cloud CDN 도메인). 비우면 사진 URL을 `null`로 준다 | 비워 둔다 |
+| `GCS_BUCKET` | 사진을 두는 Cloud Storage 버킷. 올린 사진 key가 실제로 있는지 확인한다. 비우면 사진 key를 받지 않는다(`PROFILE_IMAGE_NOT_FOUND`) | 비워 둔다 |
 | `API_BASE_URL` | 이 API 서버의 바깥 주소. 카카오 로그인 redirect_uri를 만든다 | `http://localhost:3000` |
 | `KAKAO_REST_API_KEY` | 카카오 REST API 키 (카카오 로그인 client_id, 카카오 로컬 API) | 카카오 개발자 콘솔 |
 | `KAKAO_CLIENT_SECRET` | 카카오 로그인 Client Secret (콘솔에서 켰을 때만) | 비워 둔다 |
@@ -313,7 +312,7 @@ pnpm -C server db:migrate                                       # 적용
 
 > **카카오 로그인 Redirect URI**: 카카오 개발자 콘솔에 `{API_BASE_URL}/api/v1/auth/oauth/kakao/callback`을 글자 하나까지 똑같이 등록한다. 동의 항목(이메일·닉네임 등)은 켜지 않는다 — 카카오 회원번호만 쓴다. 로그인이 끝나면 서버가 `{FRONTEND_URL}/oauth/callback?code=…`(실패 시 `?error=…`)로 보내므로 웹에 그 페이지가 있어야 한다. 웹은 받은 code로 `POST /api/v1/auth/oauth/exchange`를 부른다.
 
-운영 서버의 환경변수는 AWS SSM Parameter Store(`/foonquer/prod/*`)에 두고, 배포할 때 EC2에서 `.env`로 만든다.
+운영 서버의 환경변수는 GCP Secret Manager의 `foonquer-prod-env`(`.env` 파일 내용 그대로)에 두고, 배포할 때 VM에서 `.env`로 만든다. Cloud Storage와 Secret Manager는 VM 서비스 계정으로 접근하므로 키 파일을 두지 않는다.
 
 ### 웹 (`web/.env.local`)
 
@@ -540,25 +539,35 @@ npm i -g gitmoji-cli
 
 ## 🚢 배포
 
-> 현재 상태: 배포 파이프라인 파일은 준비되어 있고, AWS(EC2·IAM·SSM)를 만든 뒤 `.github/workflows/deploy.yml`을 추가하면 활성화된다.
+> 현재 상태: 배포 파이프라인 파일은 준비되어 있고, GCP(Compute Engine VM·서비스 계정·Secret Manager)를 만든 뒤 `.github/workflows/deploy.yml`을 추가하면 활성화된다. GCP 무료 크레딧으로 운영한다.
 
-### 서버 (EC2)
+### 서버 (Compute Engine)
 
 ```
-develop push → GitHub Actions → Docker 이미지 빌드 → GHCR → AWS SSM Run Command → EC2에서 scripts/deploy-remote.sh
+develop push → GitHub Actions → Docker 이미지 빌드 → GHCR → gcloud compute ssh (IAP) → VM에서 scripts/deploy-remote.sh
 ```
 
 1. `server/` 등 서버 관련 파일이 바뀐 커밋이 develop에 올라오면 GitHub Actions가 돈다 (`web/`·`docs/`만 바뀌면 돌지 않는다).
 2. `server/Dockerfile`로 이미지를 빌드해 `ghcr.io/foonquer/foonquer-server`에 `latest`와 커밋 SHA 태그로 올린다.
-3. EC2는 22번 포트를 열지 않고 SSM Run Command로 `deploy-remote.sh`를 실행한다.
-4. EC2에서: SSM Parameter Store로 `.env` 생성 → 이미지 pull → `prisma migrate deploy` → seed → 컨테이너 재시작.
+3. VM의 22번 포트는 IAP 대역(`35.235.240.0/20`)에만 열고, `gcloud compute ssh --tunnel-through-iap`로 `deploy-remote.sh`를 실행한다.
+4. VM에서: Secret Manager로 `.env` 생성 → 이미지 pull → `prisma migrate deploy` → seed → 컨테이너 재시작.
+
+GCP에서 준비할 것:
+
+| 항목 | 내용 |
+| --- | --- |
+| VM | Compute Engine(서울 `asia-northeast3`), 액세스 범위(scope) `cloud-platform`으로 생성(기본 범위로는 Secret Manager를 부를 수 없다), Docker·git 설치, 배포용 사용자 `deploy` 홈에 저장소 clone. SSH 사용자가 암호 없이 `deploy`로 전환할 수 있어야 한다(`gcloud compute ssh` 사용자는 기본으로 된다) |
+| VM 서비스 계정 | `roles/secretmanager.secretAccessor`, 사진 버킷의 `roles/storage.objectViewer` (사진 업로드 URL을 서버가 만들게 되면 `roles/storage.objectAdmin`과 서명 권한 `roles/iam.serviceAccountTokenCreator`) |
+| Secret Manager | `foonquer-prod-env` — 운영 `.env` 내용 |
+| Cloud Storage | 공개 사진 버킷(`GCS_BUCKET`, 프로필 `profile/{회원 id}/`·리뷰 사진)은 `allUsers` 읽기 허용, 영수증·현장·문의 사진은 공개하지 않는 별도 버킷에 둔다(그 API를 만들 때 환경변수 추가). 브라우저에서 바로 올리므로 버킷 CORS에 웹 주소와 `PUT` 허용 |
+| DB | Cloud SQL for MySQL 8 또는 VM 안의 MySQL 8 컨테이너. `DATABASE_URL`만 바꾸면 된다 |
 
 GitHub 저장소 설정(Settings → Secrets and variables → Actions)에 필요한 값:
 
 | 종류 | 이름 | 내용 |
 | --- | --- | --- |
-| Secret | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | SSM 실행 권한만 가진 IAM 사용자 키 |
-| Variable | `EC2_INSTANCE_ID` | 배포할 EC2 인스턴스 ID |
+| Secret | `GCP_SA_KEY` | 배포용 서비스 계정 키(JSON). VM에 IAP로 SSH할 권한만 준다 (`roles/compute.instanceAdmin.v1`, `roles/iap.tunnelResourceAccessor`, `roles/iam.serviceAccountUser`) |
+| Variable | `GCP_PROJECT_ID`, `GCE_INSTANCE`, `GCE_ZONE` | 배포할 프로젝트, VM 이름, 영역(예: `asia-northeast3-a`) |
 
 ### 웹 (Vercel)
 
@@ -570,7 +579,7 @@ GitHub 저장소 설정(Settings → Secrets and variables → Actions)에 필�
 
 ### 배포가 실패했거나 잘못 배포됐을 때
 
-1. GitHub Actions 로그에서 실패한 단계를 먼저 확인한다 (SSM 단계는 EC2의 stdout/stderr가 함께 찍힌다).
+1. GitHub Actions 로그에서 실패한 단계를 먼저 확인한다 (SSH 단계는 VM의 stdout/stderr가 함께 찍힌다).
 2. 문제 커밋을 develop에서 되돌린다. 되돌린 커밋이 push되면 이전 코드로 다시 배포된다.
    ```bash
    git revert <문제 커밋>
