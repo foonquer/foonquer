@@ -13,3 +13,8 @@ function hasFinalConsonant(word: string): boolean {
 export function withObjectParticle(word: string) {
   return `${word}${hasFinalConsonant(word) ? '을' : '를'}`;
 }
+
+/** 이/가 붙이기. 예) 시즌 3 → 시즌 3이, 시즌 2 → 시즌 2가 */
+export function withSubjectParticle(word: string) {
+  return `${word}${hasFinalConsonant(word) ? '이' : '가'}`;
+}
