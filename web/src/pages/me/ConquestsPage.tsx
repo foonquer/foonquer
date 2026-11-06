@@ -38,6 +38,7 @@ export function ConquestsPage() {
   const summary = useAsync(() => getMySigungus(seasonId), [seasonId]);
   const list = usePaged(
     (page) =>
+      // 내 id(USER-01)를 받기 전에는 부르지 않는다 — 받으면 deps가 바뀌어 다시 부른다. 실패는 me.error로 보여 준다
       me.data
         ? getVisitedRestaurants(me.data.id, { seasonId, page, size: 30 })
         : new Promise<never>(() => {}),

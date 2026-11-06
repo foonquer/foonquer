@@ -72,6 +72,8 @@ export function RankingPage() {
         <StatusTab seasonId={seasonId} onSeason={(id) => set({ seasonId: String(id) })} />
       ) : (
         <RankTab
+          // 알림 링크로 다른 구가 열리면 고른 구를 새로 정한다
+          key={sigunguId ?? 'none'}
           seasonId={seasonId}
           initialSigunguId={sigunguId}
           onSeason={(id) => set({ seasonId: String(id) })}

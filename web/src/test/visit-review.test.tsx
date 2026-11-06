@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Review } from '../api/reviews';
 import type { Verification } from '../api/visits';
@@ -180,8 +180,14 @@ describe('방문 인증', () => {
         return ok({ verificationId: 31, status: 'VERIFIED' });
       },
     });
+    setMyCoordsForTest({ lat: 37.56, lng: 126.85 });
     renderRoute('/visits/31');
 
+    // 결과는 위치 없이 먼저 묻고, 가게를 고를 때 위치로 다시 물어 가까운 순으로 받는다
+    await waitFor(() =>
+      expect(server.calls('GET /visit-verifications/:id').at(-1)?.query.get('lat')).toBe('37.56'),
+    );
+    expect(server.calls('GET /visit-verifications/:id')[0].query.get('lat')).toBeNull();
     expect(await screen.findByText('이 가게가 맞나요?')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /새맛집.*사업자번호 일치/ })).toBeChecked();
     fireEvent.click(screen.getByRole('radio', { name: /새맛집 마곡점/ }));
@@ -191,6 +197,20 @@ describe('방문 인증', () => {
     expect(server.calls('POST /visit-verifications/:id/restaurant')[0].body).toEqual({
       restaurantId: 8,
     });
+  });
+
+  it('영수증을 1분 넘게 읽으면 그만 묻고 다시 시도를 보여 준다', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const server = mockApi({
+      'GET /visit-verifications/:id': ok(verification({ status: 'READING', restaurant: null })),
+    });
+    renderRoute('/visits/31');
+    expect(await screen.findByText('영수증을 읽고 있어요')).toBeInTheDocument();
+    for (let i = 0; i < 40; i++) await act(() => vi.advanceTimersByTimeAsync(1500));
+    expect(await screen.findByText('영수증을 읽는 데 시간이 오래 걸려요')).toBeInTheDocument();
+    await act(() => vi.advanceTimersByTimeAsync(3000));
+    expect(server.calls('GET /visit-verifications/:id')).toHaveLength(41);
+    vi.useRealTimers();
   });
 
   it('이미 인증한 영수증이면 이유와 다음 행동을 알려 준다', async () => {

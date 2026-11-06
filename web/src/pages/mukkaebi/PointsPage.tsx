@@ -67,6 +67,14 @@ export function PointsPage() {
               {formatPoint(summary.data.monthSpent)}
             </p>
           )}
+          {summary.error !== undefined && (
+            <p className={styles.caption} role="alert" style={{ textAlign: 'left' }}>
+              {errorMessage(summary.error)}{' '}
+              <Button variant="white" size="sm" block={false} onClick={summary.reload}>
+                다시 시도
+              </Button>
+            </p>
+          )}
         </section>
 
         <FilterChips

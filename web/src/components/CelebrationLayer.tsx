@@ -61,12 +61,13 @@ function copyOf(c: Celebration): Copy {
         label: `SEASON ${c.data.seasonNo} RESULT`,
         title: `시즌 ${c.data.seasonNo} 결과 · ${c.data.tierTitle}`,
         sub: `${c.data.rank ? `${c.data.rank}위 · ` : ''}${c.data.conquestTotal}곳 정복`,
-        reward: [
-          c.data.rewardPoint > 0 ? `+${formatPoint(c.data.rewardPoint)}` : null,
-          c.data.rewardClubItem?.name,
-        ]
-          .filter(Boolean)
-          .join(' · '),
+        reward:
+          [
+            c.data.rewardPoint > 0 ? `+${formatPoint(c.data.rewardPoint)}` : null,
+            c.data.rewardClubItem?.name,
+          ]
+            .filter(Boolean)
+            .join(' · ') || undefined,
         action: '시즌 기록 보기',
         to: '/me/seasons',
       };
@@ -100,6 +101,8 @@ export function CelebrationLayer() {
         role="dialog"
         aria-modal="true"
         aria-label={copy.title}
+        // 포커스는 상자 안에 있으니 여기서 Escape를 받는다 ("나중에 할게요"와 같다)
+        onKeyDown={(e) => e.key === 'Escape' && close()}
       >
         <p className={styles.label}>{copy.label}</p>
         <h2 className={styles.title}>{copy.title}</h2>

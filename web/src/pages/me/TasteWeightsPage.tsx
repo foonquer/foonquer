@@ -54,6 +54,7 @@ function Form({ initial }: { initial: TasteWeights }) {
       navigate(-1);
     } catch (err) {
       toast(errorMessage(err));
+    } finally {
       setSaving(false);
     }
   };

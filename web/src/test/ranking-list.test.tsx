@@ -246,6 +246,60 @@ describe('맛집 리스트', () => {
       body: { memo: '주말엔 웨이팅', remind: true },
     });
   });
+
+  it('이미 저장한 가게는 저장됨으로 보이고, 저장 취소는 한 번만 보낸다', async () => {
+    resetViewRegionForTest({
+      regionId: 11,
+      dongName: '가양동',
+      sigunguName: '강서구',
+      lat: 37.56,
+      lng: 126.85,
+    });
+    let finish = () => {};
+    const server = mockApi({
+      'GET /users/me/saved-restaurants': ok({
+        summary: { totalCount: 1, wantCount: 1, conqueredCount: 0 },
+        pins: [{ restaurantId: 3, name: '망원손칼국수', lat: 37.5, lng: 126.9, conquered: false }],
+        ...page([]),
+      }),
+      'GET /restaurants/search': ok({
+        ...page([
+          {
+            restaurantId: 3,
+            name: '망원손칼국수',
+            categoryName: '칼국수',
+            distanceM: null,
+            rating: { score: null, reviewCount: 0 },
+            myOverallScore: null,
+            hasMapae: false,
+            revisitRate: null,
+            localVisitRate: null,
+            conquestState: 'NOT_CONQUERED',
+            matchedBy: 'NAME',
+            matchedMenuName: null,
+          },
+        ]),
+        emptyGuide: null,
+      }),
+      'DELETE /users/me/saved-restaurants/:id': () =>
+        new Promise<ReturnType<typeof ok>>((resolve) => (finish = () => resolve(ok({})))),
+    });
+    renderRoute('/list/add');
+
+    fireEvent.change(screen.getByRole('searchbox', { name: '가게 이름 검색' }), {
+      target: { value: '칼국수' },
+    });
+    fireEvent.submit(screen.getByRole('search'));
+    const unsave = await screen.findByRole('button', { name: '망원손칼국수 저장 취소' });
+    expect(unsave).toHaveTextContent('★ 저장됨');
+    fireEvent.click(unsave);
+    fireEvent.click(unsave);
+    finish();
+    expect(await screen.findByRole('button', { name: '망원손칼국수 저장' })).toHaveTextContent(
+      '☆ 저장',
+    );
+    expect(server.calls('DELETE /users/me/saved-restaurants/:id')).toHaveLength(1);
+  });
 });
 
 describe('내 기록', () => {
