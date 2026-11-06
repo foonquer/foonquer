@@ -17,30 +17,63 @@ import { errorMessage } from '../../lib/api';
 import { formatDate, formatDateTime, formatDistance, formatWon, joinDot } from '../../lib/format';
 import { iGa } from '../../lib/korean';
 import { useAsync } from '../../lib/useAsync';
-import { useMyCoords } from '../../lib/useMyCoords';
+import type { Coords } from '../../lib/geolocation';
+import { requestMyCoords } from '../../lib/useMyCoords';
 import flow from './Flow.module.css';
 import styles from './Visit.module.css';
 
 /** 영수증을 읽는 동안 결과를 다시 물어보는 간격 (ms) */
 const POLL_MS = 1500;
+/** 다시 물어보는 최대 횟수 (1분). 서버가 다시 켜져 읽기가 끊기면 READING으로 남을 수 있다 */
+const MAX_POLLS = 40;
 
 /** 방문 인증 결과 /visits/:visitId (VISIT-04) — 읽는 중 · 이 가게가 맞나요? · 성공 · 실패 */
 export function VerificationPage() {
   const visitId = Number(useParams().visitId);
-  const { coords, ready } = useMyCoords();
+  const [coords, setCoords] = useState<Coords | null>(null);
+  const [polls, setPolls] = useState(0);
   const { data, error, reload } = useAsync(
-    // 후보 가게를 가까운 순으로 받으려고 위치를 물어본 뒤 부른다
-    () => (ready ? getVerification(visitId, coords) : new Promise<never>(() => {})),
-    [visitId, ready, coords?.lat, coords?.lng],
+    () => getVerification(visitId, coords),
+    [visitId, coords?.lat, coords?.lng],
   );
 
-  // 영수증을 읽는 동안 다시 물어본다
+  // 후보 가게를 가까운 순으로 보여 주려고, 가게를 고를 때만 위치를 묻는다
+  const checking = data?.status === 'RESTAURANT_CHECK';
   useEffect(() => {
-    if (data?.status !== 'READING') return;
-    const timer = setTimeout(reload, POLL_MS);
-    return () => clearTimeout(timer);
-  }, [data, reload]);
+    if (!checking) return;
+    let alive = true;
+    void requestMyCoords().then((c) => alive && c && setCoords(c));
+    return () => {
+      alive = false;
+    };
+  }, [checking]);
 
+  // 영수증을 읽는 동안 다시 물어본다 (최대 MAX_POLLS번)
+  const tooLong = data?.status === 'READING' && polls >= MAX_POLLS;
+  useEffect(() => {
+    if (data?.status !== 'READING' || tooLong) return;
+    const timer = setTimeout(() => {
+      setPolls((n) => n + 1);
+      reload();
+    }, POLL_MS);
+    return () => clearTimeout(timer);
+  }, [data, reload, tooLong]);
+
+  if (tooLong) {
+    return (
+      <Screen>
+        <AppHeader title="방문 인증" />
+        <EmptyState
+          title="영수증을 읽는 데 시간이 오래 걸려요"
+          description="잠시 뒤 다시 확인해 주세요."
+          onRetry={() => {
+            setPolls(0);
+            reload();
+          }}
+        />
+      </Screen>
+    );
+  }
   if (error && !data) {
     return (
       <Screen>
