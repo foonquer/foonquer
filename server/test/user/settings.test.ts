@@ -450,6 +450,17 @@ describe('SET-04 DELETE /users/me', () => {
     ).toBeNull();
   });
 
+  it('사진 정리 중 예외가 나도 탈퇴는 200 (cleanup이 다시 지운다)', async () => {
+    const me = await createMember();
+    vi.mocked(deletePrefixQuietly).mockRejectedValueOnce(new Error('storage down'));
+    const res = await withdraw(me.id, { confirmed: true });
+    expect(res.status).toBe(200);
+    expect(await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).toMatchObject({
+      status: 'D',
+      filesPurgedAt: null,
+    });
+  });
+
   it('영수증 처리와 겹쳐도 교착되지 않는다 (방문 → 회원 순서로 잠근다)', async () => {
     const me = await createMember();
     const restaurant = await createRestaurant();
