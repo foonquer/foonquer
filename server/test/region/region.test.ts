@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app';
+import { env } from '../../src/config/env';
 import { prisma } from '../../src/lib/prisma';
 import { resetDb } from '../helpers/db';
 import { agreeConsents, bearer, createMember } from '../helpers/fixtures';
@@ -224,6 +225,24 @@ describe('REGION-02 GET /regions/current', () => {
     expect(called.searchParams.get('x')).toBe('126.8545');
     expect(called.searchParams.get('y')).toBe('37.5618');
     expect(new Headers(init?.headers).get('Authorization')).toBe('KakaoAK test-kakao-rest-key');
+  });
+
+  it('KAKAO_LOCAL_API_KEY가 있으면 로컬 API는 그 키로 부른다 (카카오맵 쿼터가 다른 앱에 있을 때)', async () => {
+    env.KAKAO_LOCAL_API_KEY = 'test-kakao-local-key';
+    try {
+      const fetchMock = stubCoord2Region([{ region_type: 'B', code: '1150010400' }]);
+      const member = await pendingMember();
+      const res = await request(app)
+        .get('/api/v1/regions/current')
+        .query({ lat: '37.5618', lng: '126.8545' })
+        .set('Authorization', bearer(member.id));
+
+      expect(res.status).toBe(200);
+      const [, init] = fetchMock.mock.calls[0];
+      expect(new Headers(init?.headers).get('Authorization')).toBe('KakaoAK test-kakao-local-key');
+    } finally {
+      env.KAKAO_LOCAL_API_KEY = undefined;
+    }
   });
 
   it('서울이 아니면 400 REGION_NOT_SUPPORTED', async () => {

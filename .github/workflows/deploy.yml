@@ -1,0 +1,108 @@
+name: Deploy
+
+# develop에 서버 관련 파일이 올라오면 서버를 배포한다 (README 배포).
+# 이미지 빌드 → GHCR(ghcr.io/foonquer/foonquer-server) → IAP로 VM에 SSH → scripts/deploy-remote.sh
+# 웹(web/)은 Vercel이 따로 배포한다.
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'server/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'docker-compose.yml'
+      - 'deploy/**'
+      - 'scripts/deploy-remote.sh'
+      - 'scripts/backup-db.sh'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch: {}
+
+# 배포가 겹치면 앞의 것을 끝까지 하고 다음 것을 한다 (마이그레이션 도중에 끊지 않는다)
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+  # GCP 로그인은 키 파일 없이 GitHub OIDC 토큰으로 (Workload Identity Federation)
+  id-token: write
+
+# 비밀값이 아닌 배포 대상 (GCP 프로젝트 foonquer-prod, README 배포)
+env:
+  IMAGE: ghcr.io/foonquer/foonquer-server
+  GCP_PROJECT_ID: foonquer-prod
+  GCE_INSTANCE: foonquer-api
+  GCE_ZONE: asia-northeast3-a
+  API_DOMAIN: api.foonquer.me
+  # 키 파일 없이 이 저장소의 Actions만 배포용 서비스 계정을 쓴다 (Workload Identity Federation)
+  GCP_WIF_PROVIDER: projects/119591913227/locations/global/workloadIdentityPools/github/providers/foonquer
+  GCP_DEPLOY_SA: foonquer-deploy@foonquer-prod.iam.gserviceaccount.com
+
+jobs:
+  deploy:
+    name: Build · Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push server image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: server/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ env.GCP_WIF_PROVIDER }}
+          service_account: ${{ env.GCP_DEPLOY_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+
+      - name: Deploy on VM
+        env:
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # VM에 둘 파일(저장소가 비공개라 VM은 clone하지 않는다)을 묶는다
+          BUNDLE=$(tar czf - docker-compose.yml deploy scripts/backup-db.sh | base64 -w0)
+          # deploy-remote.sh의 플레이스홀더에 이번 실행의 GHCR 로그인 값과 파일 묶음을 채운다 (GITHUB_TOKEN은 이 실행이 끝나면 무효)
+          sed -e "s|__GHCR_ACTOR__|${GHCR_ACTOR}|g" -e "s|__GHCR_TOKEN__|${GHCR_TOKEN}|g" \
+            -e "s|__BUNDLE__|${BUNDLE}|" \
+            scripts/deploy-remote.sh > "$RUNNER_TEMP/deploy.sh"
+          # 호스트 키는 VM이 guest attributes에 올린 값을 gcloud가 받아 known_hosts에 넣고 확인한다 (enable-guest-attributes)
+          gcloud compute ssh "$GCE_INSTANCE" \
+            --project "$GCP_PROJECT_ID" \
+            --zone "$GCE_ZONE" \
+            --tunnel-through-iap \
+            --quiet \
+            --command 'bash -s' < "$RUNNER_TEMP/deploy.sh"
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 20); do
+            if curl -fsS "https://$API_DOMAIN/api/v1/health"; then exit 0; fi
+            sleep 6
+          done
+          echo "health check failed" >&2
+          exit 1

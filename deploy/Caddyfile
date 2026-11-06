@@ -1,0 +1,6 @@
+# 운영 서버 앞단 (docker-compose의 caddy). API_DOMAIN의 인증서를 자동으로 받고 app으로 넘긴다.
+# app은 TRUST_PROXY=1로 두어 X-Forwarded-For의 실제 사용자 IP로 요청 횟수를 센다.
+{$API_DOMAIN} {
+	encode gzip
+	reverse_proxy app:{$APP_PORT}
+}

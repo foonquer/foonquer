@@ -99,8 +99,11 @@ foonquer/
 │   ├── vite.config.ts       # PWA 설정, /api 개발 프록시
 │   └── vercel.json          # Vercel 배포 설정
 ├── docs/                    # ERD, API 명세 등 기획 문서
-├── scripts/deploy-remote.sh # Compute Engine VM에서 실행되는 배포 스크립트
-├── docker-compose.yml       # VM에서 서버 컨테이너 실행
+├── scripts/
+│   ├── deploy-remote.sh     # Compute Engine VM에서 실행되는 배포 스크립트
+│   └── backup-db.sh         # 운영 DB를 덤프해 Cloud Storage에 백업
+├── deploy/Caddyfile         # 운영 https 앞단 (api.foonquer.me → app)
+├── docker-compose.yml       # VM에서 app·MySQL·Caddy 컨테이너 실행
 └── package.json             # 루트: husky, lint-staged (pnpm workspace)
 ```
 
@@ -333,6 +336,7 @@ pnpm -C server db:migrate                                       # 적용
 | `API_BASE_URL` | 이 API 서버의 바깥 주소. 카카오 로그인 redirect_uri를 만든다 | `http://localhost:3000` |
 | `KAKAO_REST_API_KEY` | 카카오 REST API 키 (카카오 로그인 client_id, 카카오 로컬 API) | 카카오 개발자 콘솔 |
 | `KAKAO_CLIENT_SECRET` | 카카오 로그인 Client Secret (콘솔에서 켰을 때만) | 비워 둔다 |
+| `KAKAO_LOCAL_API_KEY` | 카카오 로컬 API만 다른 앱의 REST 키로 부를 때 (카카오맵 무료 쿼터는 계정에서 처음 카카오맵을 켠 앱에만 있다). 비우면 `KAKAO_REST_API_KEY` | 비워 둔다 |
 
 > **카카오 로컬 API**: 지도(MAP-01)·맛집 검색(SEARCH-02)은 카카오 장소 검색으로 우리 DB에 없는 가게를 저장한 뒤 DB 기준으로 응답한다. 같은 영역·같은 검색어는 24시간 동안 서버 메모리에 캐시해 카카오를 다시 부르지 않는다(하루 호출 한도). 카카오가 실패해도 에러 대신 DB 결과만 준다. 카카오는 한 번 검색에 분류(음식점·카페)마다 최대 45곳까지만 주므로, 가게가 아주 많은 동네에서 지도를 넓게 보면 일부 가게는 지도를 확대해 그 영역을 다시 볼 때 저장된다. 카카오 개발자 콘솔에서 이 앱의 **카카오맵 API(지도·로컬)를 활성화**해야 로컬 API가 응답한다.
 
@@ -565,42 +569,87 @@ npm i -g gitmoji-cli
 
 ## 🚢 배포
 
-> 현재 상태: 배포 파이프라인 파일은 준비되어 있고, GCP(Compute Engine VM·서비스 계정·Secret Manager)를 만든 뒤 `.github/workflows/deploy.yml`을 추가하면 활성화된다. GCP 무료 크레딧으로 운영한다.
+| 부분 | 주소 | 어디 |
+| --- | --- | --- |
+| 웹 | `https://foonquer.me` | Vercel (`web/`) |
+| 서버 | `https://api.foonquer.me` | GCP 프로젝트 `foonquer-prod`, Compute Engine VM(서울 `asia-northeast3`) 하나에 Docker로 app·MySQL·Caddy |
+| 사진 | Cloud Storage 공개 버킷(프로필·리뷰), 비공개 버킷(영수증·현장·문의) | 같은 프로젝트 |
+
+웹과 서버가 같은 사이트(`foonquer.me`)라 로그인 유지 쿠키(SameSite=Lax)가 그대로 간다.
 
 ### 서버 (Compute Engine)
 
 ```
-develop push → GitHub Actions → Docker 이미지 빌드 → GHCR → gcloud compute ssh (IAP) → VM에서 scripts/deploy-remote.sh
+develop push → GitHub Actions(deploy.yml) → Docker 이미지 빌드 → GHCR → gcloud compute ssh (IAP) → VM에서 scripts/deploy-remote.sh
 ```
 
-1. `server/` 등 서버 관련 파일이 바뀐 커밋이 develop에 올라오면 GitHub Actions가 돈다 (`web/`·`docs/`만 바뀌면 돌지 않는다).
+1. `server/`·`docker-compose.yml`·`deploy/` 등 서버 관련 파일이 바뀐 커밋이 develop에 올라오면 GitHub Actions가 돈다 (`web/`·`docs/`만 바뀌면 돌지 않는다). Actions 화면에서 직접 돌릴 수도 있다(workflow_dispatch).
 2. `server/Dockerfile`로 이미지를 빌드해 `ghcr.io/foonquer/foonquer-server`에 `latest`와 커밋 SHA 태그로 올린다.
 3. VM의 22번 포트는 IAP 대역(`35.235.240.0/20`)에만 열고, `gcloud compute ssh --tunnel-through-iap`로 `deploy-remote.sh`를 실행한다.
-4. VM에서: Secret Manager로 `.env` 생성 → 이미지 pull → `prisma migrate deploy` → seed → 컨테이너 재시작.
+4. VM에서: 워크플로가 보낸 파일(`docker-compose.yml`·`deploy/`·`scripts/backup-db.sh`)을 `~/foonquer`에 풀기 → Secret Manager로 `.env` 생성 → 이미지 pull → DB 컨테이너를 띄우고 기다림 → `prisma migrate deploy` → seed → 컨테이너 재시작. 저장소가 비공개라 VM은 저장소를 clone하지 않는다.
+5. 끝나면 `https://{API_DOMAIN}/api/v1/health`로 확인한다.
+
+VM 안 컨테이너 (`docker-compose.yml`):
+
+| 컨테이너 | 하는 일 |
+| --- | --- |
+| `app` | API 서버. 바깥에 포트를 열지 않고 `caddy`가 넘겨 준다 |
+| `db` | MySQL 8.4. 데이터는 `mysql_data` 볼륨. 바깥에 열지 않는다 |
+| `caddy` | 80·443을 받아 `API_DOMAIN` 인증서를 Let's Encrypt로 자동 발급·갱신하고 `app`으로 넘긴다 (`deploy/Caddyfile`) |
 
 GCP에서 준비할 것:
 
 | 항목 | 내용 |
 | --- | --- |
-| VM | Compute Engine(서울 `asia-northeast3`), 액세스 범위(scope) `cloud-platform`으로 생성(기본 범위로는 Secret Manager를 부를 수 없다), Docker·git 설치, 배포용 사용자 `deploy` 홈에 저장소 clone. SSH 사용자가 암호 없이 `deploy`로 전환할 수 있어야 한다(`gcloud compute ssh` 사용자는 기본으로 된다) |
-| VM 서비스 계정 | `roles/secretmanager.secretAccessor`, 사진 버킷의 `roles/storage.objectViewer` (사진 업로드 URL을 서버가 만들게 되면 `roles/storage.objectAdmin`과 서명 권한 `roles/iam.serviceAccountTokenCreator`) |
-| Secret Manager | `foonquer-prod-env` — 운영 `.env` 내용 |
-| Cloud Storage | 공개 사진 버킷(`GCS_BUCKET`, 프로필 `profile/{회원 id}/`·리뷰 사진)은 `allUsers` 읽기 허용, 영수증·현장·문의 사진은 공개하지 않는 별도 버킷에 둔다(`GCS_PRIVATE_BUCKET`, `receipt/`·`site/`·`inquiry/` 폴더). 브라우저에서 signed URL로 바로 올리므로(USER-02, UPLOAD-01) 두 버킷 모두 버킷 CORS에 웹 주소, `PUT`, 요청 헤더 `Content-Type`·`x-goog-content-length-range`·`x-goog-if-generation-match` 허용 |
-| DB | Cloud SQL for MySQL 8 또는 VM 안의 MySQL 8 컨테이너. `DATABASE_URL`만 바꾸면 된다 |
+| VM | `foonquer-api`, e2-small, Ubuntu 24.04, 디스크 20GB, 고정 외부 IP, 메타데이터 `enable-guest-attributes=TRUE`(배포 SSH가 VM 호스트 키를 확인한다). 액세스 범위(scope) `cloud-platform`으로 생성(기본 범위로는 Secret Manager를 부를 수 없다), Docker 설치, 배포용 사용자 `deploy`(docker 그룹). SSH 사용자가 암호 없이 `deploy`로 전환할 수 있어야 한다(`gcloud compute ssh` 사용자는 기본으로 된다) |
+| 방화벽 | 80·443은 모두에게, 22는 IAP 대역(`35.235.240.0/20`)에만 |
+| VM 서비스 계정 | `foonquer-vm`. `roles/secretmanager.secretAccessor`, 사진 두 버킷의 `roles/storage.objectAdmin`과 서명 권한 `roles/iam.serviceAccountTokenCreator`(자기 자신에게, 업로드 signed URL), 백업 버킷의 `roles/storage.objectCreator`·`roles/storage.objectViewer`(복구할 때 읽기) |
+| Secret Manager | `foonquer-prod-env` — 운영 `.env` 내용 (아래 표) |
+| Cloud Storage | 공개 사진 버킷(`GCS_BUCKET`, 프로필 `profile/{회원 id}/`·리뷰 사진)은 `allUsers` 읽기 허용, 영수증·현장·문의 사진은 공개하지 않는 별도 버킷에 둔다(`GCS_PRIVATE_BUCKET`, `receipt/`·`site/`·`inquiry/` 폴더). 브라우저에서 signed URL로 바로 올리므로(USER-02, UPLOAD-01) 두 버킷 모두 버킷 CORS에 웹 주소, `PUT`, 요청 헤더 `Content-Type`·`x-goog-content-length-range`·`x-goog-if-generation-match` 허용. DB 백업 버킷은 비공개, 30일 지나면 지우는 수명 주기 |
+| 배포용 서비스 계정 | `foonquer-deploy`. GitHub Actions가 VM에 IAP로 SSH할 권한만 준다 (`roles/compute.instanceAdmin.v1`, `roles/iap.tunnelResourceAccessor`, `roles/iam.serviceAccountUser`). 키 파일은 만들지 않고 Workload Identity Federation으로 이 저장소(`foonquer/foonquer`)의 Actions만 이 계정을 쓸 수 있게 한다: 풀 `github`, 공급자 `foonquer`(발급자 `https://token.actions.githubusercontent.com`, 속성 매핑 `google.subject=assertion.sub,attribute.repository=assertion.repository`, 조건 `assertion.repository=='foonquer/foonquer'`), 그리고 `foonquer-deploy`에 연합 주체 `principalSet://iam.googleapis.com/projects/<프로젝트 번호>/locations/global/workloadIdentityPools/github/attribute.repository/foonquer/foonquer`의 `roles/iam.workloadIdentityUser`. VM이 한 대뿐인 프로젝트라 `instanceAdmin.v1`은 프로젝트 단위로 준다(`gcloud compute ssh`가 프로젝트 메타데이터도 읽는다). VM을 늘리면 그 VM으로 좁힌다 |
 
-GitHub 저장소 설정(Settings → Secrets and variables → Actions)에 필요한 값:
+운영 `.env`(Secret Manager `foonquer-prod-env`)에 넣는 값 — 값은 로컬 `.env`와 같은 뜻이고, 운영에서 다른 것만 적었다:
 
-| 종류 | 이름 | 내용 |
+| 변수 | 운영 값 |
+| --- | --- |
+| `NODE_ENV` | `production` |
+| `API_DOMAIN` | `api.foonquer.me` (caddy 인증서 도메인) |
+| `DATABASE_URL` | `mysql://foonquer:<MYSQL_PASSWORD>@db:3306/foonquer` (비밀번호에 `@ : / ? # %` 같은 문자가 있으면 이 자리에는 percent-encode한 값. 지금 값은 16진수라 그대로) |
+| `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD` | 각각 임의의 긴 문자열 (db 컨테이너가 처음 뜰 때 계정을 만든다. 나중에 바꾸려면 DB 안에서도 바꿔야 한다) |
+| `CORS_ORIGINS` | `https://foonquer.me,https://www.foonquer.me` (www로 들어와도 API를 부를 수 있게) |
+| `FRONTEND_URL` | `https://foonquer.me` |
+| `API_BASE_URL` | `https://api.foonquer.me` |
+| `TRUST_PROXY` | `1` (caddy 한 단계) |
+| `COOKIE_SECURE` | `true` |
+| `JWT_ACCESS_SECRET` | 32자 이상 임의 문자열 (로컬과 다르게) |
+| `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET` | 카카오 개발자 콘솔 먹짱깨기 앱의 REST API 키와 카카오 로그인 Client Secret. 그 키에 카카오 로그인 리다이렉트 URI `https://api.foonquer.me/api/v1/auth/oauth/kakao/callback` 등록 |
+| `KAKAO_LOCAL_API_KEY` | 카카오맵 무료 쿼터가 있는 앱의 REST API 키 `foonquer-server` (먹짱깨기 앱은 카카오맵을 켜면 유료라서) |
+| `GCS_BUCKET`, `GCS_PRIVATE_BUCKET`, `IMAGE_BASE_URL` | 버킷 이름, `https://storage.googleapis.com/<공개 버킷>` |
+| `CLOVA_OCR_URL`, `CLOVA_OCR_SECRET`, `GEMINI_API_KEY` | 각 콘솔 값 (비우면 그 기능만 꺼진다) |
+
+GitHub에는 비밀값을 두지 않는다. 배포 대상(프로젝트·VM·영역·도메인)과 Workload Identity 공급자·배포용 서비스 계정 이름은 비밀이 아니라서 `.github/workflows/deploy.yml`의 `env`에 적어 두었다. 서버 비밀값은 모두 Secret Manager에만 있다.
+
+DNS(Cloudflare > foonquer.me > DNS > Records). Cloudflare 프록시(주황 구름)는 끄고 **DNS only**로 둔다 (Caddy·Vercel이 직접 인증서를 받는다):
+
+| 종류 | 이름 | 값 |
 | --- | --- | --- |
-| Secret | `GCP_SA_KEY` | 배포용 서비스 계정 키(JSON). VM에 IAP로 SSH할 권한만 준다 (`roles/compute.instanceAdmin.v1`, `roles/iap.tunnelResourceAccessor`, `roles/iam.serviceAccountUser`) |
-| Variable | `GCP_PROJECT_ID`, `GCE_INSTANCE`, `GCE_ZONE` | 배포할 프로젝트, VM 이름, 영역(예: `asia-northeast3-a`) |
+| A | `api` | VM 고정 외부 IP (`foonquer-api-ip`) |
+| A | `@` | Vercel이 알려 주는 값 (Vercel 프로젝트 > Settings > Domains) |
+| CNAME | `www` | Vercel이 알려 주는 값 |
+
+#### DB 백업
+
+deploy 사용자 crontab에 넣는다. 예) 매일 새벽 3시 30분(KST)
+`30 18 * * * ~/foonquer/scripts/backup-db.sh gs://<백업 버킷> >> ~/backup.log 2>&1`
+되살리는 방법은 `scripts/backup-db.sh` 맨 위에 적어 두었다.
 
 ### 웹 (Vercel)
 
-`web/`을 Vercel 프로젝트로 연결한다 (준비 중).
+`web/`을 Vercel 프로젝트로 연결한다.
 
-- Vercel에서 이 저장소를 가져오고 **Root Directory를 `web`** 으로 지정한다. pnpm 모노레포는 Vercel이 알아서 인식한다.
-- 환경변수 `VITE_API_BASE_URL`에 서버 도메인을 넣는다.
+- Vercel에서 이 저장소를 가져오고 **Root Directory를 `web`** 으로 지정한다. pnpm 모노레포는 Vercel이 알아서 인식한다. Production Branch는 `develop`.
+- 환경변수 `VITE_API_BASE_URL`=`https://api.foonquer.me`, `VITE_KAKAO_MAP_KEY`=카카오맵 무료 쿼터가 있는 앱의 JavaScript 키 `foonquer-web`.
+- 도메인 `foonquer.me`(와 `www.foonquer.me`)를 연결한다. 카카오 개발자 콘솔 > 앱 > 플랫폼 키 > 그 JavaScript 키 > JavaScript SDK 도메인에 `https://foonquer.me`·`https://www.foonquer.me`가 있어야 지도가 뜬다.
 - `web/vercel.json`이 모든 경로를 `index.html`로 보내서, `/restaurants/1` 같은 주소로 바로 들어와도 화면이 뜬다.
 
 ### 배포가 실패했거나 잘못 배포됐을 때

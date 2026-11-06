@@ -41,6 +41,8 @@ const envSchema = z
       .transform((v) => v.replace(/\/+$/, '')),
     /** 카카오 REST API 키 (카카오 로그인 client_id, 로컬 API 호출에 같이 쓴다) */
     KAKAO_REST_API_KEY: blankAsUndefined(z.string().optional()),
+    /** 카카오 로컬 API만 다른 앱의 REST 키로 부를 때 (카카오맵 무료 쿼터가 계정의 다른 앱에 있을 때). 비우면 KAKAO_REST_API_KEY */
+    KAKAO_LOCAL_API_KEY: blankAsUndefined(z.string().optional()),
     /** 카카오 로그인 보안의 Client Secret을 켰을 때만 */
     KAKAO_CLIENT_SECRET: blankAsUndefined(z.string().optional()),
     /** 사진·영수증을 두는 Cloud Storage 버킷 이름. 비우면 올린 사진을 확인할 수 없어 사진 key를 받지 않는다 */

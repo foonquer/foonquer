@@ -6,12 +6,13 @@
 # SSH 사용자는 암호 없이 deploy로 전환할 수 있어야 한다 (gcloud compute ssh 사용자는 기본으로
 # google-sudoers 그룹이라 된다. 아니면 /etc/sudoers.d에 NOPASSWD로 추가).
 #
-# __GHCR_ACTOR__ / __GHCR_TOKEN__ 는 워크플로에서 sed로 실제 값을 채워 넣는
+# GHCR_ACTOR / GHCR_TOKEN / BUNDLE 자리(앞뒤 밑줄 두 개)는 워크플로에서 sed로 실제 값을 채워 넣는
 # 플레이스홀더다 (GitHub Actions ${{ }} 치환은 이 파일엔 안 먹히므로).
 #
-# 모노레포: 저장소 루트(~/foonquer)에 docker-compose.yml과 .env가 있고,
-# 서버 이미지는 GitHub Actions에서 server/Dockerfile로 빌드해 GHCR에 올린다.
-# VM은 이미지를 pull만 한다.
+# 저장소가 비공개라 VM에서 clone하지 않는다. 워크플로가 실행에 필요한 파일(docker-compose.yml,
+# deploy/Caddyfile, scripts/backup-db.sh)만 묶어 BUNDLE 자리(tar.gz base64)에 넣어 보내고,
+# ~/foonquer에 풀어 .env와 같이 둔다. 서버 이미지는 GitHub Actions에서 server/Dockerfile로 빌드해
+# GHCR에 올리고, VM은 이미지를 pull만 한다.
 
 set -e
 
@@ -22,11 +23,10 @@ fi
 
 sudo -iu deploy bash -s <<'DEPLOY_SCRIPT'
 set -e
+mkdir -p ~/foonquer
 cd ~/foonquer
 
-git fetch origin
-git checkout develop
-git pull origin develop
+echo '__BUNDLE__' | base64 -d | tar xzf -
 
 # 운영 환경변수는 Secret Manager의 foonquer-prod-env 하나에 .env 파일 내용 그대로 둔다.
 # VM 서비스 계정에 roles/secretmanager.secretAccessor가 필요하고, VM 액세스 범위(scope)가
@@ -51,6 +51,10 @@ echo '__GHCR_TOKEN__' | docker login ghcr.io -u __GHCR_ACTOR__ --password-stdin
 
 # --quiet: pull 진행률 로그가 길면 Actions 로그에서 뒤의 up -d/prune 결과를 찾기 어렵다.
 docker compose pull --quiet
+
+# 마이그레이션 전에 DB(같은 VM의 MySQL 컨테이너)를 띄우고 healthcheck가 통과할 때까지 기다린다.
+# 처음 배포면 이때 빈 DB와 앱용 계정(MYSQL_USER)이 만들어진다.
+docker compose up -d --wait db
 
 # < /dev/null: docker compose run은 기본적으로 컨테이너 stdin을 호출한 셸의
 # stdin에 그대로 연결한다. 이 스크립트 전체가 heredoc으로 stdin을 통해
