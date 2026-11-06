@@ -377,16 +377,8 @@ describe('SET-04 DELETE /users/me', () => {
       (await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).filesPurgedAt,
     ).not.toBeNull();
 
-    // 동의 중이던 항목은 철회 이력이 남는다
-    const latest = await prisma.memberConsent.findMany({
-      where: { userId: me.id, withdrawnAt: { not: null } },
-    });
-    expect(latest.map((r) => r.consentType).sort()).toEqual([
-      'LOCATION',
-      'MARKETING',
-      'PRIVACY',
-      'TERMS',
-    ]);
+    // 약관 동의·철회 이력도 남기지 않는다
+    expect(await prisma.memberConsent.count({ where: { userId: me.id } })).toBe(0);
 
     // 탈퇴한 회원의 토큰은 더 쓸 수 없다
     const after = await request(app)
