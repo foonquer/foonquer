@@ -68,15 +68,24 @@ UPDATE `item` SET `badge` = 'NEW' WHERE `code` = 'HAT_STRAWBERRY' AND `badge` IS
 UPDATE `item` SET `badge` = 'HOT' WHERE `code` = 'HAT_BEAR' AND `badge` IS NULL;
 
 -- 업적 보상(명예): 왕관 ← 구의 먹짱, 밤하늘 먹깨비 ← 시즌 TOP 10, 황금 방망이 ← 한 시즌 30곳 정복(시즌 상위 10% 보상이기도 함)
+-- 얻는 방법은 업적 행이 아직 없어도 바꾸고(seed가 나중에 업적을 만들면 연결한다), 업적 연결은 업적 행이 있을 때만
+UPDATE `item` SET `unlock_type` = 'A', `description` = '구의 먹짱 업적을 달성하면 받아요.' WHERE `code` = 'HAT_CROWN';
+UPDATE `item` SET `unlock_type` = 'A', `description` = '시즌 TOP 10 업적을 달성하면 받아요.' WHERE `code` = 'SKIN_NIGHTSKY';
 UPDATE `item` i JOIN `achievement` a ON a.`code` = 'MUKJJANG'
-   SET i.`required_achievement_id` = a.`id`, i.`unlock_type` = 'A', i.`description` = '구의 먹짱 업적을 달성하면 받아요.'
- WHERE i.`code` = 'HAT_CROWN';
+   SET i.`required_achievement_id` = a.`id` WHERE i.`code` = 'HAT_CROWN';
 UPDATE `item` i JOIN `achievement` a ON a.`code` = 'SEASON_TOP10'
-   SET i.`required_achievement_id` = a.`id`, i.`unlock_type` = 'A', i.`description` = '시즌 TOP 10 업적을 달성하면 받아요.'
- WHERE i.`code` = 'SKIN_NIGHTSKY';
+   SET i.`required_achievement_id` = a.`id` WHERE i.`code` = 'SKIN_NIGHTSKY';
 UPDATE `item` i JOIN `achievement` a ON a.`code` = 'SEASON_CONQUEST_30'
-   SET i.`required_achievement_id` = a.`id`
- WHERE i.`code` = 'CLUB_GOLD';
+   SET i.`required_achievement_id` = a.`id` WHERE i.`code` = 'CLUB_GOLD';
+
+-- 이미 그 업적을 달성한 회원에게 아직 없는 보상 아이템을 소급해서 준다 (이미 가진 방망이는 더 주지 않는다)
+INSERT INTO `member_item` (`user_id`, `item_id`, `quantity`, `acquired_type`, `acquired_at`)
+SELECT ma.`user_id`, i.`id`, 1, 'A', CURRENT_TIMESTAMP(3)
+  FROM `member_achievement` ma
+  JOIN `item` i ON i.`required_achievement_id` = ma.`achievement_id` AND i.`status` = 'A'
+  JOIN `member` m ON m.`id` = ma.`user_id` AND m.`status` <> 'D'
+  LEFT JOIN `member_item` mi ON mi.`user_id` = ma.`user_id` AND mi.`item_id` = i.`id`
+ WHERE mi.`id` IS NULL;
 -- 시즌 보상표는 방망이 4단계만 (왕관·밤하늘은 업적 보상으로)
 DELETE r FROM `season_reward_rule` r JOIN `item` i ON i.`id` = r.`item_id` WHERE i.`code` IN ('HAT_CROWN', 'SKIN_NIGHTSKY');
 

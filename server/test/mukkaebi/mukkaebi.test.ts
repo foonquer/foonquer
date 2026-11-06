@@ -6,7 +6,7 @@ import { grantSeasonRankAchievements } from '../../src/modules/achievement/achie
 import { openItemBox } from '../../src/modules/mukkaebi/mukkaebi.service';
 import { addExp, addPoint } from '../../src/modules/reward/reward.service';
 import { requiredExpOf } from '../../prisma/seed-data';
-import { resetDb } from '../helpers/db';
+import { resetDb, waitForRunningQueries } from '../helpers/db';
 import { bearer, createActiveSeason, createMember } from '../helpers/fixtures';
 import { conquerMany, itemId } from '../helpers/game';
 
@@ -299,16 +299,19 @@ describe('v1.3 아이템 상자 · 세트 · 업적 보상 아이템', () => {
       addExp(tx, me.id, requiredExpOf(3), 'ADMIN', { type: 'ADMIN', id: 1 }),
     );
     const box = await prisma.memberItemBox.findFirstOrThrow({ where: { userId: me.id } });
-    // 테스트가 상자 행을 먼저 잠가 두고 두 요청을 보낸다 → 잠금을 풀면 경합한다.
-    // 상자 잠금(FOR UPDATE)이 없으면 두 요청 모두 "안 엶"을 읽어서 둘 다 200이 된다
+    // 테스트가 상자 행을 먼저 잠가 두고 두 요청을 보낸다. 두 요청이 모두 상자 조회 쿼리에 도착한 것을
+    // 확인한 뒤 잠금을 풀면 경합한다. 상자 잠금(FOR UPDATE)이 없으면 두 요청 모두 "안 엶"을 읽어서 둘 다 200이 된다
     let opening: Promise<request.Response[]> = Promise.resolve([]);
-    await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM member_item_box WHERE id = ${box.id} FOR UPDATE`;
-      opening = Promise.all(
-        [1, 2].map(async () => api(me.id).post(`/characters/me/item-boxes/${box.id}/open`)),
-      );
-      await new Promise((resolve) => setTimeout(resolve, 300));
-    });
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM member_item_box WHERE id = ${box.id} FOR UPDATE`;
+        opening = Promise.all(
+          [1, 2].map(async () => api(me.id).post(`/characters/me/item-boxes/${box.id}/open`)),
+        );
+        await waitForRunningQueries('SELECT user_id, status FROM member_item_box', 2);
+      },
+      { timeout: 10_000 },
+    );
     const results = await opening;
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
     const given = await prisma.memberItem.findMany({ where: { userId: me.id, acquiredType: 'B' } });
@@ -406,6 +409,15 @@ describe('v1.3 아이템 상자 · 세트 · 업적 보상 아이템', () => {
     expect(bought.status).toBe(200);
     expect(bought.body.message).toBe('딸기 모자 세트를 샀어요!');
     expect(bought.body.data).toMatchObject({ pointBalance: 550, equipped: true });
+    const ownedAfter = await prisma.memberItem.findMany({
+      where: { userId: me.id },
+      include: { item: { select: { code: true } } },
+      orderBy: { itemId: 'asc' },
+    });
+    expect(ownedAfter.map((m) => [m.item.code, m.quantity, m.acquiredType])).toEqual([
+      ['HAT_STRAWBERRY', 1, 'P'],
+      ['PROP_HEART_BALLOON', 1, 'P'],
+    ]);
     const mukkaebi = await prisma.mukkaebi.findUniqueOrThrow({ where: { userId: me.id } });
     expect(mukkaebi).toMatchObject({
       hatItemId: await itemId('HAT_STRAWBERRY'),
@@ -428,6 +440,12 @@ describe('v1.3 아이템 상자 · 세트 · 업적 보상 아이템', () => {
     const short = await api(poor.id).post('/shop/set-purchases', { setId: set.setId });
     expect(short.status).toBe(409);
     expect(short.body.code).toBe('POINT_NOT_ENOUGH');
+    // 실패하면 아무것도 바뀌지 않는다
+    expect((await prisma.member.findUniqueOrThrow({ where: { id: poor.id } })).pointBalance).toBe(
+      0,
+    );
+    expect(await prisma.pointHistory.count({ where: { userId: poor.id } })).toBe(0);
+    expect(await prisma.memberItem.count({ where: { userId: poor.id } })).toBe(0);
   });
 
   it('명예 아이템은 업적 보상: 상점 명예 탭에 필요한 업적을 보여 주고, 업적을 달성하면 받는다', async () => {
