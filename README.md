@@ -606,7 +606,7 @@ GCP에서 준비할 것:
 | VM 서비스 계정 | `foonquer-vm`. `roles/secretmanager.secretAccessor`, 사진 두 버킷의 `roles/storage.objectAdmin`과 서명 권한 `roles/iam.serviceAccountTokenCreator`(자기 자신에게, 업로드 signed URL), 백업 버킷의 `roles/storage.objectCreator`·`roles/storage.objectViewer`(복구할 때 읽기) |
 | Secret Manager | `foonquer-prod-env` — 운영 `.env` 내용 (아래 표) |
 | Cloud Storage | 공개 사진 버킷(`GCS_BUCKET`, 프로필 `profile/{회원 id}/`·리뷰 사진)은 `allUsers` 읽기 허용, 영수증·현장·문의 사진은 공개하지 않는 별도 버킷에 둔다(`GCS_PRIVATE_BUCKET`, `receipt/`·`site/`·`inquiry/` 폴더). 브라우저에서 signed URL로 바로 올리므로(USER-02, UPLOAD-01) 두 버킷 모두 버킷 CORS에 웹 주소, `PUT`, 요청 헤더 `Content-Type`·`x-goog-content-length-range`·`x-goog-if-generation-match` 허용. DB 백업 버킷은 비공개, 30일 지나면 지우는 수명 주기 |
-| 배포용 서비스 계정 | `foonquer-deploy`. GitHub Actions가 VM에 IAP로 SSH할 권한만 준다 (`roles/compute.instanceAdmin.v1`, `roles/iap.tunnelResourceAccessor`, `roles/iam.serviceAccountUser`). 키 파일은 만들지 않고 Workload Identity Federation으로 이 저장소(`foonquer/foonquer`)의 Actions만 이 계정을 쓸 수 있게 한다: 풀 `github`, 공급자 `foonquer`(발급자 `https://token.actions.githubusercontent.com`, 조건 `assertion.repository=='foonquer/foonquer'`), 그리고 `foonquer-deploy`에 연합 주체 `principalSet://iam.googleapis.com/projects/<프로젝트 번호>/locations/global/workloadIdentityPools/github/attribute.repository/foonquer/foonquer`의 `roles/iam.workloadIdentityUser`. VM이 한 대뿐인 프로젝트라 `instanceAdmin.v1`은 프로젝트 단위로 준다(`gcloud compute ssh`가 프로젝트 메타데이터도 읽는다). VM을 늘리면 그 VM으로 좁힌다 |
+| 배포용 서비스 계정 | `foonquer-deploy`. GitHub Actions가 VM에 IAP로 SSH할 권한만 준다 (`roles/compute.instanceAdmin.v1`, `roles/iap.tunnelResourceAccessor`, `roles/iam.serviceAccountUser`). 키 파일은 만들지 않고 Workload Identity Federation으로 이 저장소(`foonquer/foonquer`)의 Actions만 이 계정을 쓸 수 있게 한다: 풀 `github`, 공급자 `foonquer`(발급자 `https://token.actions.githubusercontent.com`, 속성 매핑 `google.subject=assertion.sub,attribute.repository=assertion.repository`, 조건 `assertion.repository=='foonquer/foonquer'`), 그리고 `foonquer-deploy`에 연합 주체 `principalSet://iam.googleapis.com/projects/<프로젝트 번호>/locations/global/workloadIdentityPools/github/attribute.repository/foonquer/foonquer`의 `roles/iam.workloadIdentityUser`. VM이 한 대뿐인 프로젝트라 `instanceAdmin.v1`은 프로젝트 단위로 준다(`gcloud compute ssh`가 프로젝트 메타데이터도 읽는다). VM을 늘리면 그 VM으로 좁힌다 |
 
 운영 `.env`(Secret Manager `foonquer-prod-env`)에 넣는 값 — 값은 로컬 `.env`와 같은 뜻이고, 운영에서 다른 것만 적었다:
 
@@ -616,7 +616,8 @@ GCP에서 준비할 것:
 | `API_DOMAIN` | `api.foonquer.me` (caddy 인증서 도메인) |
 | `DATABASE_URL` | `mysql://foonquer:<MYSQL_PASSWORD>@db:3306/foonquer` (비밀번호에 `@ : / ? # %` 같은 문자가 있으면 이 자리에는 percent-encode한 값. 지금 값은 16진수라 그대로) |
 | `MYSQL_ROOT_PASSWORD`, `MYSQL_PASSWORD` | 각각 임의의 긴 문자열 (db 컨테이너가 처음 뜰 때 계정을 만든다. 나중에 바꾸려면 DB 안에서도 바꿔야 한다) |
-| `CORS_ORIGINS`, `FRONTEND_URL` | `https://foonquer.me` |
+| `CORS_ORIGINS` | `https://foonquer.me,https://www.foonquer.me` (www로 들어와도 API를 부를 수 있게) |
+| `FRONTEND_URL` | `https://foonquer.me` |
 | `API_BASE_URL` | `https://api.foonquer.me` |
 | `TRUST_PROXY` | `1` (caddy 한 단계) |
 | `COOKIE_SECURE` | `true` |
