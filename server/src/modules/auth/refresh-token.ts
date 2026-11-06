@@ -1,5 +1,6 @@
 import type { CookieOptions, Request, Response } from 'express';
 import { ACCESS_TOKEN_EXPIRES_IN, signAccessToken } from '../../common/auth/access-token';
+import { readCookie } from '../../common/cookies';
 import { randomToken, sha256Hex } from '../../common/crypto';
 import { addSeconds } from '../../common/time';
 import { env } from '../../config/env';
@@ -35,8 +36,7 @@ export function clearRefreshCookie(res: Response) {
 }
 
 export function readRefreshCookie(req: Request): string | null {
-  const value: unknown = req.cookies?.[REFRESH_COOKIE_NAME];
-  return typeof value === 'string' && value.length > 0 ? value : null;
+  return readCookie(req, REFRESH_COOKIE_NAME);
 }
 
 /** 새 refreshToken을 만들어 해시를 저장하고 원문을 돌려준다 (쿠키에 넣을 값) */

@@ -5,8 +5,10 @@ import { rateLimit } from '../../common/middlewares/rate-limit';
 import { validate } from '../../common/middlewares/validate';
 import { created, ok } from '../../common/response';
 import {
+  accountLinkBody,
   emailAvailabilityQuery,
   loginBody,
+  oauthExchangeBody,
   passwordResetBody,
   passwordResetEmailBody,
   passwordResetTokenQuery,
@@ -23,6 +25,8 @@ import {
 import { checkPasswordResetToken, resetPassword, sendPasswordResetMail } from './password.service';
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './refresh-token';
 import { loginWithEmail, logout, refreshSession } from './session.service';
+import { oauthRouter } from './oauth/oauth.router';
+import { exchangeOAuthResult, linkSocialAccount } from './social-login.service';
 
 /** /api/v1/auth — 로그인 없이 부르는 회원가입·로그인 API */
 export const authRouter = Router();
@@ -148,3 +152,22 @@ authRouter.post('/password/reset', validate({ body: passwordResetBody }), async 
   await resetPassword(token, newPassword);
   ok(res, null, '비밀번호를 바꿨어요. 새 비밀번호로 다시 로그인해 주세요.');
 });
+
+// AUTH-08 소셜 로그인 결과 교환
+authRouter.post('/oauth/exchange', validate({ body: oauthExchangeBody }), async (req, res) => {
+  const { oauthResultCode } = req.body as z.infer<typeof oauthExchangeBody>;
+  const { refreshToken, data, message } = await exchangeOAuthResult(oauthResultCode);
+  if (refreshToken) setRefreshCookie(res, refreshToken);
+  ok(res, data, message);
+});
+
+// AUTH-09 소셜 계정 연동
+authRouter.post('/oauth/link', validate({ body: accountLinkBody }), async (req, res) => {
+  const { accountLinkToken } = req.body as z.infer<typeof accountLinkBody>;
+  const { refreshToken, data, message } = await linkSocialAccount(accountLinkToken);
+  setRefreshCookie(res, refreshToken);
+  ok(res, data, message);
+});
+
+// AUTH-06·07 소셜 로그인 시작·콜백 (페이지 이동). /oauth/exchange·/oauth/link보다 뒤에 둔다.
+authRouter.use('/oauth', oauthRouter);

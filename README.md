@@ -259,6 +259,12 @@ pnpm -C server db:migrate                                       # 적용
 | `MAIL_FROM` | 보내는 사람 주소. SES에서 인증한 도메인·주소여야 한다 (`ses`일 때 필수) | 비워 둔다 |
 | `AWS_REGION` | SES·S3 리전 | `ap-northeast-2` |
 | `IMAGE_BASE_URL` | 프로필·리뷰 사진 공개 주소(CloudFront). 비우면 사진 URL을 `null`로 준다 | 비워 둔다 |
+| `API_BASE_URL` | 이 API 서버의 바깥 주소. 소셜 로그인 redirect_uri를 만든다 | `http://localhost:3000` |
+| `KAKAO_REST_API_KEY` | 카카오 REST API 키 (카카오 로그인 client_id, 카카오 로컬 API) | 카카오 개발자 콘솔 |
+| `KAKAO_CLIENT_SECRET` | 카카오 로그인 Client Secret (콘솔에서 켰을 때만) | 비워 둔다 |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | 구글 OAuth 클라이언트 | Google Cloud 콘솔 |
+
+> **소셜 로그인 Redirect URI**: 카카오·구글 콘솔에 `{API_BASE_URL}/api/v1/auth/oauth/kakao/callback`, `{API_BASE_URL}/api/v1/auth/oauth/google/callback`을 글자 하나까지 똑같이 등록한다. 로그인이 끝나면 서버가 `{FRONTEND_URL}/oauth/callback?code=…`(실패 시 `?error=…`)로 보내므로 웹에 그 페이지가 있어야 한다. 웹은 받은 code로 `POST /api/v1/auth/oauth/exchange`를 부른다.
 
 > 로컬에서 회원가입을 해 보면 인증 코드 메일이 `pnpm -C server dev`를 띄운 터미널에 `[mail:console]`로 찍힌다.
 > 운영(SES)은 EC2 인스턴스 IAM 역할에 `ses:SendEmail` 권한을 주고, SES에서 보내는 도메인을 인증해야 한다. SES 샌드박스 상태에서는 인증한 주소로만 보낼 수 있다.

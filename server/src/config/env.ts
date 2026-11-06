@@ -38,6 +38,17 @@ const envSchema = z.object({
   /** 보내는 사람 주소 (SES에서 인증한 도메인·주소). MAIL_DRIVER=ses면 필수 */
   MAIL_FROM: blankAsUndefined(z.string().optional()),
   AWS_REGION: z.string().default('ap-northeast-2'),
+  /** 이 API 서버의 바깥 주소. 소셜 로그인 redirect_uri({API_BASE_URL}/api/v1/auth/oauth/{provider}/callback)에 쓴다 */
+  API_BASE_URL: z
+    .url()
+    .default('http://localhost:3000')
+    .transform((v) => v.replace(/\/+$/, '')),
+  /** 카카오 REST API 키 (카카오 로그인 client_id, 로컬 API 호출에 같이 쓴다) */
+  KAKAO_REST_API_KEY: blankAsUndefined(z.string().optional()),
+  /** 카카오 로그인 보안의 Client Secret을 켰을 때만 */
+  KAKAO_CLIENT_SECRET: blankAsUndefined(z.string().optional()),
+  GOOGLE_CLIENT_ID: blankAsUndefined(z.string().optional()),
+  GOOGLE_CLIENT_SECRET: blankAsUndefined(z.string().optional()),
   /** 프로필·리뷰 사진 공개 주소(CloudFront). 예) https://img.example.com — 비우면 사진 URL을 null로 준다 */
   IMAGE_BASE_URL: blankAsUndefined(
     z
