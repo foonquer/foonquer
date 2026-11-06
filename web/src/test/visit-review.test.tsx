@@ -281,6 +281,31 @@ describe('방문 인증', () => {
       unmount();
       expect(stop).toHaveBeenCalled();
     });
+
+    it('켜는 중에 앨범에서 고르면 늦게 켜진 카메라는 바로 끄고, 다시 촬영하면 새로 켠다', async () => {
+      const stop = vi.fn();
+      const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream;
+      let turnOn: (s: MediaStream) => void = () => undefined;
+      const media = fakeCamera(
+        'granted',
+        () =>
+          new Promise<MediaStream>((resolve) => {
+            turnOn = resolve;
+          }),
+      );
+      renderRoute('/visits/new/receipt?restaurantId=7');
+
+      expect(await screen.findByRole('button', { name: '카메라를 켜는 중…' })).toBeDisabled();
+      fireEvent.change(screen.getByLabelText('앨범'), { target: { files: [photo()] } });
+      expect(await screen.findByText('글자가 잘 보이나요?')).toBeInTheDocument();
+
+      await act(async () => turnOn(stream));
+      expect(stop).toHaveBeenCalled();
+      expect(screen.getByText('글자가 잘 보이나요?')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: '다시 촬영' }));
+      await waitFor(() => expect(media.getUserMedia).toHaveBeenCalledTimes(2));
+    });
   });
 
   it('현장인증: 위치 확인 → 음식 사진 → 정복하기 → 먹깨비 따라가기', async () => {
