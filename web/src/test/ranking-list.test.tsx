@@ -104,6 +104,12 @@ describe('랭킹/현황', () => {
     const card = await screen.findByRole('region', { name: '강서구의 먹짱' });
     expect(card).toHaveTextContent('동네미식가');
     expect(card).toHaveTextContent('내 순위 8위 · 먹짱까지 11곳');
+    // 서울 25개 구 경계를 그리고, 고른 구는 맨 위에 테두리를 굵게
+    const board = screen.getByRole('group', { name: /구별 먹짱 지도/ });
+    const outlines = board.querySelectorAll('path[data-selected]');
+    expect(outlines).toHaveLength(25);
+    expect(board.querySelectorAll('path[data-selected="true"]')).toHaveLength(1);
+    expect(outlines[24]).toHaveAttribute('data-selected', 'true');
     fireEvent.click(screen.getByRole('button', { name: '마포구' }));
     expect(screen.getByRole('region', { name: '마포구의 먹짱' })).toHaveTextContent(
       '아직 먹짱이 없어요',

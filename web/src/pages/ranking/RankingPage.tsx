@@ -13,6 +13,7 @@ import { EmptyState, Loading } from '../../components/StateViews';
 import { ApiError, errorMessage } from '../../lib/api';
 import { formatSeasonRange } from '../../lib/format';
 import { useAsync } from '../../lib/useAsync';
+import { HAN_RIVER, SEOUL_DISTRICTS, SEOUL_VIEWBOX } from '../../data/seoulDistricts';
 import styles from './Ranking.module.css';
 
 type Tab = 'status' | 'rank';
@@ -166,12 +167,22 @@ function StatusTab({ seasonId, onSeason }: { seasonId?: number; onSeason: (id: n
   );
 }
 
-/** 서울 25개 구 중심 좌표를 판 위 위치(%)로 */
+/** 지도 판 안쪽 여백 (%) — 구 이름표가 판 밖으로 잘리지 않게 */
+const INSET = 4;
+const DISTRICT = new Map(SEOUL_DISTRICTS.map((d) => [d.name, d]));
+/** 구 모양 무게중심(피그마 지도 기준)을 판 위 위치(%)로. 모양이 없는 구는 중심 좌표로 */
 const BOX = { minLat: 37.43, maxLat: 37.7, minLng: 126.79, maxLng: 127.18 };
-const position = (g: MukjjangSigungu) => ({
-  left: `${(((g.centerLng ?? 126.98) - BOX.minLng) / (BOX.maxLng - BOX.minLng)) * 88 + 6}%`,
-  top: `${((BOX.maxLat - (g.centerLat ?? 37.56)) / (BOX.maxLat - BOX.minLat)) * 86 + 7}%`,
-});
+const position = (g: MukjjangSigungu) => {
+  const d = DISTRICT.get(g.name);
+  const [x, y] = d
+    ? [d.label[0] / SEOUL_VIEWBOX.width, d.label[1] / SEOUL_VIEWBOX.height]
+    : [
+        ((g.centerLng ?? 126.98) - BOX.minLng) / (BOX.maxLng - BOX.minLng),
+        (BOX.maxLat - (g.centerLat ?? 37.56)) / (BOX.maxLat - BOX.minLat),
+      ];
+  const span = 100 - INSET * 2;
+  return { left: `${INSET + x * span}%`, top: `${INSET + y * span}%` };
+};
 
 /** 랭킹: 구별 먹짱 지도 (RANK-06) */
 function RankTab({
@@ -203,7 +214,29 @@ function RankTab({
         <span className={styles.hint}>구를 누르면 그 구의 먹짱을 보여 줘요</span>
       </div>
       <div className={styles.board} role="group" aria-label={`${data.season.name} 구별 먹짱 지도`}>
-        <span className={styles.river} aria-hidden="true" />
+        <svg
+          className={styles.seoul}
+          viewBox={`0 0 ${SEOUL_VIEWBOX.width} ${SEOUL_VIEWBOX.height}`}
+          style={{ inset: `${INSET}%` }}
+          aria-hidden="true"
+        >
+          {/* 고른 구는 테두리가 가려지지 않게 맨 위에 그린다 */}
+          {[...SEOUL_DISTRICTS]
+            .sort((a, b) => Number(a.name === selected?.name) - Number(b.name === selected?.name))
+            .map((d) => {
+              const g = data.items.find((i) => i.name === d.name);
+              return (
+                <path
+                  key={d.name}
+                  d={d.d}
+                  fill={d.fill}
+                  data-selected={g !== undefined && g.sigunguId === selected?.sigunguId}
+                  onClick={g ? () => setPicked(g.sigunguId) : undefined}
+                />
+              );
+            })}
+          <path d={HAN_RIVER} className={styles.han} />
+        </svg>
         {data.items.map((g) =>
           g.mukjjang ? (
             <button
