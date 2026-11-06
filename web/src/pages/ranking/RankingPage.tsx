@@ -27,10 +27,15 @@ function Failed({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   return <EmptyState title={errorMessage(error)} onRetry={onRetry} />;
 }
 
-/** 랭킹/현황 탭 /ranking?tab=status|rank&seasonId= */
+/**
+ * 랭킹/현황 탭 /ranking?tab=status|rank&seasonId=
+ * 순위 변동 알림은 /ranking?sigunguId=로 온다 (NOTI-01 deepLink) → 랭킹 탭에서 그 구를 고른다
+ */
 export function RankingPage() {
   const [params, setParams] = useSearchParams();
-  const tab: Tab = params.get('tab') === 'rank' ? 'rank' : 'status';
+  const sigunguId = Number(params.get('sigunguId')) || null;
+  const tab: Tab =
+    params.get('tab') === 'rank' || (sigunguId && !params.get('tab')) ? 'rank' : 'status';
   const seasonId = Number(params.get('seasonId')) || undefined;
   const set = (patch: Record<string, string>) =>
     setParams({ ...Object.fromEntries(params), ...patch }, { replace: true });
@@ -66,7 +71,11 @@ export function RankingPage() {
       {tab === 'status' ? (
         <StatusTab seasonId={seasonId} onSeason={(id) => set({ seasonId: String(id) })} />
       ) : (
-        <RankTab seasonId={seasonId} onSeason={(id) => set({ seasonId: String(id) })} />
+        <RankTab
+          seasonId={seasonId}
+          initialSigunguId={sigunguId}
+          onSeason={(id) => set({ seasonId: String(id) })}
+        />
       )}
     </Screen>
   );
@@ -163,9 +172,17 @@ const position = (g: MukjjangSigungu) => ({
 });
 
 /** 랭킹: 구별 먹짱 지도 (RANK-06) */
-function RankTab({ seasonId, onSeason }: { seasonId?: number; onSeason: (id: number) => void }) {
+function RankTab({
+  seasonId,
+  initialSigunguId,
+  onSeason,
+}: {
+  seasonId?: number;
+  initialSigunguId: number | null;
+  onSeason: (id: number) => void;
+}) {
   const { data, error, reload } = useAsync(() => getMukjjangMap(seasonId), [seasonId]);
-  const [picked, setPicked] = useState<number | null>(null);
+  const [picked, setPicked] = useState<number | null>(initialSigunguId);
   if (error) return <Failed error={error} onRetry={reload} />;
   if (!data) return <Loading />;
 

@@ -114,6 +114,27 @@ describe('랭킹/현황', () => {
     );
   });
 
+  it('순위 변동 알림(/ranking?sigunguId=)으로 오면 랭킹 탭에서 그 구를 고른다', async () => {
+    mockApi({
+      'GET /rankings/mukjjang-map': ok({
+        season,
+        level: 'SIGUNGU',
+        items: [1, 5].map((sigunguId) => ({
+          sigunguId,
+          name: sigunguId === 1 ? '강서구' : '마포구',
+          centerLat: 37.55,
+          centerLng: 126.9,
+          mukjjang: null,
+          myRank: sigunguId === 1 ? 8 : null,
+          myConquestCount: 0,
+          mukjjangGap: 1,
+        })),
+      }),
+    });
+    renderRoute('/ranking?sigunguId=5');
+    expect(await screen.findByRole('region', { name: '마포구의 먹짱' })).toBeInTheDocument();
+  });
+
   it('진행 중 시즌이 없으면 안내한다', async () => {
     mockApi({
       'GET /users/me/conquests/sigungus': {
