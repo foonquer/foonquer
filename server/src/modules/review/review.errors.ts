@@ -5,12 +5,12 @@ export const ReviewError = defineErrors({
   INVALID_OVERALL_SCORE: {
     status: 400,
     code: 'INVALID_OVERALL_SCORE',
-    message: '종합 별점은 0.5점부터 5점까지 0.5점 단위로 골라 주세요.',
+    message: '맛 별점은 0.5점부터 5점까지 0.5점 단위로 골라 주세요.',
   },
   INVALID_DETAIL_SCORES: {
     status: 400,
     code: 'INVALID_DETAIL_SCORES',
-    message: '세부 별점은 다섯 항목 모두 1~5점으로 골라 주세요.',
+    message: '세부 별점은 청결·양·서비스·가격 네 항목 모두 1~5점으로 골라 주세요.',
   },
   INVALID_ASPECT: {
     status: 400,
@@ -50,7 +50,7 @@ export const ReviewError = defineErrors({
   RATING_REQUIRED: {
     status: 409,
     code: 'RATING_REQUIRED',
-    message: '종합 별점을 먼저 남겨 주세요.',
+    message: '맛 별점을 먼저 남겨 주세요.',
   },
   REVIEW_DETAIL_EXISTS: {
     status: 409,
