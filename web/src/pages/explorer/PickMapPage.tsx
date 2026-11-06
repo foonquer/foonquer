@@ -39,11 +39,14 @@ export function PickMapPage() {
       </Screen>
     );
   }
-  if (p.picks.length === 0) {
+  // 프로필 화면과 같이 차단한 탐험가의 PICK은 보여 주지 않는다
+  if (p.isBlocked || p.picks.length === 0) {
     return (
       <Screen>
         <AppHeader title={title} />
-        <EmptyState title="아직 고른 PICK이 없어요" />
+        <EmptyState
+          title={p.isBlocked ? '차단한 탐험가의 PICK은 볼 수 없어요' : '아직 고른 PICK이 없어요'}
+        />
       </Screen>
     );
   }

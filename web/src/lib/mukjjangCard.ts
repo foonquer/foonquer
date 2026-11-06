@@ -175,7 +175,10 @@ export async function cardPng(svg: string): Promise<Blob> {
   const canvas = document.createElement('canvas');
   canvas.width = CARD_WIDTH * 1.5;
   canvas.height = CARD_HEIGHT * 1.5;
-  canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height);
+  const ctx = canvas.getContext('2d');
+  // 그릴 수 없으면 빈 PNG를 저장·공유하지 않게 실패로 (화면이 다시 시도하라고 알린다)
+  if (!ctx) throw new Error('CARD_IMAGE_FAILED');
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   return new Promise((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('CARD_IMAGE_FAILED'))), 'image/png'),
   );
