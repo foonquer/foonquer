@@ -42,10 +42,17 @@ export function NotificationsPage() {
   const list = usePaged((page) => getNotifications({ category, page, size: 30 }), [filter]);
   const unread = list.first?.unreadCount ?? 0;
 
+  // 다시 부르면 "더 보기"로 늘린 목록이 1쪽으로 돌아가서, 받은 목록을 그 자리에서 고친다
   const open = async (n: AppNotification) => {
     try {
       const { deepLink } = await readNotification(n.notificationId);
-      list.update((i) => i.notificationId === n.notificationId, { ...n, isRead: true });
+      list.edit((p) => ({
+        ...p,
+        unreadCount: p.unreadCount - (n.isRead ? 0 : 1),
+        items: p.items.map((i) =>
+          i.notificationId === n.notificationId ? { ...i, isRead: true } : i,
+        ),
+      }));
       if (deepLink) navigate(deepLink);
     } catch (err) {
       toast(errorMessage(err));
@@ -54,7 +61,11 @@ export function NotificationsPage() {
   const readAll = async () => {
     try {
       await readAllNotifications(category);
-      list.reload();
+      list.edit((p) => ({
+        ...p,
+        unreadCount: 0,
+        items: p.items.map((i) => ({ ...i, isRead: true })),
+      }));
     } catch (err) {
       toast(errorMessage(err));
     }
@@ -62,7 +73,12 @@ export function NotificationsPage() {
   const remove = async (n: AppNotification) => {
     try {
       await deleteNotification(n.notificationId);
-      list.reload();
+      list.edit((p) => ({
+        ...p,
+        unreadCount: p.unreadCount - (n.isRead ? 0 : 1),
+        totalCount: p.totalCount - 1,
+        items: p.items.filter((i) => i.notificationId !== n.notificationId),
+      }));
     } catch (err) {
       toast(errorMessage(err));
     }

@@ -25,6 +25,7 @@ export function WithdrawPage() {
   const [agreed, setAgreed] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
 
   if (error) {
     return (
@@ -45,6 +46,7 @@ export function WithdrawPage() {
 
   const leave = async () => {
     setBusy(true);
+    setFailed(null);
     try {
       await withdraw({
         confirmed: true,
@@ -54,7 +56,8 @@ export function WithdrawPage() {
       toast('탈퇴했어요. 그동안 함께해 주셔서 고마워요.');
       signOut(); // 라우트 가드가 로그인 화면으로 보낸다
     } catch (err) {
-      toast(errorMessage(err));
+      // 확인창을 닫아도 보이게 탈퇴 버튼 위에 남긴다 (다시 누르거나 이유를 바꾸면 지운다)
+      setFailed(errorMessage(err));
       setBusy(false);
       setConfirmOpen(false);
     }
@@ -75,9 +78,16 @@ export function WithdrawPage() {
   return (
     <Screen
       footer={
-        <Button onClick={() => setConfirmOpen(true)} disabled={!agreed}>
-          탈퇴하기
-        </Button>
+        <>
+          {failed && (
+            <p className={styles.error} role="alert">
+              {failed}
+            </p>
+          )}
+          <Button onClick={() => setConfirmOpen(true)} disabled={!agreed}>
+            탈퇴하기
+          </Button>
+        </>
       }
     >
       <AppHeader title="회원 탈퇴" />
@@ -106,7 +116,10 @@ export function WithdrawPage() {
                 name="reason"
                 value={o.code}
                 checked={reason === o.code}
-                onChange={() => setReason(o.code)}
+                onChange={() => {
+                  setReason(o.code);
+                  setFailed(null);
+                }}
               />
               {o.label}
             </label>
@@ -122,7 +135,10 @@ export function WithdrawPage() {
                 placeholder="더 나은 먹장깨기를 위해 알려 주세요"
                 maxLength={DETAIL_MAX}
                 value={detail}
-                onChange={(e) => setDetail(e.target.value)}
+                onChange={(e) => {
+                  setDetail(e.target.value);
+                  setFailed(null);
+                }}
               />
             </>
           )}
@@ -139,7 +155,7 @@ export function WithdrawPage() {
         description={[
           `${data.nickname ?? '탐험가'}님의 정복 기록·먹깨비·먹포인트가 모두 사라져요.`,
         ]}
-        confirmLabel="탈퇴"
+        confirmLabel={busy ? '탈퇴하는 중…' : '탈퇴'}
         onCancel={() => setConfirmOpen(false)}
         onConfirm={leave}
         busy={busy}

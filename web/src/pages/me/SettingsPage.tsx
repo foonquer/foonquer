@@ -66,17 +66,22 @@ export function SettingsPage() {
   const notification = settings.data?.notification;
 
   type AlarmKey = 'conquestAlarm' | 'rankAlarm' | 'marketingAlarm';
+  // 저장 중인 스위치는 잠근다 (연달아 누르면 요청 순서가 엇갈려 화면과 서버 값이 달라질 수 있다)
+  const [saving, setSaving] = useState<Set<AlarmKey>>(new Set());
   const toggle = async (key: AlarmKey, value: boolean) => {
     // 먼저 바꿔 보여 주고, 실패하면 되돌린다
     const set = (v: boolean) =>
       settings.mutate((prev) => ({ ...prev, notification: { ...prev.notification, [key]: v } }));
     set(value);
+    setSaving((s) => new Set(s).add(key));
     try {
       const { message } = await updateNotificationSettings({ [key]: value });
       toast(message);
     } catch (err) {
       set(!value);
       toast(errorMessage(err));
+    } finally {
+      setSaving((s) => new Set([...s].filter((k) => k !== key)));
     }
   };
   const alarm = (key: AlarmKey, label: string) => ({
@@ -86,6 +91,7 @@ export function SettingsPage() {
         label={label}
         checked={(notification as NotificationSettings)[key]}
         onChange={(v) => toggle(key, v)}
+        disabled={saving.has(key)}
       />
     ) : undefined,
   });
@@ -158,11 +164,21 @@ export function SettingsPage() {
 
         <MenuSection title="알림">
           <MenuList
-            items={[
-              alarm('conquestAlarm', '정복·리뷰 알림'),
-              alarm('rankAlarm', '먹짱·순위 변동 알림'),
-              alarm('marketingAlarm', '이벤트·혜택 알림'),
-            ]}
+            items={
+              settings.error
+                ? [
+                    {
+                      label: '알림 설정을 불러오지 못했어요',
+                      value: '다시 시도',
+                      onClick: settings.reload,
+                    },
+                  ]
+                : [
+                    alarm('conquestAlarm', '정복·리뷰 알림'),
+                    alarm('rankAlarm', '먹짱·순위 변동 알림'),
+                    alarm('marketingAlarm', '이벤트·혜택 알림'),
+                  ]
+            }
           />
         </MenuSection>
 
