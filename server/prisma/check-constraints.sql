@@ -1,5 +1,6 @@
 -- CHECK 제약 (ERD checks) — Prisma 스키마로 표현할 수 없어 직접 추가한다
 ALTER TABLE `member` ADD CONSTRAINT `member_point_balance_chk` CHECK (point_balance >= 0);
+ALTER TABLE `member` ADD CONSTRAINT `member_role_chk` CHECK (role in ('U','A'));
 ALTER TABLE `member` ADD CONSTRAINT `member_trust_temp_chk` CHECK (trust_temp between 1 and 99);
 ALTER TABLE `member_local_region` ADD CONSTRAINT `member_local_region_order_chk` CHECK (sort_order between 0 and 1);
 ALTER TABLE `season` ADD CONSTRAINT `season_period_chk` CHECK (start_date < end_date);

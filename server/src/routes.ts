@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { adminRouter } from './modules/admin/admin.router';
 import { authRouter } from './modules/auth/auth.router';
 import { healthRouter } from './modules/health/health.router';
 import { homeRouter, mySummaryRouter } from './modules/home/home.router';
@@ -71,3 +72,4 @@ router.use('/faqs', faqRouter);
 router.use('/inquiries', inquiryRouter);
 router.use('/terms', termsRouter);
 router.use('/home', homeRouter);
+router.use('/admin', adminRouter);
