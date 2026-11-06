@@ -16,8 +16,11 @@ export function useCamera() {
   );
   const stream = useRef<MediaStream | null>(null);
   const alive = useRef(true);
+  /** 켜기 요청 번호. 끄면 올려서, 켜는 중이던 요청이 늦게 끝나도 버린다 */
+  const attempt = useRef(0);
 
   const stop = useCallback(() => {
+    attempt.current += 1;
     stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = null;
   }, []);
@@ -25,13 +28,14 @@ export function useCamera() {
   /** 켜기 (처음이면 브라우저가 권한을 묻는다). 막혀 있으면 blocked */
   const start = useCallback(async () => {
     setState('starting');
+    const mine = ++attempt.current;
     try {
       const s = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false,
       });
-      // 켜는 사이에 화면을 떠났으면 바로 끈다
-      if (!alive.current) {
+      // 켜는 사이에 화면을 떠났거나 꺼 달라고 했으면(앨범에서 사진을 고름) 바로 끈다. 상태는 starting으로 두고 다시 찍을 때 새로 켠다
+      if (!alive.current || mine !== attempt.current) {
         s.getTracks().forEach((t) => t.stop());
         return 'none' as const;
       }
