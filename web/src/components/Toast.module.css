@@ -1,0 +1,50 @@
+.area {
+  position: fixed;
+  right: 0;
+  bottom: calc(108px + var(--mk-safe-bottom));
+  left: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: center;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 var(--mk-side);
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--mk-toast);
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.2));
+  color: var(--mk-white);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  pointer-events: auto;
+  animation: pop 0.2s ease-out;
+}
+
+.check {
+  color: #8fd19a;
+  font-weight: 700;
+}
+
+.dot {
+  opacity: 0.8;
+}
+
+.action {
+  white-space: nowrap;
+}
+
+@keyframes pop {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}

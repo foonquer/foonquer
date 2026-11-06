@@ -1,4 +1,57 @@
+/* Figma(먹장깨기) 디자인 값. 화면 CSS는 색을 직접 쓰지 말고 이 변수를 쓴다. */
 :root {
+  /* 바탕·글자 */
+  --mk-bg: #f1f4ee;
+  --mk-white: #ffffff;
+  --mk-ink: #242824;
+  --mk-muted: #72766f;
+  --mk-subtle: #9a9e97;
+
+  /* 초록 (주 색) */
+  --mk-green: #59a864;
+  --mk-forest: #2f5d3d;
+  --mk-park: #ddebd5;
+  --mk-green-50: #eef6ea;
+  --mk-green-100: #e2edda;
+  --mk-green-info: #e8efe3;
+  --mk-green-soft: #bfd8bc;
+  --mk-green-mist: #cfe3c6;
+
+  /* 선 */
+  --mk-line: #dce2d8;
+  --mk-line-strong: #cfdccb;
+  --mk-divider: #edf0ea;
+  --mk-dot: #c9d2c4;
+  --mk-check-off: #c9cec5;
+
+  /* 산호색 (미정복·오류) */
+  --mk-coral: #ea7b66;
+  --mk-coral-text: #d9624b;
+  --mk-coral-50: #fdece8;
+  --mk-error: #e5533d;
+  --mk-error-bg: #fff6f4;
+
+  /* 크림·금색 */
+  --mk-cream: #fff1d9;
+  --mk-star: #de9839;
+  --mk-gold: #e9c46a;
+  --mk-gold-light: #ffe08a;
+  --mk-photo: #f1e3cf;
+
+  /* 비활성 */
+  --mk-disabled-bg: #dce2d8;
+  --mk-disabled-text: #9fa69c;
+  --mk-gray-button: #eef1eb;
+
+  /* 덮개·토스트 */
+  --mk-dim: rgba(22, 32, 26, 0.5);
+  --mk-toast: rgba(36, 40, 36, 0.94);
+
+  /* 화면 여백. 기기 상단·하단 안전 영역(노치·홈 막대)을 더한다 */
+  --mk-side: 22px;
+  --mk-safe-top: env(safe-area-inset-top, 0px);
+  --mk-safe-bottom: env(safe-area-inset-bottom, 0px);
+
   font-family:
     'Pretendard Variable',
     Pretendard,
@@ -6,9 +59,10 @@
     BlinkMacSystemFont,
     system-ui,
     sans-serif;
-  color: #1f1f1f;
-  background: #ffffff;
+  color: var(--mk-ink);
+  background: var(--mk-bg);
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
 
 *,
@@ -19,23 +73,61 @@
 
 body {
   margin: 0;
+  background: var(--mk-bg);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 /* 모바일 화면 기준. 넓은 화면에서는 가운데에 앱 폭만큼 보여 준다. */
 #root {
+  position: relative;
   max-width: 480px;
   min-height: 100dvh;
   margin: 0 auto;
+  background: var(--mk-bg);
 }
 
-.page {
-  padding: 24px 16px;
-}
-
-.status[data-status='ok'] {
-  color: #1a7f37;
-}
-
-.status[data-status='down'] {
-  color: #cf222e;
+/* 화면에는 안 보이고 화면 읽기 프로그램만 읽는 글자 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
