@@ -1,5 +1,5 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Review } from '../api/reviews';
 import type { Verification } from '../api/visits';
 import { parseExif } from '../lib/exif';
@@ -225,6 +225,62 @@ describe('방문 인증', () => {
     expect(router.state.location.pathname + router.state.location.search).toBe(
       '/visits/new/receipt?restaurantId=7',
     );
+  });
+
+  describe('화면 안 카메라', () => {
+    /** 브라우저 카메라 흉내: 권한 상태와 getUserMedia 결과 */
+    function fakeCamera(permission: PermissionState, getUserMedia: () => Promise<MediaStream>) {
+      const media = { getUserMedia: vi.fn(getUserMedia) };
+      Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: media });
+      Object.defineProperty(navigator, 'permissions', {
+        configurable: true,
+        value: { query: () => Promise.resolve({ state: permission }) },
+      });
+      return media;
+    }
+    const blocked = () => Promise.reject(new DOMException('denied', 'NotAllowedError'));
+
+    afterEach(() => {
+      Reflect.deleteProperty(navigator, 'mediaDevices');
+      Reflect.deleteProperty(navigator, 'permissions');
+    });
+
+    it('처음이면 권한 안내 → 막히면 꺼짐 안내, 다시 시도해도 막혀 있으면 알려 준다', async () => {
+      const media = fakeCamera('prompt', blocked);
+      renderRoute('/visits/new/receipt?restaurantId=7');
+
+      expect(await screen.findByText('카메라를 켜도 될까요?')).toBeInTheDocument();
+      expect(screen.getByText('가게명·날짜·금액만 확인해요')).toBeInTheDocument();
+      expect(media.getUserMedia).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: '카메라 허용하기' }));
+
+      expect(await screen.findByText('카메라 권한이 꺼져 있어요')).toBeInTheDocument();
+      expect(screen.getByText('2. 카메라를 ‘허용’으로 바꾸기')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '다시 시도하기' }));
+      expect(await screen.findByText('아직 카메라가 꺼져 있어요')).toBeInTheDocument();
+      expect(media.getUserMedia).toHaveBeenCalledTimes(2);
+
+      // 앨범에서 고르면 그대로 촬영 확인으로
+      fireEvent.change(screen.getByLabelText('앨범에서 사진 고르기'), {
+        target: { files: [photo()] },
+      });
+      expect(await screen.findByText('글자가 잘 보이나요?')).toBeInTheDocument();
+    });
+
+    it('이미 허용했으면 바로 카메라를 켜고, 화면을 떠나면 끈다', async () => {
+      const stop = vi.fn();
+      const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream;
+      const media = fakeCamera('granted', () => Promise.resolve(stream));
+      const { unmount } = renderRoute('/visits/new/receipt?restaurantId=7');
+
+      expect(await screen.findByRole('button', { name: '촬영' })).toBeEnabled();
+      expect(screen.getByLabelText('카메라 화면')).toBeInTheDocument();
+      expect(media.getUserMedia).toHaveBeenCalledWith(
+        expect.objectContaining({ video: expect.objectContaining({ facingMode: 'environment' }) }),
+      );
+      unmount();
+      expect(stop).toHaveBeenCalled();
+    });
   });
 
   it('현장인증: 위치 확인 → 음식 사진 → 정복하기 → 먹깨비 따라가기', async () => {

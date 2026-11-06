@@ -152,6 +152,39 @@
   color: var(--mk-ink);
 }
 
+/* 체크 표시 목록 (카메라 권한 안내) */
+.checklist[data-check='true'] li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.checklist[data-check='true'] li::before {
+  content: '✓';
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--mk-green-50);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+/* 권한 안내 동그라미 (카메라 그림) */
+.ask {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  margin: 24px auto 0;
+  border-radius: 50%;
+  background: var(--mk-green-50);
+  color: var(--mk-green);
+}
+
 .celebrate {
   position: relative;
   padding: 18px 18px 22px;
