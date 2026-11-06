@@ -4,12 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app';
 import { addDays, kstTodayAsDbDate, toKstIso } from '../../src/common/time';
 import { prisma } from '../../src/lib/prisma';
-import { objectExists } from '../../src/lib/storage';
+import { readObjectHead } from '../../src/lib/storage';
 import { resetDb } from '../helpers/db';
 import { agreeConsents, bearer, createMember } from '../helpers/fixtures';
+import { imageHead } from '../helpers/image';
 
 // 프로필 사진이 스토리지에 있는지는 테스트마다 정한다 (기본: 없음).
-vi.mock('../../src/lib/storage', () => ({ objectExists: vi.fn(() => Promise.resolve(false)) }));
+vi.mock('../../src/lib/storage', () => ({
+  readObjectHead: vi.fn(() => Promise.resolve(null)),
+  deleteObjectQuietly: vi.fn(() => Promise.resolve()),
+}));
 
 const app = createApp();
 
@@ -43,7 +47,7 @@ async function setupBody(overrides: Record<string, unknown> = {}) {
 
 beforeEach(async () => {
   await resetDb();
-  vi.mocked(objectExists).mockResolvedValue(false);
+  vi.mocked(readObjectHead).mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -222,12 +226,12 @@ describe('USER-03 POST /users/me/profile', () => {
   it('스토리지에 올린 프로필 사진 key를 저장하고 URL로 준다', async () => {
     const me = await pendingMember();
     const key = `profile/${me.id}/${randomUUID()}.webp`;
-    vi.mocked(objectExists).mockResolvedValue(true);
+    vi.mocked(readObjectHead).mockImplementation((k) => Promise.resolve(imageHead(k)));
 
     const res = await setup(me.id, await setupBody({ profileImageKey: key }));
     expect(res.status).toBe(201);
     expect(res.body.data.user.profileImageUrl).toBe(`https://images.test/${key}`);
-    expect(objectExists).toHaveBeenCalledWith(key);
+    expect(readObjectHead).toHaveBeenCalledWith(key, 12);
   });
 
   it.each([
@@ -237,7 +241,9 @@ describe('USER-03 POST /users/me/profile', () => {
     ['스토리지에 없음', (id: bigint) => `profile/${id}/${randomUUID()}.png`, false],
   ])('사진 key가 잘못되면 400 PROFILE_IMAGE_NOT_FOUND (%s)', async (_, keyOf, exists) => {
     const me = await pendingMember();
-    vi.mocked(objectExists).mockResolvedValue(exists);
+    vi.mocked(readObjectHead).mockImplementation((k) =>
+      Promise.resolve(exists ? imageHead(k) : null),
+    );
     const res = await setup(me.id, await setupBody({ profileImageKey: keyOf(me.id) }));
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('PROFILE_IMAGE_NOT_FOUND');

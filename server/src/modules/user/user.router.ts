@@ -1,17 +1,29 @@
 import { Router } from 'express';
 import type { z } from 'zod';
 import { getAuthUser, requireAuth } from '../../common/auth/require-auth';
+import { rateLimit } from '../../common/middlewares/rate-limit';
 import { validate } from '../../common/middlewares/validate';
 import { created, ok } from '../../common/response';
 import { consentsBody } from '../auth/auth.schema';
 import { saveMemberConsents } from '../auth/consent.service';
+import { clearRefreshCookie } from '../auth/refresh-token';
 import { addLocalRegion, getLocalRegions, removeLocalRegion } from './local-region.service';
+import {
+  changeProfileImage,
+  issueProfileImageUploadUrl,
+  removeProfileImage,
+} from './profile-image.service';
+import { getSettings, updateNotificationSettings } from './settings.service';
 import {
   localRegionAddBody,
   localRegionParams,
   nicknameAvailabilityQuery,
+  notificationSettingsBody,
+  profileImageBody,
+  profileImageUploadBody,
   profileSetupBody,
   profileUpdateBody,
+  withdrawalBody,
 } from './user.schema';
 import {
   checkNicknameAvailability,
@@ -19,6 +31,7 @@ import {
   getMyProfile,
   updateMyProfile,
 } from './user.service';
+import { getWithdrawalSummary, withdrawMember } from './withdrawal.service';
 
 /** /api/v1/users */
 export const userRouter = Router();
@@ -103,3 +116,70 @@ userRouter.delete(
     ok(res, await removeLocalRegion(userId, localRegionId), '내 동네에서 뺐어요.');
   },
 );
+
+// USER-02 프로필 사진 업로드 URL 발급 (프로필 설정 전 회원도 부른다)
+userRouter.post(
+  '/me/profile-image/upload-url',
+  requireAuth('profile'),
+  rateLimit({ windowMs: 60_000, limit: 10 }),
+  validate({ body: profileImageUploadBody }),
+  async (req, res) => {
+    const { userId } = getAuthUser(req);
+    const body = req.body as z.infer<typeof profileImageUploadBody>;
+    ok(res, await issueProfileImageUploadUrl(userId, body), '업로드 URL을 발급했어요.');
+  },
+);
+
+// USER-06 프로필 사진 변경
+userRouter.put(
+  '/me/profile-image',
+  requireAuth(),
+  validate({ body: profileImageBody }),
+  async (req, res) => {
+    const { userId } = getAuthUser(req);
+    const { imageKey } = req.body as z.infer<typeof profileImageBody>;
+    ok(res, await changeProfileImage(userId, imageKey), '프로필 사진을 바꿨어요.');
+  },
+);
+
+// USER-07 프로필 사진 삭제 (기본 캐릭터로)
+userRouter.delete('/me/profile-image', requireAuth(), async (req, res) => {
+  const { userId } = getAuthUser(req);
+  ok(res, await removeProfileImage(userId), '기본 캐릭터로 바꿨어요.');
+});
+
+// SET-01 설정 조회
+userRouter.get('/me/settings', requireAuth(), async (req, res) => {
+  const { userId } = getAuthUser(req);
+  ok(res, await getSettings(userId), '설정을 조회했어요.');
+});
+
+// SET-02 알림 설정 변경
+userRouter.patch(
+  '/me/notification-settings',
+  requireAuth(),
+  validate(
+    { body: notificationSettingsBody },
+    { validationMessage: '알림 값은 true/false로 보내 주세요.' },
+  ),
+  async (req, res) => {
+    const { userId } = getAuthUser(req);
+    const body = req.body as z.infer<typeof notificationSettingsBody>;
+    const { data, message } = await updateNotificationSettings(userId, body);
+    ok(res, data, message);
+  },
+);
+
+// SET-03 탈퇴 전 안내 조회
+userRouter.get('/me/withdrawal-summary', requireAuth(), async (req, res) => {
+  const { userId } = getAuthUser(req);
+  ok(res, await getWithdrawalSummary(userId), '탈퇴 안내를 조회했어요.');
+});
+
+// SET-04 회원 탈퇴 (성공하면 refreshToken 쿠키도 지운다)
+userRouter.delete('/me', requireAuth(), validate({ body: withdrawalBody }), async (req, res) => {
+  const { userId } = getAuthUser(req);
+  const data = await withdrawMember(userId, req.body as z.infer<typeof withdrawalBody>);
+  clearRefreshCookie(res);
+  ok(res, data, '탈퇴했어요. 그동안 함께해 주셔서 고마워요.');
+});

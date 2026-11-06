@@ -62,3 +62,58 @@ export const localRegionAddBody = z.object({
 export const localRegionParams = z.object({
   localRegionId: z.coerce.number().int().positive(),
 });
+
+/** USER-02 업로드할 수 있는 사진 형식 → 확장자 */
+export const PROFILE_IMAGE_TYPES = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+} as const;
+export const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+/** USER-02 */
+export const profileImageUploadBody = z.object({
+  contentType: z.enum(Object.keys(PROFILE_IMAGE_TYPES) as [keyof typeof PROFILE_IMAGE_TYPES], {
+    error: 'UNSUPPORTED_IMAGE_TYPE',
+  }),
+  fileSize: z.number().int().positive().max(PROFILE_IMAGE_MAX_BYTES, { error: 'IMAGE_TOO_LARGE' }),
+});
+export type ProfileImageUploadBody = z.infer<typeof profileImageUploadBody>;
+
+/** USER-06 */
+export const profileImageBody = z.object({
+  imageKey: z
+    .string({ error: 'IMAGE_KEY_REQUIRED' })
+    .trim()
+    .min(1, { error: 'IMAGE_KEY_REQUIRED' })
+    .max(255, { error: 'PROFILE_IMAGE_NOT_FOUND' }),
+});
+
+/** SET-02 (보낸 항목만 바꾼다) */
+export const notificationSettingsBody = z.object({
+  conquestAlarm: z.boolean().optional(),
+  rankAlarm: z.boolean().optional(),
+  marketingAlarm: z.boolean().optional(),
+});
+export type NotificationSettingsBody = z.infer<typeof notificationSettingsBody>;
+
+/** SET-04 떠나는 이유 (member_withdrawal.reason_code) */
+export const WITHDRAWAL_REASONS = [
+  { code: 'RARELY_USE', label: '자주 쓰지 않아요' },
+  { code: 'NO_RESTAURANT', label: '가고 싶은 맛집이 없어요' },
+  { code: 'VERIFY_HARD', label: '영수증 인증이 번거로워요' },
+  { code: 'ETC', label: '기타' },
+] as const;
+type WithdrawalReasonCode = (typeof WITHDRAWAL_REASONS)[number]['code'];
+
+/** SET-04 */
+export const withdrawalBody = z.object({
+  confirmed: z.literal(true, { error: 'WITHDRAWAL_CONFIRM_REQUIRED' }),
+  reasonCode: z
+    .enum(WITHDRAWAL_REASONS.map((r) => r.code) as [WithdrawalReasonCode], {
+      error: 'INVALID_WITHDRAWAL_REASON',
+    })
+    .nullish(),
+  reasonDetail: z.string().max(255, { error: 'REASON_DETAIL_TOO_LONG' }).nullish(),
+});
+export type WithdrawalBody = z.infer<typeof withdrawalBody>;
