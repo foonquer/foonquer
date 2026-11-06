@@ -17,6 +17,12 @@ import { MyPage } from './pages/me/MyPage';
 import { MyReviewsPage } from './pages/me/MyReviewsPage';
 import { PickEditPage } from './pages/me/PickEditPage';
 import { ProfileEditPage } from './pages/me/ProfileEditPage';
+import { CollectionPage } from './pages/mukkaebi/CollectionPage';
+import { DecoratePage } from './pages/mukkaebi/DecoratePage';
+import { ItemBoxesPage } from './pages/mukkaebi/ItemBoxesPage';
+import { MukkaebiPage } from './pages/mukkaebi/MukkaebiPage';
+import { PointsPage } from './pages/mukkaebi/PointsPage';
+import { ShopPage } from './pages/mukkaebi/ShopPage';
 import { SeasonsPage } from './pages/me/SeasonsPage';
 import { SettingsPage } from './pages/me/SettingsPage';
 import { TasteWeightsPage } from './pages/me/TasteWeightsPage';
@@ -48,7 +54,6 @@ import { VisitNewPage } from './pages/visit/VisitNewPage';
  */
 const placeholders: RouteObject[] = [
   { path: '/notifications', element: <ComingSoonPage title="알림" /> },
-  { path: '/me/mukkaebi', element: <ComingSoonPage title="내 먹깨비 꾸미기" /> },
   { path: '/me/withdraw', element: <ComingSoonPage title="회원 탈퇴" /> },
   { path: '/notices', element: <ComingSoonPage title="공지사항" /> },
   { path: '/support', element: <ComingSoonPage title="고객센터" /> },
@@ -110,6 +115,12 @@ export const routes: RouteObject[] = [
           { path: '/me/conquests', element: <ConquestsPage /> }, // ?seasonId=
           { path: '/me/seasons', element: <SeasonsPage /> },
           { path: '/me/pick', element: <PickEditPage /> },
+          { path: '/me/mukkaebi', element: <MukkaebiPage /> },
+          { path: '/me/mukkaebi/decorate', element: <DecoratePage /> }, // ?tab=
+          { path: '/me/mukkaebi/shop', element: <ShopPage /> }, // ?category=
+          { path: '/me/mukkaebi/collection', element: <CollectionPage /> },
+          { path: '/me/mukkaebi/boxes', element: <ItemBoxesPage /> },
+          { path: '/me/points', element: <PointsPage /> },
           { path: '/list/add', element: <ListAddPage /> },
           { path: '/ranking/sigungus/:sigunguId', element: <SigunguRankingPage /> }, // ?seasonId=
           { path: '/ranking/sigungus/:sigunguId/status', element: <SigunguStatusPage /> },

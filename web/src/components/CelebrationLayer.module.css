@@ -1,0 +1,80 @@
+.layer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 24px;
+  background: var(--mk-dim);
+}
+
+.box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding: 28px 22px 18px;
+  border-radius: 28px;
+  background: linear-gradient(180deg, var(--mk-cream) 0%, var(--mk-white) 55%);
+  text-align: center;
+  animation: pop 0.25s ease-out;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.94);
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .box {
+    animation: none;
+  }
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #b66a10;
+}
+
+.title {
+  margin-top: 8px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--mk-forest);
+  word-break: keep-all;
+}
+
+.sub {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--mk-muted);
+}
+
+.mukkaebi {
+  width: 120px;
+  margin: 18px 0 8px;
+}
+
+.reward {
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: var(--mk-green-info);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  margin-top: 18px;
+}
