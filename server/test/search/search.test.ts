@@ -587,3 +587,52 @@ describe('RECO-01 GET /recommendations', () => {
     expect(res.body.message).toBe('지금은 서울만 볼 수 있어요.');
   });
 });
+
+describe('myOverallScore — 회원마다 내 취향 비중으로 계산 (SEARCH-02·RECO-01)', () => {
+  // 맛 별점 4.4, 세부 평가 10개 (청결 4.3·양 4.4·서비스 4.5·가격 4.2) — 피그마 3-2 계산 보기 예시
+  async function tasteFixture() {
+    const shop = await createRestaurant({ name: '취향식당' });
+    await stat(shop.id, {
+      reviewCount: 12,
+      displayScore: 4.4,
+      detailReviewCount: 10,
+      cleanlinessSum: 43,
+      portionSum: 44,
+      serviceSum: 45,
+      priceSum: 42,
+      localVisitCount: 1,
+    });
+    const plain = await memberInGayang(); // 모두 보통 → (4.4 + 4.3 + 4.4 + 4.5 + 4.2) ÷ 5 = 4.36
+    const picky = await memberInGayang(); // 맛·청결 아주 중요, 가격 중요 → 4.34
+    await prisma.member.update({
+      where: { id: picky.id },
+      data: { weightTaste: 3, weightCleanliness: 3, weightPrice: 2 },
+    });
+    return { plain, picky };
+  }
+
+  const scoreOf = (res: request.Response) => {
+    expect(res.status).toBe(200);
+    return res.body.data.items.find((i: { name: string }) => i.name === '취향식당')?.myOverallScore;
+  };
+
+  it('검색 결과', async () => {
+    stubKakao();
+    const { plain, picky } = await tasteFixture();
+    const search = (userId: bigint) =>
+      request(app)
+        .get('/api/v1/restaurants/search')
+        .query({ keyword: '취향' })
+        .set('Authorization', bearer(userId));
+    expect(scoreOf(await search(plain.id))).toBe(4.4);
+    expect(scoreOf(await search(picky.id))).toBe(4.3);
+  });
+
+  it('추천 맛집', async () => {
+    const { plain, picky } = await tasteFixture();
+    const recommend = (userId: bigint) =>
+      request(app).get('/api/v1/recommendations').set('Authorization', bearer(userId));
+    expect(scoreOf(await recommend(plain.id))).toBe(4.4);
+    expect(scoreOf(await recommend(picky.id))).toBe(4.3);
+  });
+});

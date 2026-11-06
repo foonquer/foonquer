@@ -62,12 +62,25 @@ describe('USER-10 PUT /users/me/taste-weights', () => {
     });
   });
 
-  it('하나라도 빠지거나 값이 틀리면 400 INVALID_TASTE_WEIGHT', async () => {
+  it('하나라도 빠지거나 값이 틀리면 400 INVALID_TASTE_WEIGHT, 저장된 값은 그대로', async () => {
     const me = await createMember();
-    for (const body of [{ taste: 'VERY' }, {}, { taste: 'VERY', cleanliness: 1 }]) {
+    const all = { taste: 'VERY', cleanliness: 'VERY', portion: 'VERY', service: 'VERY' };
+    for (const body of [
+      { taste: 'VERY' },
+      {},
+      { taste: 'VERY', cleanliness: 1 },
+      { ...all, price: 'SUPER' }, // 넷은 맞고 하나만 틀림
+    ]) {
       const res = await put(me.id, body);
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('INVALID_TASTE_WEIGHT');
+      expect(await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).toMatchObject({
+        weightTaste: 1,
+        weightCleanliness: 1,
+        weightPortion: 1,
+        weightService: 1,
+        weightPrice: 1,
+      });
     }
   });
 });

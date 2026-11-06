@@ -14,6 +14,8 @@ export function usePaged<P extends PageLike<unknown>>(
   type T = P['items'][number];
   const key = JSON.stringify(deps);
   const [want, setWant] = useState<Target>({ key, page: 1, version: 0 });
+  // deps가 바뀌면 "더 보기"로 늘린 쪽 수를 버린다 (A → B → A로 돌아와도 1쪽부터)
+  if (want.key !== key) setWant({ key, page: 1, version: 0 });
   const target = want.key === key ? want : { key, page: 1, version: 0 };
   const [loaded, setLoaded] = useState<{ at: Target; pages: P[] } | null>(null);
   const [failed, setFailed] = useState<{ at: Target; error: unknown } | null>(null);

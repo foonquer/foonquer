@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { type RestaurantCardItem, searchRestaurants } from '../../api/restaurants';
-import { saveRestaurant, unsaveRestaurant } from '../../api/saved';
+import { getSavedRestaurants, saveRestaurant, unsaveRestaurant } from '../../api/saved';
 import { AppHeader } from '../../components/AppHeader';
 import { BottomSheet } from '../../components/BottomSheet';
 import { Button } from '../../components/Button';
@@ -20,10 +20,16 @@ const MEMO_MAX = 50;
 /** 맛집 추가 /list/add — 검색해서 가고 싶은 곳에 저장 (SEARCH-02 → LIST-02·03) */
 export function ListAddPage() {
   const toast = useToast();
-  const { region } = useViewRegion();
+  const { region, error: regionError, retry: retryRegion } = useViewRegion();
   const [keyword, setKeyword] = useState('');
-  const [saved, setSaved] = useState<Set<number>>(new Set());
+  // 이미 저장한 가게(LIST-01 지도 핀)는 저장됨으로 보여 준다 — 다시 저장하면 메모·알림이 처음 값으로 바뀐다
+  const already = useAsync(() => getSavedRestaurants({ tab: 'WANT', size: 1 }), []);
+  const [changed, setChanged] = useState<Map<number, boolean>>(new Map());
+  const [pending, setPending] = useState<Set<number>>(new Set());
   const [target, setTarget] = useState<RestaurantCardItem | null>(null);
+  const isSavedId = (id: number) =>
+    changed.get(id) ?? already.data?.pins.some((p) => p.restaurantId === id) ?? false;
+  const mark = (id: number, saved: boolean) => setChanged((m) => new Map(m).set(id, saved));
   const { data, error, loading, reload } = useAsync(
     () =>
       keyword && region
@@ -39,12 +45,16 @@ export function ListAddPage() {
   );
 
   const unsave = async (r: RestaurantCardItem) => {
+    if (pending.has(r.restaurantId)) return;
+    setPending((s) => new Set(s).add(r.restaurantId));
     try {
       await unsaveRestaurant(r.restaurantId);
-      setSaved((s) => new Set([...s].filter((id) => id !== r.restaurantId)));
+      mark(r.restaurantId, false);
       toast('저장을 취소했어요');
     } catch (err) {
       toast(errorMessage(err));
+    } finally {
+      setPending((s) => new Set([...s].filter((id) => id !== r.restaurantId)));
     }
   };
 
@@ -58,7 +68,13 @@ export function ListAddPage() {
           가고 싶은 가게를 검색해서 저장해 두세요
           {region && ` · ${region.sigunguName}에서 찾아요`}
         </p>
-        {!keyword ? null : error ? (
+        {!keyword ? null : !region ? (
+          regionError ? (
+            <EmptyState title={errorMessage(regionError)} onRetry={retryRegion} />
+          ) : (
+            <Loading />
+          )
+        ) : error ? (
           <EmptyState title={errorMessage(error)} onRetry={reload} />
         ) : loading ? (
           <Loading />
@@ -76,7 +92,7 @@ export function ListAddPage() {
             </p>
             <ul className={styles.rows}>
               {items.map((r) => {
-                const isSaved = saved.has(r.restaurantId);
+                const isSaved = isSavedId(r.restaurantId);
                 return (
                   <li key={r.restaurantId} className={styles.row}>
                     <span className={styles.rowText}>
@@ -91,6 +107,7 @@ export function ListAddPage() {
                         className={styles.save}
                         aria-pressed={isSaved}
                         aria-label={`${r.name} ${isSaved ? '저장 취소' : '저장'}`}
+                        disabled={pending.has(r.restaurantId)}
                         onClick={() => (isSaved ? unsave(r) : setTarget(r))}
                       >
                         {isSaved ? '★ 저장됨' : '☆ 저장'}
@@ -103,11 +120,7 @@ export function ListAddPage() {
           </>
         )}
       </div>
-      <SaveSheet
-        target={target}
-        onClose={() => setTarget(null)}
-        onSaved={(id) => setSaved((s) => new Set(s).add(id))}
-      />
+      <SaveSheet target={target} onClose={() => setTarget(null)} onSaved={(id) => mark(id, true)} />
     </Screen>
   );
 }

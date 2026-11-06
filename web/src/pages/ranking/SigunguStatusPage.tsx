@@ -9,6 +9,12 @@ import { formatRecentDay, joinDot } from '../../lib/format';
 import { usePaged } from '../../lib/usePaged';
 import styles from './Ranking.module.css';
 
+/** "오늘 정복" / "어제" / "9월 21일" */
+const conqueredDay = (iso: string) => {
+  const day = formatRecentDay(iso);
+  return day === '오늘' ? '오늘 정복' : day;
+};
+
 /** 구 현황 /ranking/sigungus/:sigunguId/status?seasonId= — 내 티어·순위·랭킹 미리보기·정복한 가게 (RANK-04) */
 export function SigunguStatusPage() {
   const sigunguId = Number(useParams().sigunguId);
@@ -129,15 +135,16 @@ export function SigunguStatusPage() {
                     <br />
                     <span className={styles.rowSub}>{joinDot([r.categoryName])}</span>
                   </span>
-                  <span className={styles.rowSub}>
-                    {formatRecentDay(r.conqueredAt) === '오늘'
-                      ? '오늘 정복'
-                      : formatRecentDay(r.conqueredAt)}
-                  </span>
+                  <span className={styles.rowSub}>{conqueredDay(r.conqueredAt)}</span>
                 </Link>
               </li>
             ))}
           </ul>
+        )}
+        {shops.error !== undefined && (
+          <p className={styles.note} role="alert">
+            {errorMessage(shops.error)}
+          </p>
         )}
         {shops.hasNext && (
           <Button variant="white" size="sm" onClick={shops.loadMore} disabled={shops.loading}>
