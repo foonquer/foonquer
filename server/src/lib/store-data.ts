@@ -86,7 +86,14 @@ async function storeList(params: Record<string, string | number>) {
     throw new StoreDataError(`상가정보 오류 ${header?.resultCode}: ${header?.resultMsg ?? ''}`);
   }
   const raw = Array.isArray(body?.items) ? body.items : (body?.items?.item ?? []);
-  return { items: Array.isArray(raw) ? raw : [raw], totalCount: Number(body?.totalCount ?? 0) };
+  // 전체 수를 모르면 다 받았는지 알 수 없다 (일부만 받고 나머지를 폐업으로 처리하지 않게)
+  const totalCount = Number(body?.totalCount);
+  if (!Number.isFinite(totalCount) || totalCount < 0) {
+    throw new StoreDataError(
+      `상가정보 totalCount가 올바르지 않습니다: ${String(body?.totalCount)}`,
+    );
+  }
+  return { items: Array.isArray(raw) ? raw : [raw], totalCount };
 }
 
 /**

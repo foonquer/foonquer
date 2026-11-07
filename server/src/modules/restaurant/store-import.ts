@@ -2,7 +2,7 @@ import { distanceBetween } from '../../common/geo';
 import { env } from '../../config/env';
 import { Prisma } from '../../generated/prisma/client';
 import { prisma } from '../../lib/prisma';
-import { fetchFoodStoresInSigungu, type PublicStore } from '../../lib/store-data';
+import { fetchFoodStoresInSigungu, type PublicStore, StoreDataError } from '../../lib/store-data';
 import { findSeoulDongByCode, listSeoulSigungus, type RegionNode } from '../region/region.service';
 import { storeNameMatches } from '../visit/visit.service';
 import { categoryIdOfIndustry, EXCLUDED_INDUSTRY_CODES } from './category';
@@ -271,6 +271,8 @@ export async function runStoreImportJob() {
   for (const sigungu of await listSeoulSigungus()) {
     try {
       const stores = await fetchFoodStoresInSigungu(sigungu.code.slice(0, 5));
+      // 서울 구에 음식 업종 상가가 0곳일 수는 없다. 빈 응답이면 일시 오류로 보고 폐업·삭제 처리를 하지 않는다
+      if (stores.length === 0) throw new StoreDataError('상가 목록이 비어 있습니다.');
       const result = await importSigunguStores(sigungu, stores);
       for (const key of Object.keys(result) as (keyof StoreImportResult)[]) {
         total[key] += result[key];

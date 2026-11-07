@@ -15,7 +15,11 @@ export class KakaoApiError extends Error {
   }
 }
 
-export async function kakaoGet<T>(path: string, params: Record<string, string | number>) {
+export async function kakaoGet<T>(
+  path: string,
+  params: Record<string, string | number>,
+  timeoutMs = TIMEOUT_MS,
+) {
   const key = env.KAKAO_LOCAL_API_KEY ?? env.KAKAO_REST_API_KEY;
   if (!key) throw new KakaoApiError('KAKAO_REST_API_KEY 환경변수가 없습니다.');
 
@@ -26,7 +30,7 @@ export async function kakaoGet<T>(path: string, params: Record<string, string | 
   try {
     res = await fetch(url, {
       headers: { Authorization: `KakaoAK ${key}` },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
     throw new KakaoApiError(`카카오 요청 실패: ${path}`, { cause: err });
@@ -49,6 +53,9 @@ export interface KakaoPlace {
   phone: string;
 }
 
+/** 상세 화면이 카카오를 기다리는 최대 시간. 전화번호·링크는 덧붙이는 정보라 오래 기다리지 않는다 */
+const PLACE_TIMEOUT_MS = 1500;
+
 interface PlaceSearchResponse {
   documents: KakaoPlace[];
 }
@@ -58,14 +65,11 @@ interface PlaceSearchResponse {
  * https://developers.kakao.com/docs/latest/ko/local/dev-guide#search-by-keyword
  */
 export async function searchPlacesNear(query: string, lat: number, lng: number, radiusM: number) {
-  const body = await kakaoGet<PlaceSearchResponse>('/v2/local/search/keyword.json', {
-    query,
-    x: lng,
-    y: lat,
-    radius: radiusM,
-    sort: 'distance',
-    size: 15,
-  });
+  const body = await kakaoGet<PlaceSearchResponse>(
+    '/v2/local/search/keyword.json',
+    { query, x: lng, y: lat, radius: radiusM, sort: 'distance', size: 15 },
+    PLACE_TIMEOUT_MS,
+  );
   return body.documents ?? [];
 }
 

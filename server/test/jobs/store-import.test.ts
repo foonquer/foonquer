@@ -8,6 +8,9 @@ import { createMember, createRestaurant, createVisit } from '../helpers/fixtures
 
 const GANGSEO = '11500'; // 강서구
 const GAYANG = '1150010400'; // 강서구 가양동
+/** 따로 정하지 않은 구(강서구 말고 24개)는 그 구의 첫 동에 가게 한 곳씩 준다 */
+const OTHER_GUS = 24;
+let firstDongOfGu = new Map<string, string>();
 
 /** 상가(상권)정보 상가 한 곳 (기본은 가양동 중심의 칼국숫집) */
 function store(overrides: Partial<PublicStore> & { bizesId: string }): PublicStore {
@@ -41,13 +44,19 @@ function calledUrls(fetchMock: ReturnType<typeof stubStoreApi>) {
   return fetchMock.mock.calls.map(([input]) => urlOf(input));
 }
 
-/** 시군구 코드별 상가 목록을 흉내 낸다 (pageSize개씩 나눠 준다). 다른 구는 결과 없음(03) */
+/**
+ * 시군구 코드별 상가 목록을 흉내 낸다 (pageSize개씩 나눠 준다).
+ * 정하지 않은 구는 그 구 첫 동의 가게 한 곳, 빈 배열이면 결과 없음(03)
+ */
 function stubStoreApi(byGu: Record<string, PublicStore[] | (() => Response)>, pageSize = 1000) {
   const fetchMock = vi.fn((input: string | URL | Request) => {
     const params = urlOf(input).searchParams;
-    const found = byGu[params.get('key') ?? ''];
+    const gu = params.get('key') ?? '';
+    const found = byGu[gu] ?? [
+      store({ bizesId: `G${gu}`, bizesNm: `기본${gu}`, ldongCd: firstDongOfGu.get(gu) }),
+    ];
     if (typeof found === 'function') return Promise.resolve(found());
-    if (!found || found.length === 0) {
+    if (found.length === 0) {
       return Promise.resolve(json({ header: { resultCode: '03', resultMsg: 'NODATA_ERROR' } }));
     }
     const pageNo = Number(params.get('pageNo'));
@@ -63,8 +72,10 @@ function stubStoreApi(byGu: Record<string, PublicStore[] | (() => Response)>, pa
   return fetchMock;
 }
 
-async function restaurantsByName() {
+/** 강서구 가게 (이름 → 행) */
+async function gangseoByName() {
   const rows = await prisma.restaurant.findMany({
+    where: { sigungu: { code: `${GANGSEO}00000` } },
     include: { region: true, sigungu: true },
     orderBy: { id: 'asc' },
   });
@@ -74,6 +85,14 @@ async function restaurantsByName() {
 beforeEach(async () => {
   await resetDb();
   env.DATA_GO_KR_SERVICE_KEY = 'test-data-go-kr-key';
+  const dongs = await prisma.region.findMany({
+    where: { level: 3, code: { startsWith: '11' } },
+    orderBy: { code: 'asc' },
+  });
+  firstDongOfGu = new Map();
+  for (const d of dongs) {
+    if (!firstDongOfGu.has(d.code.slice(0, 5))) firstDongOfGu.set(d.code.slice(0, 5), d.code);
+  }
 });
 
 afterEach(() => {
@@ -104,12 +123,12 @@ describe('store-import — 공공데이터 상가(상권)정보로 가게 가져
 
     expect(result).toMatchObject({
       sigungu: 25,
-      fetched: 6,
+      fetched: 6 + OTHER_GUS,
       skipped: 3,
-      created: 3,
+      created: 3 + OTHER_GUS,
       failed: 0,
     });
-    const rows = await restaurantsByName();
+    const rows = await gangseoByName();
     expect([...rows.keys()].sort()).toEqual(['가양돼지', '가양커피', '명동교자 가양점']);
     expect(rows.get('명동교자 가양점')).toMatchObject({
       bizesId: 'S1',
@@ -164,7 +183,7 @@ describe('store-import — 공공데이터 상가(상권)정보로 가게 가져
     const result = await runStoreImportJob();
 
     expect(result).toMatchObject({ created: 0, updated: 2, closed: 1, failed: 0 });
-    const rows = await restaurantsByName();
+    const rows = await gangseoByName();
     expect(rows.get('새이름')).toMatchObject({ bizesId: 'S1', status: 'A' });
     expect(rows.get('없어질가게')?.status).toBe('C');
     expect(rows.get('숨긴가게')?.status).toBe('H');
@@ -194,8 +213,13 @@ describe('store-import — 공공데이터 상가(상권)정보로 가게 가져
     stubStoreApi({ [GANGSEO]: [store({ bizesId: 'S1', bizesNm: '명동교자', brchNm: '가양점' })] });
     const result = await runStoreImportJob();
 
-    expect(result).toMatchObject({ created: 0, linked: 1, legacyDeleted: 1, legacyKept: 1 });
-    const rows = await prisma.restaurant.findMany({ orderBy: { id: 'asc' } });
+    expect(result).toMatchObject({
+      created: OTHER_GUS,
+      linked: 1,
+      legacyDeleted: 1,
+      legacyKept: 1,
+    });
+    const rows = [...(await gangseoByName()).values()];
     expect(rows.map((r) => [r.id, r.bizesId, r.kakaoPlaceId, r.name])).toEqual([
       [linked.id, 'S1', '777', '명동교자 가양점'],
       [farAway.id, null, null, '명동교자'],
@@ -207,7 +231,7 @@ describe('store-import — 공공데이터 상가(상권)정보로 가게 가져
     const many = Array.from({ length: 1001 }, (_, i) => store({ bizesId: `S${i}` }));
     const fetchMock = stubStoreApi({ [GANGSEO]: many });
     const result = await runStoreImportJob();
-    expect(result).toMatchObject({ created: 1001, failed: 0 });
+    expect(result).toMatchObject({ created: 1001 + OTHER_GUS, failed: 0 });
     const pages = calledUrls(fetchMock)
       .filter((u) => u.searchParams.get('key') === GANGSEO)
       .map((u) => u.searchParams.get('pageNo'));
@@ -228,10 +252,32 @@ describe('store-import — 공공데이터 상가(상권)정보로 가게 가져
 
     const result = await runStoreImportJob();
 
-    expect(result).toMatchObject({ sigungu: 24, created: 1, closed: 0, failed: 1 });
-    const rows = await restaurantsByName();
-    expect(rows.get('그대로')?.status).toBe('A');
-    expect(rows.get('흑석동가게')?.sigungu.code).toBe('1159000000');
+    expect(result).toMatchObject({ sigungu: 24, created: 1 + 23, closed: 0, failed: 1 });
+    expect((await gangseoByName()).get('그대로')?.status).toBe('A');
+    const heukseok = await prisma.restaurant.findUniqueOrThrow({
+      where: { bizesId: 'D1' },
+      include: { sigungu: true },
+    });
+    expect(heukseok.sigungu.code).toBe('1159000000');
+  });
+
+  it('빈 목록이거나 전체 수(totalCount)가 없으면 그 구는 실패로 세고 폐업 처리하지 않는다', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await createRestaurant({ bizesId: 'OLD', name: '그대로' });
+    stubStoreApi({
+      [GANGSEO]: [],
+      '11590': () =>
+        json({
+          header: { resultCode: '00', resultMsg: 'NORMAL SERVICE' },
+          body: { items: [store({ bizesId: 'D1', ldongCd: '1159010500' })] },
+        }),
+    });
+
+    const result = await runStoreImportJob();
+
+    expect(result).toMatchObject({ sigungu: 23, closed: 0, failed: 2 });
+    expect((await gangseoByName()).get('그대로')?.status).toBe('A');
+    expect(await prisma.restaurant.count({ where: { bizesId: 'D1' } })).toBe(0);
   });
 
   it('포털의 Encoding 키를 넣어도 한 번 풀어서 보낸다', async () => {
