@@ -191,7 +191,9 @@ export async function importSigunguStores(
   // 목록에는 있지만 이번에 행으로 바꾸지 못한 가게(좌표가 비었거나 동을 못 찾음)는 그대로 둔다 (폐업·잇기 대상 아님).
   // 가져오지 않는 업종으로 바뀐 가게는 목록에서 빠진 것처럼 폐업 처리한다
   const listed = new Set(
-    stores.filter((s) => !EXCLUDED_INDUSTRY_CODES.has(s.indsSclsCd)).map((s) => s.bizesId),
+    stores
+      .filter((s) => !EXCLUDED_INDUSTRY_CODES.has(s.indsSclsCd))
+      .map((s) => text(s.bizesId, 30)),
   );
   const byBizesId = new Map<string, Existing>();
   const leftovers: Existing[] = [];
