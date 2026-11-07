@@ -44,13 +44,21 @@ function calledUrls(fetchMock: ReturnType<typeof stubStoreApi>) {
   return fetchMock.mock.calls.map(([input]) => urlOf(input));
 }
 
+/** 마지막으로 받은 요청 주소 (페이지마다 다른 응답을 줄 때) */
+let lastUrl: URL | null = null;
+function urlOfLastCall() {
+  if (!lastUrl) throw new Error('요청이 없다');
+  return lastUrl;
+}
+
 /**
  * 시군구 코드별 상가 목록을 흉내 낸다 (pageSize개씩 나눠 준다).
  * 정하지 않은 구는 그 구 첫 동의 가게 한 곳, 빈 배열이면 결과 없음(03)
  */
 function stubStoreApi(byGu: Record<string, PublicStore[] | (() => Response)>, pageSize = 1000) {
   const fetchMock = vi.fn((input: string | URL | Request) => {
-    const params = urlOf(input).searchParams;
+    lastUrl = urlOf(input);
+    const params = lastUrl.searchParams;
     const gu = params.get('key') ?? '';
     const found = byGu[gu] ?? [
       store({ bizesId: `G${gu}`, bizesNm: `기본${gu}`, ldongCd: firstDongOfGu.get(gu) }),
@@ -168,6 +176,7 @@ describe('store-import — 공공데이터 상가(상권)정보로 가게 가져
       store({ bizesId: 'S1', bizesNm: '옛이름' }),
       store({ bizesId: 'S2', bizesNm: '없어질가게' }),
       store({ bizesId: 'S3', bizesNm: '숨긴가게' }),
+      store({ bizesId: 'S5', bizesNm: '좌표빠짐' }),
     ];
     stubStoreApi({ [GANGSEO]: first });
     await runStoreImportJob();
@@ -178,6 +187,8 @@ describe('store-import — 공공데이터 상가(상권)정보로 가게 가져
       [GANGSEO]: [
         store({ bizesId: 'S1', bizesNm: '새이름' }),
         store({ bizesId: 'S4', bizesNm: '돌아온가게' }),
+        // 목록에는 있지만 이번엔 좌표가 비어 행으로 바꾸지 못함 → 폐업으로 보지 않는다
+        store({ bizesId: 'S5', bizesNm: '좌표빠짐', lat: '', lon: '' }),
       ],
     });
     const result = await runStoreImportJob();
@@ -187,6 +198,7 @@ describe('store-import — 공공데이터 상가(상권)정보로 가게 가져
     expect(rows.get('새이름')).toMatchObject({ bizesId: 'S1', status: 'A' });
     expect(rows.get('없어질가게')?.status).toBe('C');
     expect(rows.get('숨긴가게')?.status).toBe('H');
+    expect(rows.get('좌표빠짐')?.status).toBe('A');
     expect(rows.get('돌아온가게')).toMatchObject({ id: closedBefore.id, status: 'A' });
   });
 
@@ -238,6 +250,28 @@ describe('store-import — 공공데이터 상가(상권)정보로 가게 가져
     expect(pages).toEqual(['1', '2']);
   });
 
+  it('뒤 페이지가 결과 없음(03)으로 와서 앞에서 본 전체 수보다 적으면 실패로 보고 폐업 처리하지 않는다', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await createRestaurant({ bizesId: 'OLD', name: '그대로' });
+    const firstPage = Array.from({ length: 1000 }, (_, i) => store({ bizesId: `S${i}` }));
+    stubStoreApi({
+      [GANGSEO]: () =>
+        json(
+          urlOfLastCall().searchParams.get('pageNo') === '1'
+            ? {
+                header: { resultCode: '00', resultMsg: 'NORMAL SERVICE' },
+                body: { items: firstPage, totalCount: 1500 },
+              }
+            : { header: { resultCode: '03', resultMsg: 'NODATA_ERROR' } },
+        ),
+    });
+
+    const result = await runStoreImportJob();
+
+    expect(result).toMatchObject({ failed: 1, closed: 0 });
+    expect((await gangseoByName()).get('그대로')?.status).toBe('A');
+  });
+
   it('구 하나가 실패해도(인증키 오류는 XML로 온다) 나머지는 가져오고, 실패한 구의 가게는 폐업 처리하지 않는다', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await createRestaurant({ bizesId: 'OLD', name: '그대로' });
@@ -264,6 +298,7 @@ describe('store-import — 공공데이터 상가(상권)정보로 가게 가져
   it('빈 목록이거나 전체 수(totalCount)가 없으면 그 구는 실패로 세고 폐업 처리하지 않는다', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await createRestaurant({ bizesId: 'OLD', name: '그대로' });
+    const jongno = await createRestaurant({ bizesId: 'JOLD', dongCode: '1111010100' });
     stubStoreApi({
       [GANGSEO]: [],
       '11590': () =>
@@ -283,6 +318,9 @@ describe('store-import — 공공데이터 상가(상권)정보로 가게 가져
     expect(result).toMatchObject({ sigungu: 22, closed: 0, failed: 3 });
     expect((await gangseoByName()).get('그대로')?.status).toBe('A');
     expect(await prisma.restaurant.count({ where: { bizesId: { in: ['D1', 'J1'] } } })).toBe(0);
+    expect((await prisma.restaurant.findUniqueOrThrow({ where: { id: jongno.id } })).status).toBe(
+      'A',
+    );
   });
 
   it('포털의 Encoding 키를 넣어도 한 번 풀어서 보낸다', async () => {

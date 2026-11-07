@@ -107,6 +107,8 @@ async function storeList(params: Record<string, string | number>) {
  */
 export async function fetchFoodStoresInSigungu(sigunguCode: string): Promise<PublicStore[]> {
   const stores: PublicStore[] = [];
+  // 뒤 페이지가 결과 없음(03, 전체 0)으로 와도 앞에서 본 전체 수보다 적으면 실패다
+  let expected = 0;
   for (let pageNo = 1; ; pageNo += 1) {
     const { items, totalCount } = await storeList({
       divId: 'signguCd',
@@ -116,10 +118,11 @@ export async function fetchFoodStoresInSigungu(sigunguCode: string): Promise<Pub
       pageNo,
       type: 'json',
     });
+    expected = Math.max(expected, totalCount);
     stores.push(...items);
-    if (items.length < PAGE_SIZE || stores.length >= totalCount) {
-      if (stores.length < totalCount) {
-        throw new StoreDataError(`상가정보를 ${totalCount}곳 중 ${stores.length}곳만 받았습니다.`);
+    if (items.length < PAGE_SIZE || stores.length >= expected) {
+      if (stores.length < expected) {
+        throw new StoreDataError(`상가정보를 ${expected}곳 중 ${stores.length}곳만 받았습니다.`);
       }
       return stores;
     }
