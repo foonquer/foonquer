@@ -271,13 +271,18 @@ describe('store-import — 공공데이터 상가(상권)정보로 가게 가져
           header: { resultCode: '00', resultMsg: 'NORMAL SERVICE' },
           body: { items: [store({ bizesId: 'D1', ldongCd: '1159010500' })] },
         }),
+      '11110': () =>
+        json({
+          header: { resultCode: '00', resultMsg: 'NORMAL SERVICE' },
+          body: { items: [store({ bizesId: 'J1', ldongCd: '1111010100' })], totalCount: null },
+        }),
     });
 
     const result = await runStoreImportJob();
 
-    expect(result).toMatchObject({ sigungu: 23, closed: 0, failed: 2 });
+    expect(result).toMatchObject({ sigungu: 22, closed: 0, failed: 3 });
     expect((await gangseoByName()).get('그대로')?.status).toBe('A');
-    expect(await prisma.restaurant.count({ where: { bizesId: 'D1' } })).toBe(0);
+    expect(await prisma.restaurant.count({ where: { bizesId: { in: ['D1', 'J1'] } } })).toBe(0);
   });
 
   it('포털의 Encoding 키를 넣어도 한 번 풀어서 보낸다', async () => {

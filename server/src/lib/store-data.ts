@@ -87,8 +87,13 @@ async function storeList(params: Record<string, string | number>) {
   }
   const raw = Array.isArray(body?.items) ? body.items : (body?.items?.item ?? []);
   // 전체 수를 모르면 다 받았는지 알 수 없다 (일부만 받고 나머지를 폐업으로 처리하지 않게)
-  const totalCount = Number(body?.totalCount);
-  if (!Number.isFinite(totalCount) || totalCount < 0) {
+  // Number(null)·Number('')는 0이 되므로 숫자 또는 숫자 문자열만 받는다
+  const rawCount = body?.totalCount;
+  const totalCount =
+    typeof rawCount === 'number' || (typeof rawCount === 'string' && /^\d+$/.test(rawCount))
+      ? Number(rawCount)
+      : NaN;
+  if (!Number.isInteger(totalCount) || totalCount < 0) {
     throw new StoreDataError(
       `상가정보 totalCount가 올바르지 않습니다: ${String(body?.totalCount)}`,
     );
