@@ -1,16 +1,12 @@
 import { AppError } from '../../common/errors/app-error';
 import { toPageResult } from '../../common/pagination';
 import { findCurrentSeason } from '../../common/season';
-import { TtlCache } from '../../common/ttl-cache';
 import { Prisma } from '../../generated/prisma/client';
-import { KakaoApiError, searchPlacesByKeyword } from '../../lib/kakao-local';
 import { prisma } from '../../lib/prisma';
 import { loadTasteWeights } from '../user/taste-weights';
 import { RegionError } from '../region/region.errors';
 import { type RegionNode, requireSeoulArea, requireSeoulDong } from '../region/region.service';
-import { bboxOfRegionCode } from '../region/seoul-regions';
 import { requireCategory } from '../restaurant/category';
-import { saveKakaoPlaces } from '../restaurant/kakao-place-sync';
 import { loadMyStates, myStateOf } from '../restaurant/my-state';
 import {
   likeContains,
@@ -70,32 +66,6 @@ export async function getSearchHome(userId: bigint, regionId: number | undefined
   };
 }
 
-// 같은 (검색어, 범위)는 24시간 동안 카카오를 다시 부르지 않고 지난번에 찾은 장소 id를 쓴다.
-const KAKAO_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const keywordResults = new TtlCache<string[]>(KAKAO_CACHE_TTL_MS);
-
-/** 카카오 키워드 검색(범위 사각형 안 음식점·카페) → 없는 가게는 DB에 저장하고 찾은 장소 id를 돌려준다 */
-async function kakaoKeywordPlaceIds(keyword: string, area: RegionNode) {
-  const key = `${keyword.toLowerCase()}|${area.code}`;
-  const cached = keywordResults.get(key);
-  if (cached) return cached;
-
-  const bbox = bboxOfRegionCode(area.code);
-  if (!bbox) return [];
-  let places;
-  try {
-    places = await searchPlacesByKeyword(keyword, bbox);
-  } catch (err) {
-    if (!(err instanceof KakaoApiError)) throw err;
-    console.error('카카오 키워드 검색 실패 (SEARCH-02)', err);
-    return [];
-  }
-  await saveKakaoPlaces(places);
-  const ids = [...new Set(places.map((p) => p.id))];
-  keywordResults.set(key, ids);
-  return ids;
-}
-
 /** 가게마다 검색어가 들어간 영수증 메뉴 중 가장 많이 나온 것 */
 async function topMatchedMenus(restaurantIds: bigint[], like: string) {
   const menus = new Map<string, string>();
@@ -125,8 +95,8 @@ async function topMatchedMenus(restaurantIds: bigint[], like: string) {
 }
 
 /**
- * SEARCH-02 맛집 검색.
- * keyword는 ① 카카오 키워드 검색 결과 ② 가게 이름 ③ 영수증 메뉴(인증 완료 방문)에서 찾아 합치고(중복 없음),
+ * SEARCH-02 맛집 검색 (우리 DB만 본다. 카카오 검색 결과는 저장할 수 없어서 쓰지 않는다).
+ * keyword는 ① 가게 이름 ② 업종 소분류(공공데이터, 예: 국수/칼국수) ③ 영수증 메뉴(인증 완료 방문)에서 찾아 합치고(중복 없음),
  * categoryId만 오면 그 카테고리 가게 전체. 둘 다 오면 둘 다 만족하는 가게만.
  */
 export async function searchRestaurants(userId: bigint, q: RestaurantSearchQuery) {
@@ -142,9 +112,7 @@ export async function searchRestaurants(userId: bigint, q: RestaurantSearchQuery
     throw new AppError(RestaurantError.LOCATION_REQUIRED);
   }
   const { dong, sigungu } = await requireSeoulDong(await regionIdOrMyFirst(userId, q.regionId));
-  const area = q.scope === 'DONG' ? dong : sigungu;
 
-  const kakaoIds = keyword ? await kakaoKeywordPlaceIds(keyword, area) : [];
   const like = keyword ? likeContains(keyword) : '';
 
   const where = Prisma.sql`
@@ -155,10 +123,10 @@ export async function searchRestaurants(userId: bigint, q: RestaurantSearchQuery
       keyword
         ? Prisma.sql`AND (
             r.name LIKE ${like} ESCAPE '!'
+            OR r.category_detail LIKE ${like} ESCAPE '!'
             OR r.id IN (
               SELECT v.restaurant_id FROM visit v JOIN visit_receipt_item i ON i.visit_id = v.id
               WHERE v.status IN ('V', 'C') AND i.menu_name LIKE ${like} ESCAPE '!')
-            ${kakaoIds.length > 0 ? Prisma.sql`OR r.kakao_place_id IN (${Prisma.join(kakaoIds)})` : Prisma.empty}
           )`
         : Prisma.empty
     }`;
@@ -193,7 +161,7 @@ export async function searchRestaurants(userId: bigint, q: RestaurantSearchQuery
 
   const lowerKeyword = keyword?.toLowerCase();
   const items = rows.map((r) => {
-    // 이름에 검색어가 있으면 NAME, 아니면 영수증 메뉴로 찾은 것은 MENU, 카카오 검색으로만 찾은 것은 NAME
+    // 이름에 검색어가 있으면 NAME, 아니면 영수증 메뉴로 찾은 것은 MENU, 업종으로만 찾은 것은 NAME
     const menuName = menus.get(r.id.toString()) ?? null;
     const byName = !!lowerKeyword && r.name.toLowerCase().includes(lowerKeyword);
     const matchedBy = !keyword ? null : !byName && menuName ? 'MENU' : 'NAME';
@@ -238,7 +206,7 @@ async function loadPreferredCategories(userId: bigint) {
 }
 
 /**
- * RECO-01 추천 맛집 목록 (카카오는 부르지 않는다: 통계가 있는 가게는 이미 DB에 있다).
+ * RECO-01 추천 맛집 목록.
  * 카테고리를 고르지 않았으면 좋아하는 음식(S-05-1) 가게를 먼저 보여 준다 (3차 멘토링 개인화).
  */
 export async function getRecommendations(userId: bigint, q: RecommendationQuery) {

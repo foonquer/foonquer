@@ -14,6 +14,7 @@ import {
   createRestaurant,
   createVisit,
 } from '../helpers/fixtures';
+import { kakaoCalls, kakaoPlace, stubKakao } from '../helpers/kakao';
 
 const app = createApp();
 
@@ -76,6 +77,8 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('MAP-02 GET /restaurants/{restaurantId}/preview', () => {
@@ -224,14 +227,23 @@ describe('MAP-02 GET /restaurants/{restaurantId}/preview', () => {
 });
 
 describe('REST-01 GET /restaurants/{restaurantId}', () => {
+  let fetchMock: ReturnType<typeof stubKakao>;
+  beforeEach(() => {
+    fetchMock = stubKakao();
+  });
+
   it('기본 정보·영업시간·별점·항목별 평균·비율을 준다', async () => {
     await createActiveSeason();
     const me = await createMember();
+    fetchMock = stubKakao({
+      keyword: () => [
+        kakaoPlace({ id: '1234567890', place_name: '새맛집', phone: '02-1234-5678' }),
+      ],
+    });
     const r = await createRestaurant({
       kakaoPlaceId: '1234567890',
       name: '새맛집',
-      kakaoCategoryName: '음식점 > 한식 > 한정식',
-      phone: '02-1234-5678',
+      categoryDetail: '백반/한정식',
       roadAddress: '서울 강서구 가양로 123',
       jibunAddress: '서울 강서구 가양동 1487',
       lat: 37.5627,
@@ -255,7 +267,7 @@ describe('REST-01 GET /restaurants/{restaurantId}', () => {
       status: 'A',
       categoryId: 1,
       categoryName: '한식',
-      kakaoCategoryName: '음식점 > 한식 > 한정식',
+      categoryDetail: '백반/한정식',
       phone: '02-1234-5678',
       roadAddress: '서울 강서구 가양로 123',
       jibunAddress: '서울 강서구 가양동 1487',
@@ -303,6 +315,72 @@ describe('REST-01 GET /restaurants/{restaurantId}', () => {
         movingVisitId: null,
         isSaved: false,
       },
+    });
+  });
+
+  describe('카카오 실시간 조회 (전화번호는 저장하지 않고, 장소 ID만 저장)', () => {
+    it('장소 ID가 없으면 가게 이름으로 100m 안을 찾아 이름이 맞는 가장 가까운 곳의 ID를 저장한다', async () => {
+      const me = await createMember();
+      const r = await createRestaurant({ name: '스이루 중앙대점', lat: 37.5627, lng: 126.8572 });
+      fetchMock = stubKakao({
+        keyword: () => [
+          kakaoPlace({ id: '111', place_name: '옆집국밥', phone: '02-111-1111' }),
+          kakaoPlace({ id: '222', place_name: '스이루 중앙대점', phone: '02-222-2222' }),
+        ],
+      });
+
+      const res = await detail(me.id, r.id);
+
+      expect(res.body.data).toMatchObject({
+        kakaoPlaceId: '222',
+        phone: '02-222-2222',
+        kakaoPlaceUrl: 'https://place.map.kakao.com/222',
+      });
+      const [params] = kakaoCalls(fetchMock, '/v2/local/search/keyword.json');
+      expect(Object.fromEntries(params)).toEqual({
+        query: '스이루 중앙대점',
+        x: '126.8572',
+        y: '37.5627',
+        radius: '100',
+        sort: 'distance',
+        size: '15',
+      });
+      const saved = await prisma.restaurant.findUniqueOrThrow({ where: { id: r.id } });
+      expect(saved.kakaoPlaceId).toBe('222');
+    });
+
+    it('이름이 맞는 곳이 없으면 전화번호·링크 없이 null', async () => {
+      const me = await createMember();
+      const r = await createRestaurant({ name: '새맛집' });
+      stubKakao({ keyword: () => [kakaoPlace({ id: '111', place_name: '옆집국밥' })] });
+      const res = await detail(me.id, r.id);
+      expect(res.body.data).toMatchObject({ kakaoPlaceId: null, phone: null, kakaoPlaceUrl: null });
+    });
+
+    it('다른 가게가 이미 같은 장소 ID를 가졌으면 저장하지 않고 응답에만 쓴다', async () => {
+      const me = await createMember();
+      await createRestaurant({ name: '새맛집', kakaoPlaceId: '333' });
+      const r = await createRestaurant({ name: '새맛집' });
+      stubKakao({ keyword: () => [kakaoPlace({ id: '333', place_name: '새맛집' })] });
+      const res = await detail(me.id, r.id);
+      expect(res.status).toBe(200);
+      expect(res.body.data.kakaoPlaceId).toBe('333');
+      const saved = await prisma.restaurant.findUniqueOrThrow({ where: { id: r.id } });
+      expect(saved.kakaoPlaceId).toBeNull();
+    });
+
+    it('카카오가 실패하면 전화번호는 null, 저장해 둔 장소 ID로 링크는 준다', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const me = await createMember();
+      const r = await createRestaurant({ kakaoPlaceId: '444' });
+      stubKakao({ keyword: () => 500 });
+      const res = await detail(me.id, r.id);
+      expect(res.status).toBe(200);
+      expect(res.body.data).toMatchObject({
+        kakaoPlaceId: '444',
+        phone: null,
+        kakaoPlaceUrl: 'https://place.map.kakao.com/444',
+      });
     });
   });
 

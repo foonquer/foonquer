@@ -5,6 +5,7 @@ import { toKstIso, toKstIsoOrNull } from '../../common/time';
 import { prisma } from '../../lib/prisma';
 import { loadTasteWeights } from '../user/taste-weights';
 import { businessStatusOf, parseBusinessHours } from './business-hours';
+import { findKakaoPlace } from './kakao-link';
 import { loadMyStates, myStateOf } from './my-state';
 import { RestaurantError } from './restaurant.errors';
 import type { RestaurantLocationQuery } from './restaurant.schema';
@@ -161,16 +162,19 @@ export async function getRestaurantDetail(
   } = await loadContext(userId, restaurantId);
   const conquest = state.conquestState === 'CONQUERED' ? state.currentConquest : null;
   const businessHours = parseBusinessHours(r.businessHours);
+  // 전화번호는 카카오에서 실시간으로만 가져온다 (저장 불가). 장소 ID는 저장해 둔 것이 있으면 카카오가 실패해도 링크를 준다
+  const kakao = await findKakaoPlace(r);
+  const kakaoPlaceId = kakao?.id ?? r.kakaoPlaceId;
 
   return {
     restaurantId: r.id,
-    kakaoPlaceId: r.kakaoPlaceId,
+    kakaoPlaceId,
     name: r.name,
     status: r.status,
     categoryId: r.categoryId,
     categoryName: r.category?.name ?? null,
-    kakaoCategoryName: r.kakaoCategoryName,
-    phone: r.phone,
+    categoryDetail: r.categoryDetail,
+    phone: kakao?.phone || null,
     roadAddress: r.roadAddress,
     jibunAddress: r.jibunAddress,
     sigunguName: r.sigungu.name,
@@ -178,7 +182,7 @@ export async function getRestaurantDetail(
     lat: r.lat.toNumber(),
     lng: r.lng.toNumber(),
     distanceM: distanceMeters(from, { lat: r.lat.toNumber(), lng: r.lng.toNumber() }),
-    kakaoPlaceUrl: `https://place.map.kakao.com/${r.kakaoPlaceId}`,
+    kakaoPlaceUrl: kakaoPlaceId ? `https://place.map.kakao.com/${kakaoPlaceId}` : null,
     businessHours,
     businessStatus: businessStatusOf(businessHours, now),
     rating: ratingOf(r.restaurantStat),

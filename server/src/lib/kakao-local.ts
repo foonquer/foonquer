@@ -39,84 +39,34 @@ export async function kakaoGet<T>(path: string, params: Record<string, string | 
   }
 }
 
-/** 카카오 장소 검색 결과 한 곳 (필요한 필드만) */
+/**
+ * 카카오 장소 검색 결과 한 곳 (필요한 필드만).
+ * 카카오 이용 정책상 장소 ID 말고는 저장하지 않고 응답에만 쓴다.
+ */
 export interface KakaoPlace {
   id: string;
   place_name: string;
-  /** 예) 음식점 > 한식 > 칼국수 */
-  category_name: string;
-  /** FD6 음식점 / CE7 카페 */
-  category_group_code: string;
   phone: string;
-  /** 지번 주소. 예) 서울 강서구 가양동 1487 */
-  address_name: string;
-  road_address_name: string;
-  /** 경도 */
-  x: string;
-  /** 위도 */
-  y: string;
 }
 
 interface PlaceSearchResponse {
-  meta: { is_end: boolean };
   documents: KakaoPlace[];
 }
 
-/** 음식점(FD6)·카페(CE7). 카카오는 요청 한 번에 그룹 코드 하나만 받는다 */
-const PLACE_GROUP_CODES = ['FD6', 'CE7'] as const;
-/** 한 그룹에서 최대 page 3 × size 15 = 45곳 (카카오 한도) */
-const MAX_PAGES = 3;
-const PAGE_SIZE = 15;
-
-/** [남, 서, 북, 동] → 카카오 rect "서(최소 경도),남(최소 위도),동(최대 경도),북(최대 위도)" */
-function rectParam([south, west, north, east]: readonly [number, number, number, number]) {
-  return `${west},${south},${east},${north}`;
-}
-
-async function collectPages(path: string, params: Record<string, string | number>) {
-  const places: KakaoPlace[] = [];
-  for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const body = await kakaoGet<PlaceSearchResponse>(path, { ...params, page, size: PAGE_SIZE });
-    places.push(...(body.documents ?? []));
-    if (body.meta?.is_end !== false) break;
-  }
-  return places;
-}
-
 /**
- * 사각형 안의 음식점·카페 (카테고리 검색, MAP-01).
- * https://developers.kakao.com/docs/latest/ko/local/dev-guide#search-by-category
- */
-export async function searchPlacesInRect(bbox: readonly [number, number, number, number]) {
-  const lists = await Promise.all(
-    PLACE_GROUP_CODES.map((code) =>
-      collectPages('/v2/local/search/category.json', {
-        category_group_code: code,
-        rect: rectParam(bbox),
-      }),
-    ),
-  );
-  return lists.flat();
-}
-
-/**
- * 사각형 안에서 키워드로 찾은 음식점·카페 (키워드 검색, SEARCH-02).
+ * 좌표 둘레 radiusM 안에서 키워드로 찾은 장소, 가까운 순 15곳 (음식점 상세 REST-01).
  * https://developers.kakao.com/docs/latest/ko/local/dev-guide#search-by-keyword
  */
-export async function searchPlacesByKeyword(
-  query: string,
-  bbox: readonly [number, number, number, number],
-) {
-  const lists = await Promise.all(
-    PLACE_GROUP_CODES.map((code) =>
-      collectPages('/v2/local/search/keyword.json', {
-        query,
-        category_group_code: code,
-        rect: rectParam(bbox),
-      }),
-    ),
-  );
-  return lists.flat();
+export async function searchPlacesNear(query: string, lat: number, lng: number, radiusM: number) {
+  const body = await kakaoGet<PlaceSearchResponse>('/v2/local/search/keyword.json', {
+    query,
+    x: lng,
+    y: lat,
+    radius: radiusM,
+    sort: 'distance',
+    size: 15,
+  });
+  return body.documents ?? [];
 }
 
 interface RegionCodeResponse {

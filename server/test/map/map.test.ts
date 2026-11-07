@@ -13,12 +13,11 @@ import {
   createRestaurant,
   createVisit,
 } from '../helpers/fixtures';
-import { kakaoCalls, kakaoPlace, stubKakao } from '../helpers/kakao';
+import { stubKakao } from '../helpers/kakao';
 
 const app = createApp();
 
 const GAYANG = '1150010400'; // 강서구 가양동
-const DEUNGCHON = '1150010200'; // 강서구 등촌동
 
 // 가양동 중심(37.5664, 126.8447) 둘레, 대각선 약 1.9km
 const BOUNDS = { swLat: '37.5600', swLng: '126.8380', neLat: '37.5730', neLng: '126.8520' };
@@ -44,186 +43,22 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('MAP-01 GET /map/restaurants — 카카오 가게 저장', () => {
-  it('카카오 음식점(FD6)·카페(CE7)를 영역으로 불러 없는 가게를 저장한다', async () => {
-    const fetchMock = stubKakao({
-      category: (params) =>
-        params.get('category_group_code') === 'FD6'
-          ? [
-              kakaoPlace({
-                id: '1001',
-                place_name: '옛날손칼국수',
-                category_name: '음식점 > 한식 > 국수 > 칼국수',
-                x: '126.8450',
-                y: '37.5665',
-              }),
-              kakaoPlace({
-                id: '1002',
-                place_name: '가양고기집',
-                category_name: '음식점 > 한식 > 육류,고기 > 삼겹살',
-                x: '126.8480',
-                y: '37.5690',
-                phone: '',
-              }),
-            ]
-          : [
-              kakaoPlace({
-                id: '2001',
-                place_name: '가양커피',
-                category_name: '음식점 > 카페 > 커피전문점',
-                category_group_code: 'CE7',
-                x: '126.8400',
-                y: '37.5620',
-              }),
-            ],
-    });
-    const me = await createMember();
-
-    const res = await getMap(me.id);
-
-    expect(res.status).toBe(200);
-    expect(res.body.message).toBe('지도 음식점을 조회했어요.');
-    expect(res.body.data.kakaoSynced).toBe(true);
-    expect(res.body.data.truncated).toBe(false);
-    expect(res.body.data.totalCount).toBe(3);
-    // 화면 중심에서 가까운 순
-    expect(res.body.data.items.map((i: { name: string }) => i.name)).toEqual([
-      '옛날손칼국수',
-      '가양고기집',
-      '가양커피',
-    ]);
-    expect(res.body.data.items[0]).toEqual({
-      restaurantId: expect.any(Number),
-      name: '옛날손칼국수',
-      categoryId: 1,
-      categoryName: '한식',
-      lat: 37.5665,
-      lng: 126.845,
-      conquestState: 'NOT_CONQUERED',
-      conqueredInPastSeason: false,
-      isSaved: false,
-    });
-
-    const gayang = await region(GAYANG);
-    const saved = await prisma.restaurant.findMany({ orderBy: { kakaoPlaceId: 'asc' } });
-    expect(saved.map((r) => [r.kakaoPlaceId, r.categoryId, r.regionId, r.sigunguId])).toEqual([
-      ['1001', 1, gayang.id, gayang.parentId],
-      ['1002', 6, gayang.id, gayang.parentId],
-      ['2001', 11, gayang.id, gayang.parentId],
-    ]);
-    expect(saved[0]).toMatchObject({
-      kakaoCategoryName: '음식점 > 한식 > 국수 > 칼국수',
-      phone: '02-1234-5678',
-      roadAddress: '서울 강서구 가양로 123',
-      jibunAddress: '서울 강서구 가양동 1487',
-      status: 'A',
-    });
-    expect(saved[1].phone).toBeNull();
-
-    // 카카오 요청: 그룹마다 한 번, rect는 화면을 소수점 3자리 격자로 넓힌 사각형 (서,남,동,북)
-    const calls = kakaoCalls(fetchMock, '/v2/local/search/category.json');
-    expect(calls.map((p) => p.get('category_group_code')).sort()).toEqual(['CE7', 'FD6']);
-    expect(calls[0].get('rect')).toBe('126.838,37.56,126.852,37.573');
-    expect(calls[0].get('size')).toBe('15');
-    expect(calls[0].get('page')).toBe('1');
+describe('MAP-01 GET /map/restaurants — 조회·필터', () => {
+  let fetchMock: ReturnType<typeof stubKakao>;
+  beforeEach(() => {
+    fetchMock = stubKakao();
   });
 
-  it('지번 주소로 동을 못 찾으면 좌표로 찾고, 서울이 아니면 저장하지 않는다', async () => {
-    const fetchMock = stubKakao({
-      category: (params) =>
-        params.get('category_group_code') === 'FD6'
-          ? [
-              kakaoPlace({ id: '1', address_name: '', x: '126.8450', y: '37.5665' }),
-              kakaoPlace({
-                id: '2',
-                address_name: '경기 고양시 덕양구 화정동 1',
-                x: '126.84',
-                y: '37.57',
-              }),
-              kakaoPlace({
-                id: '3',
-                address_name: '서울 강서구 없는동 1',
-                x: '126.8451',
-                y: '37.5666',
-              }),
-            ]
-          : [],
-      coord2region: (params) => (params.get('x') === '126.8451' ? null : GAYANG),
-    });
+  it('DB 가게만 보고 카카오는 부르지 않는다 (카카오 결과는 저장할 수 없다)', async () => {
     const me = await createMember();
-
-    await getMap(me.id);
-
-    const saved = await prisma.restaurant.findMany({ select: { kakaoPlaceId: true } });
-    expect(saved.map((r) => r.kakaoPlaceId)).toEqual(['1']);
-    // 경기 주소는 좌표 변환도 부르지 않는다
-    expect(kakaoCalls(fetchMock, '/v2/local/geo/coord2regioncode.json')).toHaveLength(2);
-  });
-
-  it('이미 있는 가게는 이름·전화·주소·좌표만 바꾸고 카테고리·동·상태는 그대로 둔다', async () => {
-    const deungchon = await region(DEUNGCHON);
-    const existing = await createRestaurant({
-      kakaoPlaceId: '1001',
-      name: '옛 이름',
-      categoryId: 12,
-      dongCode: DEUNGCHON,
-      lat: 37.5665,
-      lng: 126.845,
-    });
-    stubKakao({
-      category: (params) =>
-        params.get('category_group_code') === 'FD6'
-          ? [kakaoPlace({ id: '1001', place_name: '새 이름', x: '126.8460', y: '37.5670' })]
-          : [],
-    });
-    const me = await createMember();
-
-    await getMap(me.id);
-
-    const updated = await prisma.restaurant.findUniqueOrThrow({ where: { id: existing.id } });
-    expect(updated).toMatchObject({
-      name: '새 이름',
-      phone: '02-1234-5678',
-      jibunAddress: '서울 강서구 가양동 1487',
-      categoryId: 12,
-      regionId: deungchon.id,
-      status: 'A',
-    });
-    expect(updated.lat.toNumber()).toBe(37.567);
-    expect(updated.lng.toNumber()).toBe(126.846);
-  });
-
-  it('같은 영역은 24시간 동안 카카오를 다시 부르지 않는다', async () => {
-    const fetchMock = stubKakao();
-    const me = await createMember();
-
-    await getMap(me.id);
-    // 소수점 3자리 격자가 같으면 같은 영역
-    const again = await getMap(me.id, { ...BOUNDS, swLat: '37.5601' });
-    expect(again.body.data.kakaoSynced).toBe(true);
-    expect(kakaoCalls(fetchMock, '/v2/local/search/category.json')).toHaveLength(2);
-
-    await getMap(me.id, { ...BOUNDS, swLat: '37.5590' });
-    expect(kakaoCalls(fetchMock, '/v2/local/search/category.json')).toHaveLength(4);
-  });
-
-  it('카카오가 실패해도 에러 없이 DB 결과만 주고(kakaoSynced false), 다음 요청에 다시 부른다', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const fetchMock = stubKakao({ category: () => 500 });
-    await createRestaurant({ name: 'DB가게', lat: 37.5665, lng: 126.845 });
-    const me = await createMember();
-
+    await createRestaurant({ name: '공공데이터가게', lat: 37.5665, lng: 126.845 });
     const res = await getMap(me.id);
     expect(res.status).toBe(200);
-    expect(res.body.data.kakaoSynced).toBe(false);
-    expect(res.body.data.items.map((i: { name: string }) => i.name)).toEqual(['DB가게']);
-
-    await getMap(me.id);
-    expect(kakaoCalls(fetchMock, '/v2/local/search/category.json').length).toBeGreaterThan(2);
+    expect(res.body.data.items.map((i: { name: string }) => i.name)).toEqual(['공공데이터가게']);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('서울 밖 영역이면 카카오를 부르지 않고 빈 목록', async () => {
-    const fetchMock = stubKakao();
+  it('서울 밖 영역이면 빈 목록', async () => {
     const me = await createMember();
     const res = await getMap(me.id, {
       swLat: '35.1500',
@@ -232,19 +67,7 @@ describe('MAP-01 GET /map/restaurants — 카카오 가게 저장', () => {
       neLng: '129.0600',
     });
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual({
-      items: [],
-      totalCount: 0,
-      truncated: false,
-      kakaoSynced: true,
-    });
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-});
-
-describe('MAP-01 GET /map/restaurants — 조회·필터', () => {
-  beforeEach(() => {
-    stubKakao();
+    expect(res.body.data).toEqual({ items: [], totalCount: 0, truncated: false });
   });
 
   it('영역 안 영업 중 가게만, 내 정복 상태·저장 여부를 붙여 준다', async () => {
@@ -303,8 +126,7 @@ describe('MAP-01 GET /map/restaurants — 조회·필터', () => {
     expect(await names('NOT_CONQUERED')).toEqual(['미정복', '이동중']);
   });
 
-  it('mineOnly=true면 내가 찜한 곳·정복한 곳(지난 시즌·이동 중 포함)만 주고 카카오는 부르지 않는다', async () => {
-    const fetchMock = stubKakao();
+  it('mineOnly=true면 내가 찜한 곳·정복한 곳(지난 시즌·이동 중 포함)만 준다', async () => {
     const season = await createActiveSeason(2);
     const past = await createPastSeason(1);
     const me = await createMember();
@@ -331,8 +153,6 @@ describe('MAP-01 GET /map/restaurants — 조회·필터', () => {
       '정복',
       '지난시즌',
     ]);
-    expect(res.body.data.kakaoSynced).toBe(true);
-    expect(kakaoCalls(fetchMock, '/v2/local/search/category.json')).toHaveLength(0);
   });
 
   it('이번 시즌에 정복한 가게라도 별점 대기 방문이 있으면 이동 중이라 NOT_CONQUERED 쪽에 나온다', async () => {

@@ -13,6 +13,7 @@ import {
   createRestaurant,
   createVisit,
 } from '../helpers/fixtures';
+import { stubKakao } from '../helpers/kakao';
 import { resetStorageMock } from '../helpers/storage-mock';
 
 vi.mock('../../src/lib/storage', async () =>
@@ -29,6 +30,7 @@ beforeEach(async () => {
 afterEach(() => {
   vi.clearAllMocks();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 /** 별점 대기(V) 방문 인증 */
@@ -347,6 +349,7 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
       4.5, 3,
     ]);
 
+    stubKakao();
     const detail = await request(app)
       .get(`/api/v1/restaurants/${shop.id}`)
       .set('Authorization', bearer(viewer.id));

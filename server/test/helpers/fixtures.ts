@@ -50,7 +50,7 @@ export async function createRestaurant(
   placeSeq += 1;
   return prisma.restaurant.create({
     data: {
-      kakaoPlaceId: `test-${placeSeq}`,
+      bizesId: `test-${placeSeq}`,
       name: `가게${placeSeq}`,
       categoryId: 1,
       regionId: dong.id,

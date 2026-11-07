@@ -39,6 +39,8 @@ const envSchema = z
       .url()
       .default('http://localhost:3000')
       .transform((v) => v.replace(/\/+$/, '')),
+    /** 공공데이터포털 일반 인증키 (상가(상권)정보 API, 주기 작업 store-import). 비우면 가게를 가져오지 않는다 */
+    DATA_GO_KR_SERVICE_KEY: blankAsUndefined(z.string().optional()),
     /** 카카오 REST API 키 (카카오 로그인 client_id, 로컬 API 호출에 같이 쓴다) */
     KAKAO_REST_API_KEY: blankAsUndefined(z.string().optional()),
     /** 카카오 로컬 API만 다른 앱의 REST 키로 부를 때 (카카오맵 무료 쿼터가 계정의 다른 앱에 있을 때). 비우면 KAKAO_REST_API_KEY */
