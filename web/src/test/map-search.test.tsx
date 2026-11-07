@@ -93,7 +93,6 @@ describe('홈 지도 (MAP-01·02)', () => {
         items: [pin(1, '옛날손칼국수', 'CONQUERED'), pin(2, '이가네떡볶이', 'NOT_CONQUERED')],
         totalCount: 2,
         truncated: false,
-        kakaoSynced: true,
       }),
     });
     renderRoute('/');
@@ -120,7 +119,7 @@ describe('홈 지도 (MAP-01·02)', () => {
   it('찜하거나 정복한 가게가 없으면 지도에 안내를 띄운다', async () => {
     mockApi({
       ...regionApi,
-      'GET /map/restaurants': ok({ items: [], totalCount: 0, truncated: false, kakaoSynced: true }),
+      'GET /map/restaurants': ok({ items: [], totalCount: 0, truncated: false }),
     });
     renderRoute('/');
 
@@ -130,7 +129,7 @@ describe('홈 지도 (MAP-01·02)', () => {
   it('프로필 줄에 레벨·대표 칭호를 보여 준다 (HOME-01)', async () => {
     mockApi({
       ...regionApi,
-      'GET /map/restaurants': ok({ items: [], totalCount: 0, truncated: false, kakaoSynced: true }),
+      'GET /map/restaurants': ok({ items: [], totalCount: 0, truncated: false }),
       'GET /home/summary': ok({
         mukkaebi: { level: 7, stage: 'BABY', stageName: '아기', equipped: {} },
         title: null,
@@ -164,7 +163,6 @@ describe('홈 지도 (MAP-01·02)', () => {
         items: [pin(4, '이가네떡볶이', 'NOT_CONQUERED')],
         totalCount: 1,
         truncated: false,
-        kakaoSynced: true,
       }),
       'GET /restaurants/:id/preview': ok({
         restaurantId: 4,
@@ -200,7 +198,7 @@ describe('홈 지도 (MAP-01·02)', () => {
   it('지역 선택 시트에서 동네를 바꾸면 그 동네 지도를 다시 불러온다', async () => {
     const server = mockApi({
       ...regionApi,
-      'GET /map/restaurants': ok({ items: [], totalCount: 0, truncated: false, kakaoSynced: true }),
+      'GET /map/restaurants': ok({ items: [], totalCount: 0, truncated: false }),
     });
     renderRoute('/');
 
@@ -230,7 +228,7 @@ describe('음식점 상세 (REST-01)', () => {
         status: 'A',
         categoryId: 5,
         categoryName: '분식',
-        kakaoCategoryName: '분식',
+        categoryDetail: '김밥/만두/분식',
         phone: '02-123-4567',
         roadAddress: '서울 강서구 가양로 12',
         jibunAddress: null,

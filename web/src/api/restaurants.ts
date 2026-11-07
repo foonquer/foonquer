@@ -41,7 +41,7 @@ export type MapRestaurant = {
 
 /** mineOnly: 내가 찜한 곳·정복한 곳만 */
 export const getMapRestaurants = (query: Bounds & { mineOnly?: boolean }, signal?: AbortSignal) =>
-  api.get<{ items: MapRestaurant[]; totalCount: number; truncated: boolean; kakaoSynced: boolean }>(
+  api.get<{ items: MapRestaurant[]; totalCount: number; truncated: boolean }>(
     '/map/restaurants',
     query,
     signal,
@@ -88,7 +88,9 @@ export type RestaurantDetail = {
   status: 'A' | 'C';
   categoryId: number | null;
   categoryName: string | null;
-  kakaoCategoryName: string | null;
+  /** 공공데이터 업종 소분류. 예) 국수/칼국수 */
+  categoryDetail: string | null;
+  /** 카카오에서 실시간으로 찾은 전화번호 (저장하지 않는다) */
   phone: string | null;
   roadAddress: string | null;
   jibunAddress: string | null;
