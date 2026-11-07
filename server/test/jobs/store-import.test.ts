@@ -177,6 +177,7 @@ describe('store-import — 공공데이터 상가(상권)정보로 가게 가져
       store({ bizesId: 'S2', bizesNm: '없어질가게' }),
       store({ bizesId: 'S3', bizesNm: '숨긴가게' }),
       store({ bizesId: 'S5', bizesNm: '좌표빠짐' }),
+      store({ bizesId: 'S6', bizesNm: '구내식당됨' }),
     ];
     stubStoreApi({ [GANGSEO]: first });
     await runStoreImportJob();
@@ -189,16 +190,24 @@ describe('store-import — 공공데이터 상가(상권)정보로 가게 가져
         store({ bizesId: 'S4', bizesNm: '돌아온가게' }),
         // 목록에는 있지만 이번엔 좌표가 비어 행으로 바꾸지 못함 → 폐업으로 보지 않는다
         store({ bizesId: 'S5', bizesNm: '좌표빠짐', lat: '', lon: '' }),
+        // 가져오지 않는 업종으로 바뀜 → 폐업
+        store({
+          bizesId: 'S6',
+          bizesNm: '구내식당됨',
+          indsSclsCd: 'I20701',
+          indsSclsNm: '구내식당',
+        }),
       ],
     });
     const result = await runStoreImportJob();
 
-    expect(result).toMatchObject({ created: 0, updated: 2, closed: 1, failed: 0 });
+    expect(result).toMatchObject({ created: 0, updated: 2, closed: 2, failed: 0 });
     const rows = await gangseoByName();
     expect(rows.get('새이름')).toMatchObject({ bizesId: 'S1', status: 'A' });
     expect(rows.get('없어질가게')?.status).toBe('C');
     expect(rows.get('숨긴가게')?.status).toBe('H');
     expect(rows.get('좌표빠짐')?.status).toBe('A');
+    expect(rows.get('구내식당됨')?.status).toBe('C');
     expect(rows.get('돌아온가게')).toMatchObject({ id: closedBefore.id, status: 'A' });
   });
 
@@ -212,7 +221,7 @@ describe('store-import — 공공데이터 상가(상권)정보로 가게 가져
       lat: 37.5666,
       lng: 126.8449,
     });
-    await createVisit(me.id, linked.id);
+    const visit = await createVisit(me.id, linked.id);
     const farAway = await createRestaurant({
       bizesId: null,
       name: '명동교자',
@@ -237,6 +246,10 @@ describe('store-import — 공공데이터 상가(상권)정보로 가게 가져
       [farAway.id, null, null, '명동교자'],
     ]);
     expect(rows[0].lat.toNumber()).toBe(37.5664);
+    // 방문 기록은 같은 가게 id를 그대로 가리킨다
+    expect((await prisma.visit.findUniqueOrThrow({ where: { id: visit.id } })).restaurantId).toBe(
+      linked.id,
+    );
   });
 
   it('1000곳이 넘으면 페이지를 이어 받는다', async () => {
