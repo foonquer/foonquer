@@ -30,7 +30,13 @@ export function RestaurantCard({ item, note }: Props) {
       <span className={styles.text}>
         <span className={styles.name}>{item.name}</span>
         <span className={styles.meta}>
-          {joinDot([item.categoryName, formatDistance(item.distanceM), note])}
+          {joinDot([
+            item.categoryName,
+            // "한식 · 해장국": 같은 한식끼리도 무엇을 파는지 보이게
+            item.categoryDetail !== item.categoryName ? item.categoryDetail : null,
+            formatDistance(item.distanceM),
+            note,
+          ])}
         </span>
         <span className={styles.score}>{scoreLine}</span>
       </span>

@@ -64,10 +64,11 @@
   pointer-events: none;
 }
 
+/* 오른쪽 위: 왼쪽 아래는 카카오 로고·축척 자리라 가리지 않는다 */
 .legend {
   position: absolute;
-  bottom: 10px;
-  left: 10px;
+  top: 10px;
+  right: 10px;
   z-index: 2;
   pointer-events: none;
   display: flex;

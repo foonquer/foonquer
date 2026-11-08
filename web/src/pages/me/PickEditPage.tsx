@@ -169,6 +169,7 @@ function Editor({ initial, max }: { initial: Pick[]; max: number }) {
               keyword ? `'${keyword}'에 맞는 정복한 가게가 없어요` : '아직 정복한 가게가 없어요'
             }
             description="방문 인증하고 맛 별점을 남기면 PICK으로 고를 수 있어요."
+            action={keyword ? undefined : { label: '맛집 찾으러 가기', to: '/search' }}
           />
         ) : (
           <ul className={styles.rows}>

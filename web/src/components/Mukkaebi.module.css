@@ -7,6 +7,17 @@
   background: var(--mk-cream);
 }
 
+/* 내 먹깨비(단계·아이템): 피그마 홈 프로필(324:5788)처럼 동그라미 안에 서고, 모자는 위로 삐져나온다 */
+.avatar[data-figure='true'] {
+  overflow: visible;
+}
+
+.figure {
+  position: absolute;
+  top: -12.1%;
+  left: 3.3%;
+}
+
 /* Figma: 먹깨비 그림이 동그라미보다 13% 크고 위로 살짝 올라가 있다 */
 .image {
   position: absolute;

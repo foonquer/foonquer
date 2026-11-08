@@ -8,7 +8,6 @@ import {
   type MapRestaurant,
 } from '../../api/restaurants';
 import { getMe } from '../../api/users';
-import bellIcon from '../../assets/icons/bell.svg';
 import flagIcon from '../../assets/icons/flag.svg';
 import gearIcon from '../../assets/icons/gear.svg';
 import locateIcon from '../../assets/icons/locate.svg';
@@ -16,6 +15,7 @@ import searchIcon from '../../assets/icons/search.svg';
 import { MapView } from '../../components/MapView';
 import { MukkaebiAvatar } from '../../components/Mukkaebi';
 import { MyLocationMarker } from '../../components/MyLocationMarker';
+import { NotificationBell } from '../../components/NotificationBell';
 import { RegionChip } from '../../components/RegionChip';
 import { RegionSelectSheet } from '../../components/RegionSelectSheet';
 import { EmptyState, Loading } from '../../components/StateViews';
@@ -57,6 +57,15 @@ export function HomePage() {
   const me = useAsync(getMe, []);
   // 레벨·칭호 — 못 받아도 홈은 그대로 쓴다
   const summary = useAsync(getHomeSummary, []);
+  // 다른 앱에 갔다가 돌아오면 안 읽은 알림 수·레벨을 다시 받는다 (reload 중에는 이전 값을 그대로 보여 준다)
+  const reloadSummary = summary.reload;
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') reloadSummary();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [reloadSummary]);
   const title = summary.data ? (summary.data.title ?? summary.data.rank.main?.tierTitle) : null;
   const { region, error: regionError, retry } = useViewRegion();
   const { coords } = useMyCoords();
@@ -205,7 +214,11 @@ export function HomePage() {
     <div className={styles.page}>
       <header className={styles.top}>
         <div className={styles.profileRow}>
-          <MukkaebiAvatar size={54} />
+          <MukkaebiAvatar
+            size={54}
+            stage={myMukkaebi?.stage}
+            wearing={myMukkaebi ? wearingOf(myMukkaebi) : undefined}
+          />
           <div className={styles.profileText}>
             {summary.data && <span className={styles.level}>LV.{summary.data.mukkaebi.level}</span>}
             <p className={styles.nameRow}>
@@ -213,14 +226,15 @@ export function HomePage() {
               {title && <span className={styles.title}>{title}</span>}
             </p>
           </div>
-          <Link to="/notifications" className={styles.iconButton} aria-label="알림">
-            <img src={bellIcon} alt="" width={24} height={24} />
-          </Link>
+          <NotificationBell
+            unread={summary.data?.unreadNotificationCount ?? 0}
+            className={styles.iconButton}
+          />
           <Link to="/me/settings" className={styles.iconButton} aria-label="설정">
             <img src={gearIcon} alt="" width={24} height={23} />
           </Link>
         </div>
-        <Link to="/search" className={styles.search}>
+        <Link to="/search" state={{ focusSearch: true }} className={styles.search}>
           <img src={searchIcon} alt="" width={16} height={16} />
           음식점 검색
         </Link>

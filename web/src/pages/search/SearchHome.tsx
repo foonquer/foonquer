@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { getSearchHome, type Category } from '../../api/restaurants';
 import chevronRight from '../../assets/icons/chevron-right-green.svg';
 import { AppHeader } from '../../components/AppHeader';
-import { ButtonLink } from '../../components/Button';
 import { RegionChip } from '../../components/RegionChip';
 import { RegionSelectSheet } from '../../components/RegionSelectSheet';
 import { Screen } from '../../components/Screen';
@@ -23,6 +22,8 @@ import styles from './Search.module.css';
 /** 검색 홈: 검색창·지역·최근 검색·음식 종류 (SEARCH-01) */
 export function SearchHome() {
   const navigate = useNavigate();
+  const focusSearch =
+    (useLocation().state as { focusSearch?: boolean } | null)?.focusSearch === true;
   const { region, error: regionError, retry } = useViewRegion();
   const [recent, setRecent] = useState(recentSearches.list);
   const [regionOpen, setRegionOpen] = useState(false);
@@ -39,10 +40,14 @@ export function SearchHome() {
     go({ type: 'category', categoryId: c.categoryId, name: c.name });
 
   return (
-    <Screen footer={<ButtonLink to="/recommendations">추천맛집 둘러보기</ButtonLink>}>
+    <Screen>
       <AppHeader title="맛집 검색" />
       <div className={styles.content}>
-        <SearchBar onSubmit={(keyword) => go({ type: 'keyword', keyword })} />
+        {/* 홈 검색창을 누르고 들어왔을 때만 바로 입력할 수 있게 (빈 화면의 "맛집 찾으러 가기"는 둘러보기) */}
+        <SearchBar
+          autoFocus={focusSearch}
+          onSubmit={(keyword) => go({ type: 'keyword', keyword })}
+        />
         <div className={styles.regionRow}>
           <RegionChip region={region} onClick={() => setRegionOpen(true)} />
         </div>

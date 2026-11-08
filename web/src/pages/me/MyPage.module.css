@@ -14,18 +14,18 @@
   color: var(--mk-ink);
 }
 
-.bell {
+/* 홈과 같은 종·톱니 아이콘 버튼 */
+.bell,
+.settings {
   display: flex;
-  padding: 4px;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 44px;
 }
 
 .settings {
-  padding: 6px 12px;
-  border-radius: 14px;
-  background: var(--mk-white);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--mk-forest);
+  margin-right: -6px;
 }
 
 .content {

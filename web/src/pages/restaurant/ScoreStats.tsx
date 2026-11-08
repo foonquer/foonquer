@@ -27,8 +27,28 @@ function emphasisOf(r: RestaurantDetail) {
 export function ScoreStats({ r }: { r: RestaurantDetail }) {
   const [open, setOpen] = useState(false);
   const percent = (v: number | null) => (v === null ? '–' : `${v}%`);
-  const emphasis = emphasisOf(r);
+  // 인증 평가가 하나도 없으면 "–" 칸 대신 한 줄로
+  // (방문 인증만 있고 리뷰가 없을 때도 방문율은 계산되니 값이 있으면 보여 준다)
+  if (r.rating.reviewCount === 0) {
+    const hasRates = r.stats?.localVisitRate != null || r.stats?.revisitRate != null;
+    return (
+      <section className={styles.statsCard} aria-label="항목별 평가">
+        {hasRates && (
+          <div className={styles.statsHead}>
+            <p>방문 기록</p>
+            <p className={styles.visitRates}>
+              현지인 방문 {percent(r.stats.localVisitRate)} · 재방문 {percent(r.stats.revisitRate)}
+            </p>
+          </div>
+        )}
+        <p className={styles.statsEmpty}>
+          아직 항목별 평가가 없어요. 첫 방문 인증의 별점부터 여기에 모여요.
+        </p>
+      </section>
+    );
+  }
 
+  const emphasis = emphasisOf(r);
   return (
     <section className={styles.statsCard} aria-label="항목별 평가">
       <div className={styles.statsHead}>

@@ -6,6 +6,7 @@ import {
   type MukjjangSigungu,
   type MySigungu,
 } from '../../api/ranking';
+import { getMe } from '../../api/users';
 import mukkaebi from '../../assets/illust/mukkaebi.svg';
 import { Screen } from '../../components/Screen';
 import { SeasonSelect } from '../../components/SeasonSelect';
@@ -103,7 +104,16 @@ function StatusTab({ seasonId, onSeason }: { seasonId?: number; onSeason: (id: n
       </div>
       <section className={styles.hero} aria-label="이번 시즌 정복">
         <p className={styles.heroTitle}>총 {data.totalConquestCount}곳 정복</p>
-        <p className={styles.heroSub}>{data.sigunguCount}개 구 탐험 중</p>
+        <p className={styles.heroSub}>
+          {data.totalConquestCount > 0
+            ? `${data.sigunguCount}개 구 탐험 중`
+            : '첫 맛집을 정복하면 여기에 쌓여요'}
+        </p>
+        {data.totalConquestCount === 0 && (
+          <Link to="/search" className={styles.heroAction}>
+            맛집 찾으러 가기 ›
+          </Link>
+        )}
       </section>
 
       {first && (
@@ -119,13 +129,17 @@ function StatusTab({ seasonId, onSeason }: { seasonId?: number; onSeason: (id: n
             )}
             <span className={styles.chip}>{first.sigunguName}</span>
           </p>
-          <p className={styles.muted}>활동 탐험가 {first.activeExplorerCount}명 중</p>
+          <p className={styles.muted}>
+            {first.activeExplorerCount > 0
+              ? `활동 탐험가 ${first.activeExplorerCount}명 중`
+              : '아직 이 구에서 정복한 탐험가가 없어요'}
+          </p>
         </Link>
       )}
 
       <div className={styles.sectionHead}>
-        <h2 className={styles.sectionTitle}>내가 정복한 구</h2>
-        <span>내 동네 · 정복 많은 순</span>
+        <h2 className={styles.sectionTitle}>내 동네 · 정복한 구</h2>
+        <span>내 동네 먼저 · 정복 많은 순</span>
       </div>
       {data.items.length === 0 ? (
         <EmptyState
@@ -195,14 +209,18 @@ function RankTab({
   onSeason: (id: number) => void;
 }) {
   const { data, error, reload } = useAsync(() => getMukjjangMap(seasonId), [seasonId]);
+  // 순위가 있는 구가 없으면 내 동네 구부터 보여 준다 — 못 받아도 지도는 그대로
+  const me = useAsync(getMe, []).data;
   const [picked, setPicked] = useState<number | null>(initialSigunguId);
   if (error) return <Failed error={error} onRetry={reload} />;
   if (!data) return <Loading />;
 
-  // 처음에는 내가 순위가 있는 구 (없으면 먹짱이 있는 첫 구)
+  // 처음에는 내가 순위가 있는 구 → 내 동네 구 → 먹짱이 있는 첫 구
+  const homeSigunguId = me?.localRegions[0]?.sigunguId;
   const selected =
     data.items.find((g) => g.sigunguId === picked) ??
     data.items.find((g) => g.myRank !== null) ??
+    data.items.find((g) => g.sigunguId === homeSigunguId) ??
     data.items.find((g) => g.mukjjang) ??
     data.items[0];
   const query = seasonId ? `?seasonId=${seasonId}` : '';

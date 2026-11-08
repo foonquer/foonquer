@@ -13,6 +13,7 @@ import { useToast } from '../../components/Toast';
 import { errorMessage } from '../../lib/api';
 import { useViewRegion } from '../../lib/region';
 import { useMyCoords } from '../../lib/useMyCoords';
+import { NearbyStores } from './NearbyStores';
 import { parseRecoType, RECO_EMPTY, RECO_OPTIONS } from './recoTypes';
 import styles from './RecommendationList.module.css';
 
@@ -128,7 +129,14 @@ export function RecommendationListPage() {
         ) : !current ? (
           <Loading label="추천 맛집을 불러오는 중" />
         ) : current.items.length === 0 ? (
-          <EmptyState title="아직 추천할 맛집이 없어요" description={RECO_EMPTY[type]} />
+          <>
+            <EmptyState
+              title="아직 추천할 맛집이 없어요"
+              description={RECO_EMPTY[type]}
+              action={{ label: '검색으로 더 찾기', to: '/search' }}
+            />
+            <NearbyStores region={region} />
+          </>
         ) : (
           <>
             <h2 className={styles.title}>

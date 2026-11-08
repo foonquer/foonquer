@@ -1,5 +1,6 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import eggArt from '../assets/illust/mukkaebi-egg.svg';
 import { resetViewRegionForTest } from '../lib/region';
 import { setMyCoordsForTest } from '../lib/useMyCoords';
 import { fail, mockApi, ok } from './http';
@@ -120,6 +121,42 @@ describe('홈 지도 (MAP-01·02)', () => {
     expect(q.get('mineOnly')).toBe('true');
   });
 
+  it('다른 앱에 갔다 돌아오면 안 읽은 알림 수를 다시 받는다', async () => {
+    let unread = 0;
+    mockApi({
+      ...regionApi,
+      'GET /map/restaurants': ok({ items: [], totalCount: 0, truncated: false }),
+      'GET /home/summary': () =>
+        ok({
+          mukkaebi: { level: 1, stage: 'EGG', stageName: '알', equipped: {} },
+          title: null,
+          season: null,
+          rank: { conquestCount: 0, main: null },
+          unreadNotificationCount: unread,
+          celebrationCount: 0,
+        }),
+    });
+    renderRoute('/');
+    expect(await screen.findByRole('link', { name: '알림' })).toBeInTheDocument();
+
+    unread = 3;
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    expect(
+      await screen.findByRole('link', { name: '알림 (안 읽은 알림 3개)' }),
+    ).toBeInTheDocument();
+  });
+
+  it('홈 검색창을 누르고 들어가면 검색 입력칸에 바로 커서가 있다', async () => {
+    mockApi({
+      ...regionApi,
+      'GET /map/restaurants': ok({ items: [], totalCount: 0, truncated: false }),
+      'GET /search/home': ok({ region: GAYANG, categories: [] }),
+    });
+    renderRoute('/');
+    fireEvent.click(await screen.findByRole('link', { name: '음식점 검색' }));
+    expect(await screen.findByRole('searchbox', { name: '음식점·메뉴 검색' })).toHaveFocus();
+  });
+
   it('찜하거나 정복한 가게가 없으면 지도에 안내를 띄운다', async () => {
     mockApi({
       ...regionApi,
@@ -128,6 +165,8 @@ describe('홈 지도 (MAP-01·02)', () => {
     renderRoute('/');
 
     expect(await screen.findByText('찜하거나 정복한 가게가 지도에 표시돼요')).toBeInTheDocument();
+    // 안 읽은 알림이 없으면 점 없이 그냥 "알림"
+    expect(screen.getByRole('link', { name: '알림' })).toBeInTheDocument();
   });
 
   it('프로필 줄에 레벨·대표 칭호를 보여 준다 (HOME-01)', async () => {
@@ -147,7 +186,11 @@ describe('홈 지도 (MAP-01·02)', () => {
 
     expect(await screen.findByText('LV.7')).toBeInTheDocument();
     expect(screen.getByText('강서구 단골')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '알림' })).toHaveAttribute('href', '/notifications');
+    // 안 읽은 알림이 있을 때만 빨간 점 (아이콘 그림에 점이 박혀 늘 켜져 있었다)
+    expect(screen.getByRole('link', { name: '알림 (안 읽은 알림 2개)' })).toHaveAttribute(
+      'href',
+      '/notifications',
+    );
   });
 
   it('지도가 너무 넓으면 확대해 달라고 안내한다', async () => {
@@ -404,6 +447,9 @@ describe('홈 지도 (MAP-01·02)', () => {
 
       expect(await screen.findByRole('img', { name: '내 위치 (내 먹깨비)' })).toBeInTheDocument();
       expect(screen.getByText('내 먹깨비')).toBeInTheDocument();
+      // 아직 알이면 프로필 줄과 지도 모두 알 그림 (늘 다 큰 먹깨비가 아니라)
+      const eggs = () => [...document.images].filter((img) => img.getAttribute('src') === eggArt);
+      await waitFor(() => expect(eggs().length).toBeGreaterThan(1));
       unmount();
       expect(clearWatch).toHaveBeenCalled();
     });
@@ -543,7 +589,8 @@ describe('음식점 상세 (REST-01)', () => {
     const { router } = renderRoute('/restaurants/4');
 
     expect(await screen.findByRole('heading', { name: '이가네떡볶이' })).toBeInTheDocument();
-    expect(screen.getByText('강서구 가양동 · 서울 강서구 가양로 12')).toBeInTheDocument();
+    // 주소의 "서울"을 빼고, 주소에 구 이름이 있으니 앞에는 동만
+    expect(screen.getByText('가양동 · 강서구 가양로 12')).toBeInTheDocument();
     expect(screen.getByText('맛 별점')).toBeInTheDocument();
     // 맛 기준표: 4.2 → 4.0점대 "다른 사람에게 추천할 수 있는 맛"
     expect(
@@ -552,7 +599,8 @@ describe('음식점 상세 (REST-01)', () => {
     expect(screen.getByRole('region', { name: '마패' })).toHaveTextContent(
       '리뷰 이벤트를 하는 가게입니다',
     );
-    expect(screen.getByText('영업시간 정보가 아직 없어요')).toBeInTheDocument();
+    // 영업시간을 모르면 줄을 숨긴다
+    expect(screen.queryByText(/영업시간/)).not.toBeInTheDocument();
     expect(screen.getByText('현지인 방문 72% · 재방문 38%')).toBeInTheDocument();
     expect(screen.getByText('내 평가 ★ 4.8')).toBeInTheDocument();
     expect(screen.getByText('81%')).toBeInTheDocument();
@@ -591,7 +639,7 @@ describe('맛집 검색 (SEARCH-01·02)', () => {
         ],
       }),
       'GET /restaurants/search': ok({
-        items: [card(1, '옛날손칼국수', 'CONQUERED')],
+        items: [{ ...card(1, '옛날손칼국수', 'CONQUERED'), categoryDetail: '국수/칼국수' }],
         page: 1,
         size: 20,
         totalCount: 1,
@@ -600,6 +648,9 @@ describe('맛집 검색 (SEARCH-01·02)', () => {
       }),
     });
     const { router } = renderRoute('/search');
+    // 바로 들어오면(빈 화면의 "맛집 찾으러 가기" 등) 둘러보기라 입력칸에 커서를 두지 않는다. 추천맛집 버튼은 배너 하나만
+    expect(await screen.findByRole('searchbox', { name: '음식점·메뉴 검색' })).not.toHaveFocus();
+    expect(screen.queryByRole('link', { name: '추천맛집 둘러보기' })).not.toBeInTheDocument();
 
     expect(
       await screen.findByText('강서구 가양동에서 다음 정복 장소를 찾아보세요.'),
@@ -607,6 +658,8 @@ describe('맛집 검색 (SEARCH-01·02)', () => {
     fireEvent.click(await screen.findByRole('button', { name: /한식\s*42곳/ }));
 
     expect(await screen.findByText('강서구 가양동 한식 1곳')).toBeInTheDocument();
+    // 같은 한식끼리도 무엇을 파는지 (업종 소분류)
+    expect(screen.getByText(/한식 · 국수\/칼국수/)).toBeInTheDocument();
     expect(router.state.location.search).toBe('?categoryId=1&category=%ED%95%9C%EC%8B%9D');
     const q = server.calls('GET /restaurants/search')[0].query;
     expect(q.get('categoryId')).toBe('1');
@@ -684,6 +737,47 @@ describe('맛집 검색 (SEARCH-01·02)', () => {
 });
 
 describe('추천맛집 (RECO-01)', () => {
+  it('추천할 곳이 없으면 동네 가게를 둘러보러 가는 길을 준다 (탭 화면이라 뒤로 가기는 없다)', async () => {
+    mockApi({
+      ...regionApi,
+      'GET /recommendations': ok({
+        items: [],
+        preferredCategories: [],
+        page: 1,
+        size: 5,
+        hasNext: false,
+      }),
+      'GET /map/restaurants': ok({
+        // 네모 모서리의 먼집(약 520m)은 400m 밖이라 빠진다
+        items: [
+          pin(3, '양천골황태', 'NOT_CONQUERED'),
+          {
+            ...pin(4, '모서리먼집', 'NOT_CONQUERED'),
+            lat: GAYANG.centerLat + 0.0033,
+            lng: GAYANG.centerLng + 0.0042,
+          },
+        ],
+        totalCount: 2,
+        truncated: false,
+      }),
+    });
+    renderRoute('/recommendations');
+
+    expect(await screen.findByText('아직 추천할 맛집이 없어요')).toBeInTheDocument();
+    // 대신 동 중심에서 가까운 동네 가게
+    const nearby = await screen.findByRole('region', { name: '동네 가게' });
+    expect(within(nearby).getByRole('link', { name: /양천골황태/ })).toHaveAttribute(
+      'href',
+      '/restaurants/3',
+    );
+    expect(within(nearby).queryByText('모서리먼집')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '검색으로 더 찾기' })).toHaveAttribute(
+      'href',
+      '/search',
+    );
+    expect(screen.queryByRole('button', { name: '뒤로 가기' })).not.toBeInTheDocument();
+  });
+
   it('추천 기준을 바꾸면 그 기준으로 다시 불러온다', async () => {
     const server = mockApi({
       ...regionApi,

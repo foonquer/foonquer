@@ -11,9 +11,9 @@ export function businessText(status: BusinessStatus | null) {
   return status.todayOpenTime ? '영업시간 외' : '오늘 휴무';
 }
 
-/** 상세용: "영업 중 · 11:00–21:00" */
+/** 상세용: "영업 중 · 11:00–21:00" (영업시간을 모르면 null — 줄을 숨긴다) */
 export function businessLine(status: BusinessStatus | null) {
-  if (!status) return '영업시간 정보가 아직 없어요';
+  if (!status) return null;
   const hours =
     status.todayOpenTime && status.todayCloseTime
       ? `${status.todayOpenTime}–${status.todayCloseTime}`

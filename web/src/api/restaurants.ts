@@ -161,6 +161,8 @@ export type RestaurantCardItem = {
   name: string;
   categoryId: number | null;
   categoryName: string | null;
+  /** 업종 소분류 (예: 해장국·냉면). 옛 서버 응답에는 없을 수 있다 */
+  categoryDetail?: string | null;
   distanceM: number | null;
   rating: Rating;
   /** 내 종합 별점 ("★ 4.6 맛 · 내 종합 4.4") */

@@ -150,6 +150,13 @@
   text-decoration: underline;
 }
 
+.statsEmpty {
+  padding: 4px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+}
+
 .statsCard {
   padding: 12px 14px 10px;
 }
