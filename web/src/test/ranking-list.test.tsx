@@ -141,6 +141,32 @@ describe('랭킹/현황', () => {
     expect(await screen.findByRole('region', { name: '마포구의 먹짱' })).toBeInTheDocument();
   });
 
+  it('순위가 있는 구가 없으면 내 동네 구를 먼저 보여 준다 (목록 첫 구가 아니라)', async () => {
+    mockApi({
+      'GET /users/me': ok({
+        id: 1,
+        nickname: '아기깨비',
+        localRegions: [{ regionId: 11, dongName: '가양동', sigunguId: 5, sigunguName: '강서구' }],
+      }),
+      'GET /rankings/mukjjang-map': ok({
+        season,
+        level: 'SIGUNGU',
+        items: [1, 5].map((sigunguId) => ({
+          sigunguId,
+          name: sigunguId === 1 ? '종로구' : '강서구',
+          centerLat: 37.55,
+          centerLng: 126.9,
+          mukjjang: null,
+          myRank: null,
+          myConquestCount: 0,
+          mukjjangGap: 1,
+        })),
+      }),
+    });
+    renderRoute('/ranking?tab=rank');
+    expect(await screen.findByRole('region', { name: '강서구의 먹짱' })).toBeInTheDocument();
+  });
+
   it('진행 중 시즌이 없으면 안내한다', async () => {
     mockApi({
       'GET /users/me/conquests/sigungus': {

@@ -76,6 +76,7 @@ export function ConquestsPage() {
           <EmptyState
             title="이 시즌에 정복한 가게가 없어요"
             description="방문 인증하고 맛 별점을 남기면 여기에 쌓여요."
+            action={{ label: '맛집 찾으러 가기', to: '/search' }}
           />
         ) : (
           byMonth(list.items).map((group) => (

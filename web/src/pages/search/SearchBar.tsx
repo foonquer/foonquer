@@ -10,10 +10,17 @@ type Props = {
   onSubmit: (keyword: string) => void;
   /** 기본: 음식점·메뉴 검색 */
   placeholder?: string;
+  /** 화면에 들어오자마자 입력칸에 커서 */
+  autoFocus?: boolean;
 };
 
 /** 음식점·메뉴 검색창 (엔터로 찾는다) */
-export function SearchBar({ initial = '', onSubmit, placeholder = '음식점·메뉴 검색' }: Props) {
+export function SearchBar({
+  initial = '',
+  onSubmit,
+  placeholder = '음식점·메뉴 검색',
+  autoFocus,
+}: Props) {
   const [value, setValue] = useState(initial);
 
   const submit = (e: FormEvent) => {
@@ -33,6 +40,7 @@ export function SearchBar({ initial = '', onSubmit, placeholder = '음식점·�
         placeholder={placeholder}
         maxLength={KEYWORD_MAX}
         aria-label={placeholder}
+        autoFocus={autoFocus}
       />
     </form>
   );

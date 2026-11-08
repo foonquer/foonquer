@@ -1,20 +1,25 @@
 import { Link } from 'react-router';
+import { getHomeSummary } from '../../api/home';
 import { AGE_LABEL, GENDER_LABEL, getMe, getMySummary } from '../../api/users';
-import bellIcon from '../../assets/icons/bell.svg';
 import chevron from '../../assets/icons/chevron-right.svg';
+import gearIcon from '../../assets/icons/gear.svg';
 import { MenuList } from '../../components/MenuList';
 import { MukkaebiAvatar } from '../../components/Mukkaebi';
+import { NotificationBell } from '../../components/NotificationBell';
 import { Screen } from '../../components/Screen';
 import { EmptyState } from '../../components/StateViews';
 import { errorMessage } from '../../lib/api';
 import { joinDot } from '../../lib/format';
 import { useAsync } from '../../lib/useAsync';
+import { wearingOf } from '../../lib/wearing';
 import styles from './MyPage.module.css';
 
 /** 내 정보 탭: 프로필 카드(USER-04), 시즌 나의 기록과 메뉴 숫자(USER-08) */
 export function MyPage() {
   const me = useAsync(getMe, []);
   const summary = useAsync(getMySummary, []).data;
+  // 안 읽은 알림 수와 먹깨비 착용 아이템 (홈과 같은 HOME-01) — 못 받아도 화면은 그대로
+  const home = useAsync(getHomeSummary, []).data;
   const record = summary?.seasonRecord;
   const first = me.data?.localRegions[0];
 
@@ -22,11 +27,9 @@ export function MyPage() {
     <Screen inTab>
       <header className={styles.header}>
         <h1 className={styles.title}>내 정보</h1>
-        <Link to="/notifications" className={styles.bell} aria-label="알림">
-          <img src={bellIcon} alt="" width={24} height={24} />
-        </Link>
-        <Link to="/me/settings" className={styles.settings}>
-          설정
+        <NotificationBell unread={home?.unreadNotificationCount ?? 0} className={styles.bell} />
+        <Link to="/me/settings" className={styles.settings} aria-label="설정">
+          <img src={gearIcon} alt="" width={24} height={24} />
         </Link>
       </header>
 
@@ -35,7 +38,11 @@ export function MyPage() {
           <EmptyState title={errorMessage(me.error)} onRetry={me.reload} />
         ) : (
           <Link to="/me/profile" className={styles.profile} aria-label="프로필 수정">
-            <MukkaebiAvatar size={64} />
+            <MukkaebiAvatar
+              size={64}
+              stage={home?.mukkaebi.stage}
+              wearing={home ? wearingOf(home.mukkaebi) : undefined}
+            />
             <span className={styles.profileText}>
               <span className={styles.nickname}>{me.data?.nickname ?? ' '}</span>
               {summary?.title && <span className={styles.titleChip}>{summary.title}</span>}

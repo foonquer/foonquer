@@ -2,11 +2,38 @@ import { act, fireEvent, render, renderHook, screen } from '@testing-library/rea
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
+import type { RestaurantDetail } from '../api/restaurants';
 import { Dialog } from '../components/Dialog';
+import { EmptyState } from '../components/StateViews';
+import { ScoreStats } from '../pages/restaurant/ScoreStats';
 import { FilterChips } from '../components/Chips';
 import { TextField } from '../components/TextField';
 import { ToastProvider, useToast } from '../components/Toast';
 import { useAsync } from '../lib/useAsync';
+
+describe('빈 화면 · 항목별 평가', () => {
+  it('빈 화면에 다음 행동 버튼을 단다', () => {
+    render(
+      <MemoryRouter>
+        <EmptyState
+          title="아직 남긴 리뷰가 없어요"
+          action={{ label: '맛집 찾으러 가기', to: '/search' }}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: '맛집 찾으러 가기' })).toHaveAttribute(
+      'href',
+      '/search',
+    );
+  });
+
+  it('인증 평가가 없으면 "–" 칸 대신 한 줄 안내', () => {
+    const r = { rating: { score: null, reviewCount: 0 } } as unknown as RestaurantDetail;
+    render(<ScoreStats r={r} />);
+    expect(screen.getByText(/아직 항목별 평가가 없어요/)).toBeInTheDocument();
+    expect(screen.queryByText('내 종합')).not.toBeInTheDocument();
+  });
+});
 
 describe('TextField', () => {
   it('ok 문구 앞에는 ✓, 에러면 입력창을 잘못됨으로 표시한다', () => {

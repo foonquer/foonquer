@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router';
 import { getSearchHome, type Category } from '../../api/restaurants';
 import chevronRight from '../../assets/icons/chevron-right-green.svg';
 import { AppHeader } from '../../components/AppHeader';
-import { ButtonLink } from '../../components/Button';
 import { RegionChip } from '../../components/RegionChip';
 import { RegionSelectSheet } from '../../components/RegionSelectSheet';
 import { Screen } from '../../components/Screen';
@@ -39,10 +38,11 @@ export function SearchHome() {
     go({ type: 'category', categoryId: c.categoryId, name: c.name });
 
   return (
-    <Screen footer={<ButtonLink to="/recommendations">추천맛집 둘러보기</ButtonLink>}>
+    <Screen>
       <AppHeader title="맛집 검색" />
       <div className={styles.content}>
-        <SearchBar onSubmit={(keyword) => go({ type: 'keyword', keyword })} />
+        {/* 홈 검색창을 누르고 들어왔으니 바로 입력할 수 있게 */}
+        <SearchBar autoFocus onSubmit={(keyword) => go({ type: 'keyword', keyword })} />
         <div className={styles.regionRow}>
           <RegionChip region={region} onClick={() => setRegionOpen(true)} />
         </div>

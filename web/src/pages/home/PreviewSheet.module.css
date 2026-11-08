@@ -46,14 +46,17 @@
   gap: 8px;
 }
 
+/* 긴 가게 이름은 두 줄까지 (한 줄이면 "양천골용대리황태…"로 잘렸다) */
 .name {
+  display: -webkit-box;
   overflow: hidden;
   font-size: 19px;
   font-weight: 700;
   line-height: 1.4;
   color: var(--mk-ink);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: keep-all;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .rating {

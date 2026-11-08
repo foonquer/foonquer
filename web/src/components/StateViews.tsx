@@ -1,5 +1,5 @@
 import mukkaebi from '../assets/illust/mukkaebi.svg';
-import { Button } from './Button';
+import { Button, ButtonLink } from './Button';
 import styles from './StateViews.module.css';
 
 /** 불러오는 중 (가운데 작은 원) */
@@ -16,10 +16,12 @@ type EmptyProps = {
   description?: string;
   /** 다시 시도 버튼 */
   onRetry?: () => void;
+  /** 빈 화면에서 할 다음 행동 (예: 맛집 찾으러 가기) */
+  action?: { label: string; to: string };
 };
 
 /** 먹깨비 그림과 안내 (빈 목록·준비 중·불러오기 실패) */
-export function EmptyState({ title, description, onRetry }: EmptyProps) {
+export function EmptyState({ title, description, onRetry, action }: EmptyProps) {
   return (
     <div className={styles.center}>
       <div className={styles.circle}>
@@ -31,6 +33,11 @@ export function EmptyState({ title, description, onRetry }: EmptyProps) {
         <Button variant="white" block={false} size="sm" onClick={onRetry}>
           다시 시도
         </Button>
+      )}
+      {action && (
+        <ButtonLink to={action.to} block={false} size="sm">
+          {action.label}
+        </ButtonLink>
       )}
     </div>
   );

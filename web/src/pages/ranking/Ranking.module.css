@@ -67,6 +67,17 @@
   color: var(--mk-white);
 }
 
+.heroAction {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 6px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-white);
+}
+
 .heroTitle {
   font-size: 22px;
   font-weight: 700;

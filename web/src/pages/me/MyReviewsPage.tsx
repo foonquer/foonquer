@@ -37,6 +37,7 @@ export function MyReviewsPage() {
           <EmptyState
             title="아직 남긴 리뷰가 없어요"
             description="방문 인증하고 맛 별점을 남기면 여기에 모여요."
+            action={{ label: '맛집 찾으러 가기', to: '/search' }}
           />
         ) : (
           <div className={styles.list}>

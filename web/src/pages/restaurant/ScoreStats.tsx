@@ -27,8 +27,18 @@ function emphasisOf(r: RestaurantDetail) {
 export function ScoreStats({ r }: { r: RestaurantDetail }) {
   const [open, setOpen] = useState(false);
   const percent = (v: number | null) => (v === null ? '–' : `${v}%`);
-  const emphasis = emphasisOf(r);
+  // 인증 평가가 하나도 없으면 "–" 칸 대신 한 줄로
+  if (r.rating.reviewCount === 0) {
+    return (
+      <section className={styles.statsCard} aria-label="항목별 평가">
+        <p className={styles.statsEmpty}>
+          아직 항목별 평가가 없어요. 첫 방문 인증의 별점부터 여기에 모여요.
+        </p>
+      </section>
+    );
+  }
 
+  const emphasis = emphasisOf(r);
   return (
     <section className={styles.statsCard} aria-label="항목별 평가">
       <div className={styles.statsHead}>

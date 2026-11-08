@@ -29,6 +29,8 @@ export function toRestaurantCard(
     name: row.name,
     categoryId: row.categoryId,
     categoryName: row.category?.name ?? null,
+    /** 업종 소분류 (공공데이터, 예: 해장국·냉면) — 같은 한식끼리도 구분되게 카드에 같이 보인다 */
+    categoryDetail: row.categoryDetail,
     distanceM: distanceMeters(from, { lat: row.lat.toNumber(), lng: row.lng.toNumber() }),
     rating: ratingOf(row.restaurantStat),
     // "★ 4.6 맛 · 내 종합 4.4" (피그마 3-2)

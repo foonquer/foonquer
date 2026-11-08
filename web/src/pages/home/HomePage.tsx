@@ -8,7 +8,6 @@ import {
   type MapRestaurant,
 } from '../../api/restaurants';
 import { getMe } from '../../api/users';
-import bellIcon from '../../assets/icons/bell.svg';
 import flagIcon from '../../assets/icons/flag.svg';
 import gearIcon from '../../assets/icons/gear.svg';
 import locateIcon from '../../assets/icons/locate.svg';
@@ -16,6 +15,7 @@ import searchIcon from '../../assets/icons/search.svg';
 import { MapView } from '../../components/MapView';
 import { MukkaebiAvatar } from '../../components/Mukkaebi';
 import { MyLocationMarker } from '../../components/MyLocationMarker';
+import { NotificationBell } from '../../components/NotificationBell';
 import { RegionChip } from '../../components/RegionChip';
 import { RegionSelectSheet } from '../../components/RegionSelectSheet';
 import { EmptyState, Loading } from '../../components/StateViews';
@@ -205,7 +205,11 @@ export function HomePage() {
     <div className={styles.page}>
       <header className={styles.top}>
         <div className={styles.profileRow}>
-          <MukkaebiAvatar size={54} />
+          <MukkaebiAvatar
+            size={54}
+            stage={myMukkaebi?.stage}
+            wearing={myMukkaebi ? wearingOf(myMukkaebi) : undefined}
+          />
           <div className={styles.profileText}>
             {summary.data && <span className={styles.level}>LV.{summary.data.mukkaebi.level}</span>}
             <p className={styles.nameRow}>
@@ -213,9 +217,10 @@ export function HomePage() {
               {title && <span className={styles.title}>{title}</span>}
             </p>
           </div>
-          <Link to="/notifications" className={styles.iconButton} aria-label="알림">
-            <img src={bellIcon} alt="" width={24} height={24} />
-          </Link>
+          <NotificationBell
+            unread={summary.data?.unreadNotificationCount ?? 0}
+            className={styles.iconButton}
+          />
           <Link to="/me/settings" className={styles.iconButton} aria-label="설정">
             <img src={gearIcon} alt="" width={24} height={23} />
           </Link>

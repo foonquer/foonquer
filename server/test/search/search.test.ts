@@ -177,6 +177,7 @@ describe('SEARCH-02 GET /restaurants/search', () => {
         name: '옛날손칼국수',
         categoryId: 1,
         categoryName: '한식',
+        categoryDetail: null,
         distanceM: null,
         rating: { score: null, reviewCount: 0 },
         myOverallScore: null,
@@ -204,7 +205,11 @@ describe('SEARCH-02 GET /restaurants/search', () => {
     const res = await search(me.id, { keyword: '칼국수' });
 
     expect(names(res)).toEqual(['명동교자 가양점']);
-    expect(res.body.data.items[0]).toMatchObject({ matchedBy: 'NAME', matchedMenuName: null });
+    expect(res.body.data.items[0]).toMatchObject({
+      categoryDetail: '국수/칼국수',
+      matchedBy: 'NAME',
+      matchedMenuName: null,
+    });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -418,6 +423,7 @@ describe('RECO-01 GET /recommendations', () => {
       name: 'C',
       categoryId: 1,
       categoryName: '한식',
+      categoryDetail: null,
       distanceM: null,
       rating: { score: null, reviewCount: 0 },
       myOverallScore: null,

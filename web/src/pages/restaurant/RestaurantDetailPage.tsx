@@ -19,6 +19,24 @@ import { scoreBand, tasteCriterion } from '../../lib/taste';
 import { useAsync } from '../../lib/useAsync';
 import { useMyCoords } from '../../lib/useMyCoords';
 import { businessLine } from './business';
+
+/**
+ * "가양동 · 강서구 양천로49길 20". 주소 앞의 "서울특별시"를 빼고, 주소에 구 이름이 있으면 동만 앞에 둔다
+ * (예전: "강서구 가양동 · 서울특별시 강서구 양천로49길 20")
+ */
+function addressLine(r: {
+  sigunguName: string | null;
+  dongName: string | null;
+  roadAddress: string | null;
+  jibunAddress: string | null;
+}) {
+  const address = (r.roadAddress ?? r.jibunAddress)?.replace(/^서울(특별시)?\s+/, '') ?? null;
+  const area =
+    address && r.sigunguName && address.startsWith(r.sigunguName)
+      ? r.dongName
+      : [r.sigunguName, r.dongName].filter(Boolean).join(' ');
+  return joinDot([area, address]);
+}
 import { ScoreStats } from './ScoreStats';
 import styles from './RestaurantDetailPage.module.css';
 
@@ -83,6 +101,7 @@ function Detail({
   const score = formatScore(r.rating.score);
   const myScore = formatScore(r.my.myScore);
   const closed = r.status === 'C';
+  const hours = businessLine(r.businessStatus);
 
   const toggleSave = async () => {
     setSaving(true);
@@ -195,15 +214,12 @@ function Detail({
         )}
 
         <section className={styles.infoCard} aria-label="가게 정보">
-          <p className={styles.address}>
-            {joinDot([
-              [r.sigunguName, r.dongName].filter(Boolean).join(' '),
-              r.roadAddress ?? r.jibunAddress,
-            ])}
-          </p>
-          <p className={styles.hours} data-closed={closed}>
-            {closed ? '폐업한 가게예요' : businessLine(r.businessStatus)}
-          </p>
+          <p className={styles.address}>{addressLine(r)}</p>
+          {(closed || hours) && (
+            <p className={styles.hours} data-closed={closed}>
+              {closed ? '폐업한 가게예요' : hours}
+            </p>
+          )}
           {(r.phone || r.kakaoPlaceUrl) && (
             <p className={styles.links}>
               {r.phone && <a href={`tel:${r.phone}`}>{r.phone}</a>}

@@ -128,7 +128,11 @@ export function RecommendationListPage() {
         ) : !current ? (
           <Loading label="추천 맛집을 불러오는 중" />
         ) : current.items.length === 0 ? (
-          <EmptyState title="아직 추천할 맛집이 없어요" description={RECO_EMPTY[type]} />
+          <EmptyState
+            title="아직 추천할 맛집이 없어요"
+            description={RECO_EMPTY[type]}
+            action={{ label: '동네 가게 둘러보기', to: '/search' }}
+          />
         ) : (
           <>
             <h2 className={styles.title}>

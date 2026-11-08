@@ -57,7 +57,7 @@ export function RecommendationsPage() {
         ) : undefined
       }
     >
-      <AppHeader title="추천맛집" />
+      <AppHeader title="추천맛집" hideBack />
       <div className={styles.content}>
         <RegionChip region={region} onClick={() => setRegionOpen(true)} />
         <h2 className={styles.title}>이 동네의 다음 한 끼</h2>
@@ -85,7 +85,11 @@ export function RecommendationsPage() {
         ) : !reco.data ? (
           <Loading label="추천 맛집을 불러오는 중" />
         ) : items.length === 0 ? (
-          <EmptyState title="아직 추천할 맛집이 없어요" description={RECO_EMPTY[type]} />
+          <EmptyState
+            title="아직 추천할 맛집이 없어요"
+            description={RECO_EMPTY[type]}
+            action={{ label: '동네 가게 둘러보기', to: '/search' }}
+          />
         ) : (
           <Carousel key={`${type}-${region?.regionId}`} items={items} reason={RECO_REASON[type]} />
         )}

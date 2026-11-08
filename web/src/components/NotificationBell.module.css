@@ -1,0 +1,17 @@
+.bell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 종 그림 오른쪽 위 (예전 그림 속 점과 같은 자리·크기) */
+.dot {
+  position: absolute;
+  top: calc(50% - 12px + 3px);
+  left: calc(50% - 12px + 15px);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mk-coral);
+}
