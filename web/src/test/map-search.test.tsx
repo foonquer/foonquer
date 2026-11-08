@@ -723,8 +723,16 @@ describe('추천맛집 (RECO-01)', () => {
         hasNext: false,
       }),
       'GET /map/restaurants': ok({
-        items: [pin(3, '양천골황태', 'NOT_CONQUERED')],
-        totalCount: 1,
+        // 네모 모서리의 먼집(약 520m)은 400m 밖이라 빠진다
+        items: [
+          pin(3, '양천골황태', 'NOT_CONQUERED'),
+          {
+            ...pin(4, '모서리먼집', 'NOT_CONQUERED'),
+            lat: GAYANG.centerLat + 0.0033,
+            lng: GAYANG.centerLng + 0.0042,
+          },
+        ],
+        totalCount: 2,
         truncated: false,
       }),
     });
@@ -737,6 +745,7 @@ describe('추천맛집 (RECO-01)', () => {
       'href',
       '/restaurants/3',
     );
+    expect(within(nearby).queryByText('모서리먼집')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '검색으로 더 찾기' })).toHaveAttribute(
       'href',
       '/search',

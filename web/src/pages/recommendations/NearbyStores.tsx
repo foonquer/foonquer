@@ -1,6 +1,6 @@
 import { getMapRestaurants } from '../../api/restaurants';
 import { MenuList } from '../../components/MenuList';
-import { boundsAround } from '../../lib/geo';
+import { boundsAround, metersBetween } from '../../lib/geo';
 import type { ViewRegion } from '../../lib/region';
 import { useAsync } from '../../lib/useAsync';
 import styles from './Recommendations.module.css';
@@ -23,7 +23,13 @@ export function NearbyStores({ region }: { region: ViewRegion | null }) {
         : Promise.resolve({ items: [], totalCount: 0, truncated: false }),
     [lat, lng],
   );
-  const items = data?.items.slice(0, MAX_ITEMS) ?? [];
+  // 네모 영역 모서리(최대 약 566m)의 가게는 빼고, 서버가 준 가까운 순 그대로 자른다
+  const items =
+    lat && lng
+      ? (data?.items
+          .filter((r) => metersBetween({ lat, lng }, r) <= RADIUS_M)
+          .slice(0, MAX_ITEMS) ?? [])
+      : [];
   if (items.length === 0) return null;
   return (
     <section className={styles.nearby} aria-label="동네 가게">
