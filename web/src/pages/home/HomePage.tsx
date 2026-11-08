@@ -17,13 +17,37 @@ import { ApiError, errorMessage } from '../../lib/api';
 import { SEOUL_CENTER, useViewRegion } from '../../lib/region';
 import { useAsync } from '../../lib/useAsync';
 import { useMyCoords } from '../../lib/useMyCoords';
+import { NearbySheet } from './NearbySheet';
 import { PreviewSheet } from './PreviewSheet';
 import styles from './HomePage.module.css';
 
+type LatLng = { lat: number; lng: number };
+
 /** 지도를 멈추고 이만큼 기다렸다가 가게를 다시 불러온다 (ms) */
 const FETCH_DELAY_MS = 300;
+/** 지도를 누른 자리에서 가게를 찾는 반경 (m). 카카오 지도의 가게 이름 위치와 공공데이터 좌표가 조금씩 다르다 */
+const TAP_RADIUS_M = 30;
+/** 여러 곳이면 가까운 순으로 이만큼만 보여 준다 */
+const TAP_MAX_ITEMS = 10;
 
-/** 홈: 프로필 줄(HOME-01) + 음식점 검색 + 지도(MAP-01) + 가게 미리보기(MAP-02) */
+/** 위도 1도의 길이 (m). 경도 1도는 여기에 cos(위도)를 곱한다 */
+const M_PER_DEG = 111_320;
+
+/** 한 점 둘레 radiusM 정사각형 영역. 모서리는 radiusM보다 멀어서 받은 뒤 metersBetween으로 다시 거른다 */
+function boundsAround({ lat, lng }: LatLng, radiusM: number): Bounds {
+  const dLat = radiusM / M_PER_DEG;
+  const dLng = radiusM / (M_PER_DEG * Math.cos((lat * Math.PI) / 180));
+  return { swLat: lat - dLat, swLng: lng - dLng, neLat: lat + dLat, neLng: lng + dLng };
+}
+
+/** 두 점 사이 거리 (m). 수십 m 안이라 평면으로 계산해도 충분하다 */
+function metersBetween(a: LatLng, b: LatLng): number {
+  const dy = (a.lat - b.lat) * M_PER_DEG;
+  const dx = (a.lng - b.lng) * M_PER_DEG * Math.cos((a.lat * Math.PI) / 180);
+  return Math.hypot(dx, dy);
+}
+
+/** 홈: 프로필 줄(HOME-01) + 음식점 검색 + 지도(MAP-01) + 가게 미리보기(MAP-02). 지도의 빈 곳을 누르면 그 자리 가게를 찾는다 */
 export function HomePage() {
   const toast = useToast();
   const me = useAsync(getMe, []);
@@ -35,9 +59,11 @@ export function HomePage() {
   const [pins, setPins] = useState<MapRestaurant[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [nearby, setNearby] = useState<MapRestaurant[] | null>(null);
   const [regionOpen, setRegionOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const request = useRef<AbortController>(undefined);
+  const tapRequest = useRef<AbortController>(undefined);
 
   const loadPins = useCallback(
     (bounds: Bounds) => {
@@ -71,15 +97,58 @@ export function HomePage() {
     [toast],
   );
 
+  // 핀이 아닌 곳을 누르면 그 자리 가게(찜·정복 여부와 상관없이)를 찾아 미리보기, 여러 곳이면 고르기
+  const findAt = useCallback(
+    async (point: LatLng) => {
+      tapRequest.current?.abort();
+      const controller = new AbortController();
+      tapRequest.current = controller;
+      try {
+        const { items } = await getMapRestaurants(
+          boundsAround(point, TAP_RADIUS_M),
+          controller.signal,
+        );
+        // 응답이 이미 와 있던 이전 요청은 abort로 못 막으니 결과를 버린다
+        if (controller.signal.aborted) return;
+        // 서버가 누른 자리에서 가까운 순으로 준다
+        const near = items.filter((r) => metersBetween(point, r) <= TAP_RADIUS_M);
+        if (near.length === 0) {
+          toast('이 자리에서 가게를 찾지 못했어요');
+        } else if (near.length === 1) {
+          setNearby(null);
+          setSelectedId(near[0].restaurantId);
+        } else {
+          setSelectedId(null);
+          setNearby(near.slice(0, TAP_MAX_ITEMS));
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) toast(errorMessage(err));
+      }
+    },
+    [toast],
+  );
+
   useEffect(
     () => () => {
       clearTimeout(timer.current);
       request.current?.abort();
+      tapRequest.current?.abort();
     },
     [],
   );
 
   const closePreview = useCallback(() => setSelectedId(null), []);
+  const closeNearby = useCallback(() => setNearby(null), []);
+  // 핀이나 목록에서 고르거나 지역 시트를 열면, 아직 오는 중인 지도 누르기 결과는 버린다
+  const pickRestaurant = useCallback((restaurantId: number) => {
+    tapRequest.current?.abort();
+    setNearby(null);
+    setSelectedId(restaurantId);
+  }, []);
+  const openRegion = useCallback(() => {
+    tapRequest.current?.abort();
+    setRegionOpen(true);
+  }, []);
   const center = region?.lat && region.lng ? { lat: region.lat, lng: region.lng } : SEOUL_CENTER;
 
   return (
@@ -113,7 +182,8 @@ export function HomePage() {
             center={center}
             pins={pins}
             selectedId={selectedId}
-            onPinClick={setSelectedId}
+            onPinClick={pickRestaurant}
+            onMapClick={findAt}
             onBoundsChange={loadPins}
           />
         ) : regionError ? (
@@ -123,7 +193,7 @@ export function HomePage() {
         )}
 
         <div className={styles.overlayTop}>
-          <RegionChip region={region} variant="map" onClick={() => setRegionOpen(true)} />
+          <RegionChip region={region} variant="map" onClick={openRegion} />
           <p className={styles.legend}>
             <span className={styles.legendConquered}>● 정복 완료</span>
             <span className={styles.legendUnconquered}>● 미정복</span>
@@ -143,6 +213,7 @@ export function HomePage() {
         </Link>
       </section>
 
+      <NearbySheet items={nearby} onPick={pickRestaurant} onClose={closeNearby} />
       <PreviewSheet restaurantId={selectedId} coords={coords} onClose={closePreview} />
       <RegionSelectSheet open={regionOpen} onClose={() => setRegionOpen(false)} />
     </div>
