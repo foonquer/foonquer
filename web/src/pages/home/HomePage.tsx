@@ -225,7 +225,7 @@ export function HomePage() {
             <img src={gearIcon} alt="" width={24} height={23} />
           </Link>
         </div>
-        <Link to="/search" className={styles.search}>
+        <Link to="/search" state={{ focusSearch: true }} className={styles.search}>
           <img src={searchIcon} alt="" width={16} height={16} />
           음식점 검색
         </Link>

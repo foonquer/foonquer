@@ -121,6 +121,17 @@ describe('홈 지도 (MAP-01·02)', () => {
     expect(q.get('mineOnly')).toBe('true');
   });
 
+  it('홈 검색창을 누르고 들어가면 검색 입력칸에 바로 커서가 있다', async () => {
+    mockApi({
+      ...regionApi,
+      'GET /map/restaurants': ok({ items: [], totalCount: 0, truncated: false }),
+      'GET /search/home': ok({ region: GAYANG, categories: [] }),
+    });
+    renderRoute('/');
+    fireEvent.click(await screen.findByRole('link', { name: '음식점 검색' }));
+    expect(await screen.findByRole('searchbox', { name: '음식점·메뉴 검색' })).toHaveFocus();
+  });
+
   it('찜하거나 정복한 가게가 없으면 지도에 안내를 띄운다', async () => {
     mockApi({
       ...regionApi,
@@ -612,8 +623,8 @@ describe('맛집 검색 (SEARCH-01·02)', () => {
       }),
     });
     const { router } = renderRoute('/search');
-    // 홈 검색창을 누르고 들어왔으니 바로 입력, 추천맛집 버튼은 배너 하나만
-    expect(await screen.findByRole('searchbox', { name: '음식점·메뉴 검색' })).toHaveFocus();
+    // 바로 들어오면(빈 화면의 "맛집 찾으러 가기" 등) 둘러보기라 입력칸에 커서를 두지 않는다. 추천맛집 버튼은 배너 하나만
+    expect(await screen.findByRole('searchbox', { name: '음식점·메뉴 검색' })).not.toHaveFocus();
     expect(screen.queryByRole('link', { name: '추천맛집 둘러보기' })).not.toBeInTheDocument();
 
     expect(
@@ -711,11 +722,22 @@ describe('추천맛집 (RECO-01)', () => {
         size: 5,
         hasNext: false,
       }),
+      'GET /map/restaurants': ok({
+        items: [pin(3, '양천골황태', 'NOT_CONQUERED')],
+        totalCount: 1,
+        truncated: false,
+      }),
     });
     renderRoute('/recommendations');
 
     expect(await screen.findByText('아직 추천할 맛집이 없어요')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '동네 가게 둘러보기' })).toHaveAttribute(
+    // 대신 동 중심에서 가까운 동네 가게
+    const nearby = await screen.findByRole('region', { name: '동네 가게' });
+    expect(within(nearby).getByRole('link', { name: /양천골황태/ })).toHaveAttribute(
+      'href',
+      '/restaurants/3',
+    );
+    expect(screen.getByRole('link', { name: '검색으로 더 찾기' })).toHaveAttribute(
       'href',
       '/search',
     );

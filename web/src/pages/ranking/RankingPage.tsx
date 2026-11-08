@@ -139,7 +139,7 @@ function StatusTab({ seasonId, onSeason }: { seasonId?: number; onSeason: (id: n
 
       <div className={styles.sectionHead}>
         <h2 className={styles.sectionTitle}>내 동네 · 정복한 구</h2>
-        <span>정복 많은 순</span>
+        <span>내 동네 먼저 · 정복 많은 순</span>
       </div>
       {data.items.length === 0 ? (
         <EmptyState

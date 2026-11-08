@@ -33,6 +33,15 @@ describe('빈 화면 · 항목별 평가', () => {
     expect(screen.getByText(/아직 항목별 평가가 없어요/)).toBeInTheDocument();
     expect(screen.queryByText('내 종합')).not.toBeInTheDocument();
   });
+
+  it('리뷰가 없어도 방문 인증으로 계산된 방문율은 보여 준다', () => {
+    const r = {
+      rating: { score: null, reviewCount: 0 },
+      stats: { localVisitRate: 100, revisitRate: 0 },
+    } as unknown as RestaurantDetail;
+    render(<ScoreStats r={r} />);
+    expect(screen.getByText('현지인 방문 100% · 재방문 0%')).toBeInTheDocument();
+  });
 });
 
 describe('TextField', () => {

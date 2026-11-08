@@ -7,6 +7,19 @@
   padding: 2px var(--mk-side) 16px;
 }
 
+.nearby {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.nearbyTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
 .title {
   margin-top: 21px;
   font-size: 24px;
