@@ -1,8 +1,16 @@
-import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react';
+import {
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+import { createPortal } from 'react-dom';
 import type { Bounds, MapRestaurant } from '../api/restaurants';
 import pinConquered from '../assets/illust/pin-conquered.svg';
 import pinUnconquered from '../assets/illust/pin-unconquered.svg';
 import { KAKAO_MAP_KEY } from '../lib/config';
+import { metersBetween } from '../lib/geo';
 import {
   loadKakaoMaps,
   type KakaoEventHandler,
@@ -10,6 +18,7 @@ import {
   type KakaoMaps,
   type KakaoOverlay,
 } from '../lib/kakaoMaps';
+import { MY_LOCATION_Y_ANCHOR } from './MyLocationMarker';
 import styles from './MapView.module.css';
 
 type LatLng = { lat: number; lng: number };
@@ -23,10 +32,14 @@ type Props = {
   onPinClick: (restaurantId: number) => void;
   /** 핀이 아닌 곳을 눌렀을 때 그 자리 좌표 (홈: 그 자리 가게 찾기) */
   onMapClick?: (point: LatLng) => void;
+  /** 내 위치와 그 자리에 그릴 것 (홈: 내 먹깨비). 위치가 바뀌면 걸어가듯 옮긴다 */
+  me?: { coords: LatLng; marker: ReactNode } | null;
 } & (
   | {
-      /** 홈: 이 위치에서 시작하고 */
+      /** 홈: 이 위치에서 시작하고 (바뀌면 옮긴다) */
       center: LatLng;
+      /** 바뀌면 center가 같아도 다시 옮긴다 (내 위치 버튼을 다시 누른 경우) */
+      recenterKey?: number;
       /** 지도를 다 움직였을 때 (처음 뜰 때도 한 번) */
       onBoundsChange: (bounds: Bounds) => void;
     }
@@ -40,6 +53,12 @@ type Props = {
 const LEVEL = 4;
 /** 지도를 한 번 누른 것으로 보기 전에 두 번 누르기(확대)를 기다리는 시간 (ms) */
 const DOUBLE_TAP_MS = 250;
+/** 내 위치가 이만큼(m) 넘게 움직이면 걸어서 옮긴다. 이보다 작으면(위치 흔들림) 그냥 옮긴다 */
+const WALK_MIN_M = 3;
+/** 이보다 멀리 바뀌면(처음 잡히거나 크게 튐) 걷지 않고 바로 옮긴다 */
+const WALK_MAX_M = 300;
+/** 1m 걷는 데 걸리는 시간(ms). 화면에서 보기 좋은 빠르기로, 실제 걸음보다 빠르다 */
+const WALK_MS_PER_M = 40;
 
 /** 핀들이 놓인 범위 */
 function spanOf(pins: MapPin[]) {
@@ -91,6 +110,11 @@ export function MapView(props: Props) {
   return <KakaoMapView {...props} maps={kakao} />;
 }
 
+/** 내 위치 먹깨비가 걷는 중인지 (MyLocationMarker CSS가 data-walking을 본다) */
+function setWalking(el: HTMLElement, walking: boolean) {
+  el.dataset.walking = String(walking);
+}
+
 /** 핀 하나 (그림 + 가게 이름). 카카오 지도 오버레이와 간단한 지도가 같이 쓴다 */
 function pinElement(pin: MapPin, selected: boolean, onClick: () => void) {
   const button = document.createElement('button');
@@ -122,9 +146,18 @@ function KakaoMapView(props: Props & { maps: KakaoMaps }) {
   const fit = 'fit' in props;
   const center = 'center' in props ? props.center : spanOf(pins).center;
   const onBoundsChange = 'onBoundsChange' in props ? props.onBoundsChange : undefined;
+  const recenterKey = 'recenterKey' in props ? props.recenterKey : undefined;
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<KakaoMap | null>(null);
   const overlays = useRef<KakaoOverlay[]>([]);
+  // 내 위치 먹깨비: 오버레이에 넣을 상자에 React로 그린다
+  const [meBox] = useState(() => {
+    const el = document.createElement('div');
+    el.dataset.walking = 'false';
+    return el;
+  });
+  const meOverlay = useRef<KakaoOverlay | null>(null);
+  const walk = useRef<number>(undefined);
   // 이벤트 안에서 최신 함수를 부르도록
   const callbacks = useRef({ onPinClick, onBoundsChange, onMapClick });
   // 지도를 누르고 두 번 누르기를 기다리는 중 (그 사이 핀을 누르면 취소)
@@ -177,10 +210,67 @@ function KakaoMapView(props: Props & { maps: KakaoMaps }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maps]);
 
-  // 동네를 바꾸면 그곳으로 옮긴다 (홈)
+  // 동네를 바꾸거나 내 위치 버튼을 누르면 그곳으로 옮긴다 (홈)
   useEffect(() => {
     if (!fit) map.current?.setCenter(new maps.LatLng(center.lat, center.lng));
-  }, [maps, fit, center.lat, center.lng]);
+  }, [maps, fit, center.lat, center.lng, recenterKey]);
+
+  // 내 위치 먹깨비 놓기 · 옮기기
+  const me = props.me?.coords;
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !me) return;
+    const to = new maps.LatLng(me.lat, me.lng);
+    const overlay = meOverlay.current;
+    if (!overlay) {
+      const created = new maps.CustomOverlay({
+        position: to,
+        content: meBox,
+        xAnchor: 0.5,
+        yAnchor: MY_LOCATION_Y_ANCHOR,
+        zIndex: 3,
+      });
+      created.setMap(m);
+      meOverlay.current = created;
+      return;
+    }
+    const at = overlay.getPosition();
+    const from = { lat: at.getLat(), lng: at.getLng() };
+    const distanceM = metersBetween(from, me);
+    if (walk.current !== undefined) cancelAnimationFrame(walk.current);
+    if (distanceM < WALK_MIN_M || distanceM > WALK_MAX_M) {
+      overlay.setPosition(to);
+      setWalking(meBox, false);
+      return;
+    }
+    const duration = distanceM * WALK_MS_PER_M;
+    const start = performance.now();
+    setWalking(meBox, true);
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      overlay.setPosition(
+        new maps.LatLng(from.lat + (me.lat - from.lat) * t, from.lng + (me.lng - from.lng) * t),
+      );
+      if (t < 1) walk.current = requestAnimationFrame(step);
+      else setWalking(meBox, false);
+    };
+    walk.current = requestAnimationFrame(step);
+  }, [maps, meBox, me]);
+
+  // 내 위치를 못 쓰게 되거나 화면을 떠나면 치운다
+  const hasMe = Boolean(me);
+  useEffect(() => {
+    if (hasMe) return;
+    meOverlay.current?.setMap(null);
+    meOverlay.current = null;
+  }, [hasMe]);
+  useEffect(
+    () => () => {
+      if (walk.current !== undefined) cancelAnimationFrame(walk.current);
+      meOverlay.current?.setMap(null);
+    },
+    [],
+  );
 
   // 핀이 바뀌면 모두 보이게 맞춘다 (맛집 리스트·PICK). 한 곳뿐이면 동네 크기로
   const place = pins.map((p) => `${p.lat},${p.lng}`).join('|');
@@ -228,6 +318,7 @@ function KakaoMapView(props: Props & { maps: KakaoMaps }) {
   return (
     <>
       <div ref={box} className={styles.map} />
+      {props.me && createPortal(props.me.marker, meBox)}
       {fit && (
         <div className={styles.zoom}>
           <button type="button" aria-label="지도 확대" onClick={() => zoom(-1)}>
@@ -297,9 +388,23 @@ function SimpleMap(props: Props & { notice: string }) {
     });
   };
 
+  const me = props.me;
   return (
     <div className={`${styles.map} ${styles.simple}`} onClick={click}>
       <div ref={layer} className={styles.layer} />
+      {me && (
+        <div
+          className={styles.simpleMe}
+          data-walking="false"
+          style={{
+            left: `${((me.coords.lng - (center.lng - halfLng)) / (2 * halfLng)) * 100}%`,
+            top: `${((center.lat + halfLat - me.coords.lat) / (2 * halfLat)) * 100}%`,
+            transform: `translate(-50%, -${MY_LOCATION_Y_ANCHOR * 100}%)`,
+          }}
+        >
+          {me.marker}
+        </div>
+      )}
       <p className={styles.notice} data-fit={fit}>
         {notice}
       </p>

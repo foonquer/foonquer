@@ -66,6 +66,11 @@
   max-height: 72%;
 }
 
+/* 바탕 없이 쓸 때는 높이 제한을 풀고 넓이로만 크기를 정한다 */
+.free {
+  max-height: none;
+}
+
 .bodyImage {
   display: block;
   width: 100%;

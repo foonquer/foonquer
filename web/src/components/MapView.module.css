@@ -48,6 +48,15 @@
   cursor: pointer;
 }
 
+/* 간단한 지도의 내 위치 먹깨비 (위치가 바뀌면 미끄러지듯 옮긴다) */
+.simpleMe {
+  position: absolute;
+  z-index: 3;
+  transition:
+    left 0.8s ease-in-out,
+    top 0.8s ease-in-out;
+}
+
 .simplePin {
   position: absolute;
   transform: translate(-50%, -100%);

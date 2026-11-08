@@ -75,6 +75,46 @@ function placeOf(category: ItemCategory, code: string): CSSProperties | null {
 const LAYERS: ItemCategory[] = ['CLUB', 'PROP', 'FACE', 'HAT'];
 const SPOTS: ItemCategory[] = ['HAT', 'FACE', 'PROP', 'CLUB'];
 
+/** 몸 그림 고르기: 알이면 알, 밤하늘(SKIN)이면 밤하늘 먹깨비 */
+function bodyArt(wearing: Wearing, stage?: Stage) {
+  return stage === 'EGG' ? egg : wearing.SKIN?.code === 'SKIN_NIGHTSKY' ? nightsky : mukkaebi;
+}
+
+/** 그림이 있는 착용 아이템과 몸 위 자리 */
+function placedItems(wearing: Wearing) {
+  return LAYERS.flatMap((c) => {
+    const item = wearing[c];
+    const art = itemArt(item?.code);
+    const place = item?.code ? placeOf(c, item.code) : null;
+    return item && art && place ? [{ c, art, place }] : [];
+  });
+}
+
+/**
+ * 바탕 없이 몸과 입힌 아이템만 (프로필 동그라미·지도 위 내 위치 먹깨비).
+ * 그림이 없는 아이템은 칸 아이콘 자리가 없어 그리지 않는다
+ */
+export function MukkaebiBody({
+  wearing,
+  stage,
+  width,
+  className,
+}: {
+  wearing: Wearing;
+  stage?: Stage;
+  width: number;
+  className?: string;
+}) {
+  return (
+    <span className={`${styles.body} ${styles.free} ${className ?? ''}`} style={{ width }}>
+      <img src={bodyArt(wearing, stage)} alt="" className={styles.bodyImage} />
+      {placedItems(wearing).map(({ c, art, place }) => (
+        <img key={c} src={art} alt="" className={styles.item} data-layer={c} style={place} />
+      ))}
+    </span>
+  );
+}
+
 /** 꾸민 먹깨비 그림. 밤하늘(SKIN)이면 몸이 밤하늘 먹깨비, 모자·얼굴·소품·방망이는 몸 위에 입힌다 */
 export function MukkaebiFigure({
   wearing,
@@ -84,13 +124,8 @@ export function MukkaebiFigure({
   badge,
   height = 260,
 }: Props) {
-  const body = stage === 'EGG' ? egg : wearing.SKIN?.code === 'SKIN_NIGHTSKY' ? nightsky : mukkaebi;
-  const placed = LAYERS.flatMap((c) => {
-    const item = wearing[c];
-    const art = itemArt(item?.code);
-    const place = item?.code ? placeOf(c, item.code) : null;
-    return item && art && place ? [{ c, art, place }] : [];
-  });
+  const body = bodyArt(wearing, stage);
+  const placed = placedItems(wearing);
   // 그림이 없는 아이템은 둘레에 칸 모양 아이콘과 이름
   const spots = SPOTS.filter((c) => wearing[c] && !placed.some((p) => p.c === c));
   const bgArt = backgroundArt(background?.bgKey);
