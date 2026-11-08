@@ -622,10 +622,76 @@ describe('방문 인증', () => {
     fireEvent.click(await screen.findByRole('button', { name: '새맛집 정복하기' }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/visits/40/follow'));
+    // 정복 준비가 끝나면 이어서 하기에서 지운다
+    expect(localStorage.getItem('mk:pending-onsite')).toBeNull();
     expect(server.calls('POST /visit-verifications/:id/on-site')[0].body).toEqual({
       sitePhotoKey: 'receipt/1/a.jpg',
     });
     expect(await screen.findByText(/새맛집까지 이동 중|새맛집 도착!/)).toBeInTheDocument();
+  });
+
+  describe('위치만 확인해 두고 나중에 사진 올리기', () => {
+    /** 지금부터 minutes 뒤 (KST ISO, 서버 expiresAt 모양) */
+    const kstAfter = (minutes: number) =>
+      new Date(Date.now() + (9 * 60 + minutes) * 60_000).toISOString().replace(/\.\d+Z$/, '+09:00');
+    const onSiteApi = (expiresAt: string) => ({
+      'GET /restaurants/:id': ok({
+        restaurantId: 7,
+        name: '새맛집',
+        categoryName: '한식',
+        dongName: '가양동',
+        lat: 37.5628,
+        lng: 126.8571,
+      }),
+      'POST /visit-verifications/location-checks': ok({
+        verificationId: 40,
+        restaurantId: 7,
+        distanceM: 42,
+        allowedM: 100,
+        expiresAt,
+      }),
+    });
+
+    beforeEach(() => {
+      Object.defineProperty(navigator, 'geolocation', {
+        configurable: true,
+        value: {
+          getCurrentPosition: (done: (p: object) => void) =>
+            done({ coords: { latitude: 37.5627, longitude: 126.8572, accuracy: 12 } }),
+        },
+      });
+    });
+
+    it('나갔다 다시 오면 인증 방식 화면에서 이어 하고, 위치 확인 없이 음식 사진부터', async () => {
+      const expiresAt = kstAfter(120);
+      const server = mockApi(onSiteApi(expiresAt));
+      const { router } = renderRoute('/visits/new/on-site?restaurantId=7');
+      fireEvent.click(await screen.findByRole('button', { name: '위치 권한 허용하기' }));
+      expect(await screen.findByText('매장 위치 확인 완료')).toBeInTheDocument();
+
+      // 식사하러 나갔다가 홈 → 정복하기로 다시 온다
+      await act(() => router.navigate('/visits/new'));
+      const resume = await screen.findByRole('link', { name: /새맛집 이어서 인증하기/ });
+      expect(resume).toHaveTextContent(`${expiresAt.slice(11, 16)}까지 음식 사진만 올리면 돼요`);
+      fireEvent.click(resume);
+
+      expect(await screen.findByText(/위치 확인 완료 · .*까지 올리면 돼요/)).toBeInTheDocument();
+      expect(screen.getByLabelText(/탭해서 갤러리에서 사진을 골라주세요/)).toBeInTheDocument();
+      expect(server.calls('POST /visit-verifications/location-checks')).toHaveLength(1);
+    });
+
+    it('2시간이 지난 위치 확인은 잊고 처음부터 한다', async () => {
+      mockApi(onSiteApi(kstAfter(-1)));
+      const { router } = renderRoute('/visits/new/on-site?restaurantId=7');
+      fireEvent.click(await screen.findByRole('button', { name: '위치 권한 허용하기' }));
+      await screen.findByText('매장 위치 확인 완료');
+
+      await act(() => router.navigate('/visits/new'));
+      expect(await screen.findByText('어떻게 방문을 인증할까요?')).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /이어서 인증하기/ })).not.toBeInTheDocument();
+      await act(() => router.navigate('/visits/new/on-site?restaurantId=7'));
+      expect(await screen.findByRole('button', { name: '위치 권한 허용하기' })).toBeInTheDocument();
+    });
   });
 
   it('매장에서 멀면 거리를 알려 주고 다시 확인할 수 있다', async () => {

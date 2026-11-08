@@ -23,8 +23,8 @@ import { FAIL_MESSAGES, VisitError } from './visit.errors';
 
 /** 현장 인증 허용 거리 (m) — "매장에서 42m · 인증 범위 100m 이내" */
 export const ALLOWED_DISTANCE_M = 100;
-/** 위치 확인 뒤 음식 사진을 고를 수 있는 시간 (초) */
-export const LOCATION_CHECK_TTL_SEC = 600;
+/** 위치 확인 뒤 음식 사진을 올릴 수 있는 시간 (초). 가게에 도착해 확인하고 다 먹은 뒤 올릴 수 있게 2시간 */
+export const LOCATION_CHECK_TTL_SEC = 2 * 60 * 60;
 /** 사진 EXIF 위치가 가게에서 이보다 멀면 다른 곳 사진으로 본다 (m) */
 const PHOTO_DISTANCE_LIMIT_M = 300;
 /** 사진 EXIF 촬영 시각이 위치 확인보다 이만큼 이전이면 오래된 사진으로 본다 (시간) */

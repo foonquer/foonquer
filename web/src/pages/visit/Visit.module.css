@@ -567,6 +567,45 @@
   color: var(--mk-forest);
 }
 
+/* 위치만 확인해 두고 사진을 아직 안 올린 현장인증 이어서 하기 */
+.resume {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--mk-green);
+  border-radius: 18px;
+  background: var(--mk-green-50);
+  color: var(--mk-forest);
+}
+
+.resume > span:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.resumeTitle {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.resumeText {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.until {
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--mk-green-50);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--mk-forest);
+}
+
 .searchLink {
   display: flex;
   justify-content: space-between;

@@ -65,8 +65,17 @@ describe('VISIT-01·02 현장 인증', () => {
       .send({ restaurantId: Number(restaurant.id), lat: north(lat, 42), lng, accuracyM: 15 });
     expect(check.status).toBe(201);
     expect(check.body.data).toMatchObject({ distanceM: 42, allowedM: 100 });
+    // 가게에 도착해 확인하고 다 먹은 뒤 사진을 올릴 수 있게 2시간
+    const expiresInMin = (Date.parse(check.body.data.expiresAt) - Date.now()) / 60_000;
+    expect(expiresInMin).toBeGreaterThan(119);
+    expect(expiresInMin).toBeLessThanOrEqual(120);
     const id = check.body.data.verificationId as number;
 
+    // 1시간 반 뒤에 올려도 된다
+    await prisma.visit.update({
+      where: { id: BigInt(id) },
+      data: { checkinAt: new Date(Date.now() - 90 * 60_000) },
+    });
     const photo = await request(app)
       .post(`/api/v1/visit-verifications/${id}/on-site`)
       .set('Authorization', bearer(me.id))
@@ -104,7 +113,7 @@ describe('VISIT-01·02 현장 인증', () => {
     expect(again.body.data.verificationId).toBe(id);
   });
 
-  it('100m 밖이면 422 VISIT_TOO_FAR, 사진 위치가 300m 넘게 다르면 422 PHOTO_MISMATCH, 10분 지나면 409', async () => {
+  it('100m 밖이면 422 VISIT_TOO_FAR, 사진 위치가 300m 넘게 다르면 422 PHOTO_MISMATCH, 2시간 지나면 409', async () => {
     const { me, restaurant, lat, lng } = await setup();
     const far = await request(app)
       .post('/api/v1/visit-verifications/location-checks')
@@ -134,7 +143,7 @@ describe('VISIT-01·02 현장 인증', () => {
 
     await prisma.visit.update({
       where: { id: BigInt(id) },
-      data: { checkinAt: new Date(Date.now() - 11 * 60_000) },
+      data: { checkinAt: new Date(Date.now() - 121 * 60_000) },
     });
     const expired = await request(app)
       .post(`/api/v1/visit-verifications/${id}/on-site`)
