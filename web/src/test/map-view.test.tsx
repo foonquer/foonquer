@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { MapView } from '../components/MapView';
 
@@ -172,6 +173,25 @@ describe('MapView 내 위치 (홈)', () => {
     // 위치를 못 쓰게 되면 치운다
     rerender(<MapView {...props} me={null} />);
     expect(screen.queryByText('내 먹깨비')).not.toBeInTheDocument();
+  });
+});
+
+describe('MapView 내 위치 (StrictMode)', () => {
+  it('효과가 두 번 돌아도(개발 모드) 새 지도에 내 먹깨비를 다시 붙인다', async () => {
+    fakeKakao();
+    render(
+      <StrictMode>
+        <MapView
+          center={{ lat: 37.56, lng: 126.85 }}
+          pins={pins}
+          selectedId={null}
+          onPinClick={vi.fn()}
+          onBoundsChange={vi.fn()}
+          me={{ coords: { lat: 37.56, lng: 126.85 }, marker: <span>내 먹깨비</span> }}
+        />
+      </StrictMode>,
+    );
+    expect(await screen.findByText('내 먹깨비')).toBeInTheDocument();
   });
 });
 

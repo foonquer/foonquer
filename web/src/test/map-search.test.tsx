@@ -427,6 +427,24 @@ describe('홈 지도 (MAP-01·02)', () => {
       });
     });
 
+    it('권한을 막았다가 허용하고 다시 누르면 위치를 새로 받는다', async () => {
+      let calls = 0;
+      fakeLocation('prompt', (ok, fail) => {
+        calls += 1;
+        if (calls === 1) fail({ code: 1, PERMISSION_DENIED: 1 });
+        else ok({ coords: ME });
+      });
+      mockApi(homeApi);
+      renderRoute('/');
+      const button = await screen.findByRole('button', { name: '내 위치로 이동' });
+
+      fireEvent.click(button);
+      expect(await screen.findByText(/위치 권한이 꺼져 있어요/)).toBeInTheDocument();
+      fireEvent.click(button);
+      expect(await screen.findByText('내 먹깨비')).toBeInTheDocument();
+      expect(calls).toBe(2);
+    });
+
     it('위치 권한을 막았으면 켜는 방법을 알려 준다', async () => {
       fakeLocation('prompt', (_ok, fail) => fail({ code: 1, PERMISSION_DENIED: 1 }));
       mockApi(homeApi);

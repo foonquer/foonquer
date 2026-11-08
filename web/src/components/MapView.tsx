@@ -268,6 +268,8 @@ function KakaoMapView(props: Props & { maps: KakaoMaps }) {
     () => () => {
       if (walk.current !== undefined) cancelAnimationFrame(walk.current);
       meOverlay.current?.setMap(null);
+      // 다시 붙을 때(StrictMode 등) 새 지도에 새로 만들도록 비운다
+      meOverlay.current = null;
     },
     [],
   );

@@ -87,6 +87,8 @@ export function HomePage() {
       wantFocus.current = null;
     },
     onError: (error) => {
+      // 권한을 막으면 브라우저가 감시를 멈추므로 꺼 둔다 → 허용한 뒤 버튼을 다시 누르면 새로 시작
+      if (error === 'DENIED') setWatching(false);
       // 버튼을 눌렀을 때만 알린다 (자동으로 켠 경우는 조용히)
       if (!wantFocus.current) return;
       wantFocus.current = null;
