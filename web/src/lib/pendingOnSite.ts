@@ -32,7 +32,15 @@ export const pendingOnSite = {
   save(restaurantId: number, restaurantName: string, check: PendingCheck) {
     writeJson(KEY, { owner: sessionOwner(), restaurantId, restaurantName, check } satisfies Saved);
   },
-  clear() {
+  /**
+   * 지운다. verificationId를 주면 저장된 것이 그 위치 확인일 때만
+   * (다른 탭이 그사이 새 위치 확인을 저장했으면 남겨 둔다)
+   */
+  clear(verificationId?: number) {
+    if (verificationId !== undefined) {
+      const saved = readJson<Saved | null>(KEY, null);
+      if (saved?.check?.verificationId !== verificationId) return;
+    }
     try {
       localStorage.removeItem(KEY);
     } catch {

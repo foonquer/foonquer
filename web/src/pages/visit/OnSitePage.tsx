@@ -328,7 +328,7 @@ function OnSite({ r, passed }: { r: RestaurantDetail; passed: PassedCoords | nul
     getVerification(resumed.verificationId).then(
       (v) => {
         if (!alive || (v.status === 'LOCATION_CHECKED' && !v.isExpired)) return;
-        pendingOnSite.clear();
+        pendingOnSite.clear(resumed.verificationId);
         setStep({ kind: 'start' });
       },
       () => {
@@ -380,7 +380,7 @@ function OnSite({ r, passed }: { r: RestaurantDetail; passed: PassedCoords | nul
         photoLat: s.meta.lat,
         photoLng: s.meta.lng,
       });
-      pendingOnSite.clear();
+      pendingOnSite.clear(s.check.verificationId);
       if (result.reward.point > 0)
         toast({ message: `방문 인증 +${result.reward.point}P`, check: true });
       navigate(`/visits/${result.verificationId}/follow`, { replace: true });
@@ -395,7 +395,7 @@ function OnSite({ r, passed }: { r: RestaurantDetail; passed: PassedCoords | nul
         err instanceof ApiError &&
         (err.code === 'LOCATION_CHECK_EXPIRED' || err.code === 'INVALID_VISIT_STATE')
       ) {
-        pendingOnSite.clear();
+        pendingOnSite.clear(s.check.verificationId);
         setStep({ kind: 'start' });
       }
     }

@@ -697,6 +697,39 @@ describe('방문 인증', () => {
       expect(localStorage.getItem('mk:pending-onsite')).toBeNull();
     });
 
+    it('지울 때 그사이 다른 탭이 저장한 새 위치 확인은 남겨 둔다', async () => {
+      const saved = (verificationId: number) =>
+        JSON.stringify({
+          owner: '',
+          restaurantId: 7,
+          restaurantName: '새맛집',
+          check: {
+            verificationId,
+            distanceM: 42,
+            allowedM: 100,
+            expiresAt: kstAfter(120),
+            me: { lat: 37.5627, lng: 126.8572 },
+          },
+        });
+      localStorage.setItem('mk:pending-onsite', saved(40));
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      mockApi({
+        ...onSiteApi(kstAfter(120)),
+        'GET /visit-verifications/:id': async () => {
+          await held;
+          return ok(verification({ verificationId: 40, status: 'VERIFIED' }));
+        },
+      });
+      renderRoute('/visits/new/on-site?restaurantId=7');
+      expect(await screen.findByText(/위치 확인 완료 · .*까지 올리면 돼요/)).toBeInTheDocument();
+
+      localStorage.setItem('mk:pending-onsite', saved(41)); // 다른 탭이 새로 확인
+      release();
+      expect(await screen.findByRole('button', { name: '위치 권한 허용하기' })).toBeInTheDocument();
+      expect(JSON.parse(localStorage.getItem('mk:pending-onsite')!).check.verificationId).toBe(41);
+    });
+
     it('2시간이 지난 위치 확인은 잊고 처음부터 한다', async () => {
       mockApi(onSiteApi(kstAfter(-1)));
       const { router } = renderRoute('/visits/new/on-site?restaurantId=7');
