@@ -303,6 +303,20 @@ describe('MAP-03 GET /map/nearest-restaurant — 누른 자리의 가장 가까�
     expect(saved.kakaoPlaceId).toBe('333');
   });
 
+  it('카카오 장소 가까이에 이름이 다른 가게가 많아도 100m 안 이름이 맞는 가게를 찾는다', async () => {
+    const me = await createMember();
+    // 빽빽한 건물: 이름이 다른 가게 60곳이 카카오 장소 바로 옆에 있다
+    for (let i = 0; i < 60; i += 1) await createRestaurant({ name: `다른가게${i}`, ...at(0, 1) });
+    const shop = await createRestaurant({ name: '골목끝국밥', ...at(80, 0) });
+    stubKakao({
+      category: (p) =>
+        p.get('category_group_code') === 'FD6' ? [place('666', '골목끝국밥', 5)] : [],
+    });
+
+    const res = await nearest(me.id);
+    expect(res.body.data).toEqual({ restaurantId: Number(shop.id), placeName: '골목끝국밥' });
+  });
+
   it('카카오 가게가 우리 가게가 아니면 이름만 알려 준다 (다른 가게를 대신 보여 주지 않는다)', async () => {
     const me = await createMember();
     await createRestaurant({ name: '옆집분식', ...at(5, 0) });

@@ -103,6 +103,11 @@ export async function getMapRestaurants(userId: bigint, q: MapRestaurantsQuery) 
 
 /** 카카오 장소와 같은 가게로 볼 우리 가게의 최대 거리(m). 음식점 상세(kakao-link)와 같은 기준 */
 const SAME_STORE_RADIUS_M = 100;
+/**
+ * 이름을 맞춰 볼 100m 안 가게 수 상한. 가까운 곳이 모두 다른 이름이어도 맞는 가게를 놓치지 않게 넉넉히 둔다
+ * (서울에서 가게가 가장 빽빽한 구도 100m 안은 수백 곳 아래)
+ */
+const SAME_STORE_MAX_CANDIDATES = 1000;
 
 /** 영업 중(A)인 우리 가게 중 (lat, lng)에서 radiusM 안, 가까운 순. 위경도 사각형으로 먼저 좁힌다 */
 function nearbyRestaurants(
@@ -139,7 +144,7 @@ async function restaurantForPlace(place: KakaoNearPlace): Promise<bigint | null>
     Number(place.x),
     SAME_STORE_RADIUS_M,
     Prisma.sql`AND r.kakao_place_id IS NULL`,
-    50,
+    SAME_STORE_MAX_CANDIDATES,
   );
   const match = near.find((r) => storeNameMatches(place.place_name, r.name));
   if (!match) return null;
