@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import type { KakaoPlace } from '../../src/lib/kakao-local';
+import type { KakaoNearPlace, KakaoPlace } from '../../src/lib/kakao-local';
 
 /** 카카오 장소 검색 결과 한 곳 */
 export function kakaoPlace(overrides: Partial<KakaoPlace> & { id: string }): KakaoPlace {
@@ -22,6 +22,8 @@ type PlaceHandler = (params: URLSearchParams) => KakaoPlace[] | number;
 interface KakaoStub {
   /** 키워드 검색 (REST-01 전화번호·장소 ID). 숫자를 돌려주면 그 HTTP 상태로 실패 */
   keyword?: PlaceHandler;
+  /** 카테고리 검색 (MAP-03, category_group_code별). 숫자를 돌려주면 그 HTTP 상태로 실패 */
+  category?: (params: URLSearchParams) => KakaoNearPlace[] | number;
   /** 좌표 → 법정동 코드 (없으면 빈 결과) */
   coord2region?: (params: URLSearchParams) => string | null;
 }
@@ -33,6 +35,11 @@ export function stubKakao(stub: KakaoStub = {}) {
     const params = url.searchParams;
     if (url.pathname === '/v2/local/search/keyword.json') {
       const result = stub.keyword ? stub.keyword(params) : [];
+      if (typeof result === 'number') return Promise.resolve(json({ message: 'error' }, result));
+      return Promise.resolve(json({ meta: { is_end: true }, documents: result }));
+    }
+    if (url.pathname === '/v2/local/search/category.json') {
+      const result = stub.category ? stub.category(params) : [];
       if (typeof result === 'number') return Promise.resolve(json({ message: 'error' }, result));
       return Promise.resolve(json({ meta: { is_end: true }, documents: result }));
     }

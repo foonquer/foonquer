@@ -33,15 +33,19 @@ export async function findKakaoPlace(r: LinkTarget): Promise<KakaoPlace | null> 
     ? places.find((p) => p.id === r.kakaoPlaceId)
     : places.find((p) => storeNameMatches(p.place_name, r.name));
   if (!place || r.kakaoPlaceId) return place ?? null;
+  await saveKakaoPlaceId(r.id, place.id);
+  return place;
+}
 
+/** 처음 찾은 카카오 장소 ID만 저장한다 (카카오 이용 정책상 저장해도 되는 값). 이미 ID가 있으면 그대로 둔다 */
+export async function saveKakaoPlaceId(restaurantId: bigint, placeId: string) {
   try {
     await prisma.restaurant.updateMany({
-      where: { id: r.id, kakaoPlaceId: null },
-      data: { kakaoPlaceId: place.id },
+      where: { id: restaurantId, kakaoPlaceId: null },
+      data: { kakaoPlaceId: placeId },
     });
   } catch (err) {
     // 공공데이터에 같은 가게가 두 번 있어 다른 행이 이미 이 ID를 가졌으면 저장하지 않는다
     if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002')) throw err;
   }
-  return place;
 }

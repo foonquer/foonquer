@@ -199,7 +199,7 @@ describe('홈 지도 (MAP-01·02)', () => {
     expect(router.state.location.search).toBe('?restaurantId=4');
   });
 
-  describe('핀이 아닌 곳을 누르면 그 자리 가게를 찾는다', () => {
+  describe('핀이 아닌 곳을 누르면 그 자리에서 가장 가까운 음식점을 보여 준다', () => {
     const previewOf = (restaurantId: number, name: string) =>
       ok({
         restaurantId,
@@ -237,28 +237,20 @@ describe('홈 지도 (MAP-01·02)', () => {
       fireEvent.click(map, { clientX: 200, clientY: 300 });
     }
 
-    /** 지도 가운데(가양동 중심)에서 북쪽·동쪽으로 offsetM씩 떨어진 가게 (거리는 offsetM·√2) */
-    const here = (restaurantId: number, name: string, offsetM = 0) => ({
-      ...pin(restaurantId, name, 'NOT_CONQUERED'),
-      lat: GAYANG.centerLat + offsetM / 111_320,
-      lng: GAYANG.centerLng + offsetM / (111_320 * Math.cos((GAYANG.centerLat * Math.PI) / 180)),
+    /** 내 가게 핀(MAP-01 mineOnly)과 누른 자리의 가장 가까운 음식점(MAP-03) */
+    const mapApi = (nearest: { restaurantId: number | null; placeName: string | null }) => ({
+      'GET /map/restaurants': ok({
+        items: [pin(9, '내가찜한집', 'NOT_CONQUERED')],
+        totalCount: 1,
+        truncated: false,
+      }),
+      'GET /map/nearest-restaurant': ok(nearest),
     });
 
-    /** 내 가게 핀(mineOnly)과 누른 자리 찾기(mineOnly 없음)를 따로 답한다 */
-    const mapApi = (tapped: ReturnType<typeof pin>[]) => ({
-      'GET /map/restaurants': ({ query }: { query: URLSearchParams }) =>
-        ok({
-          items:
-            query.get('mineOnly') === 'true' ? [pin(9, '내가찜한집', 'NOT_CONQUERED')] : tapped,
-          totalCount: 0,
-          truncated: false,
-        }),
-    });
-
-    it('한 곳이면 바로 미리보기. 누른 자리 30m 안을 찜·정복과 상관없이 찾는다', async () => {
+    it('가장 가까운 음식점 1곳을 바로 미리보기. 반경은 보이는 지도 가로의 6%', async () => {
       const server = mockApi({
         ...regionApi,
-        ...mapApi([here(5, '옆집국밥')]),
+        ...mapApi({ restaurantId: 5, placeName: '옆집국밥' }),
         'GET /restaurants/:id/preview': previewOf(5, '옆집국밥'),
       });
       renderRoute('/');
@@ -268,52 +260,42 @@ describe('홈 지도 (MAP-01·02)', () => {
 
       const sheet = await screen.findByRole('dialog', { name: '가게 미리보기' });
       expect(await within(sheet).findByText('옆집국밥')).toBeInTheDocument();
-      const tap = server.calls('GET /map/restaurants').find((c) => !c.query.has('mineOnly'));
-      if (!tap) throw new Error('누른 자리 찾기 요청이 없다');
-      const [swLat, swLng, neLat, neLng] = ['swLat', 'swLng', 'neLat', 'neLng'].map((k) =>
-        Number(tap.query.get(k)),
-      );
-      // 가양동 중심(= 지도 가운데) 둘레 위아래 30m씩
-      expect((swLat + neLat) / 2).toBeCloseTo(GAYANG.centerLat, 6);
-      expect((swLng + neLng) / 2).toBeCloseTo(GAYANG.centerLng, 6);
-      expect((neLat - swLat) * 111_320).toBeCloseTo(60, 0);
-      expect(neLng - swLng).toBeGreaterThan(neLat - swLat);
+      const [tap] = server.calls('GET /map/nearest-restaurant');
+      expect(Number(tap.query.get('lat'))).toBeCloseTo(GAYANG.centerLat, 6);
+      expect(Number(tap.query.get('lng'))).toBeCloseTo(GAYANG.centerLng, 6);
+      // 지금 보이는 지도(MAP-01로 물은 영역) 가로 m의 6%, 20~100m
+      const view = server.calls('GET /map/restaurants')[0].query;
+      const widthM =
+        (Number(view.get('neLng')) - Number(view.get('swLng'))) *
+        111_320 *
+        Math.cos((GAYANG.centerLat * Math.PI) / 180);
+      const expected = Math.min(100, Math.max(20, Math.round(widthM * 0.06)));
+      expect(Number(tap.query.get('radiusM'))).toBe(expected);
     });
 
-    it('여러 곳이면 가까운 순 목록에서 고른다', async () => {
-      mockApi({
-        ...regionApi,
-        ...mapApi([here(5, '옆집국밥'), here(6, '2층카페', 10)]),
-        'GET /restaurants/:id/preview': previewOf(6, '2층카페'),
-      });
+    it('카카오 가게가 아직 우리 가게가 아니면 이름으로 알려 준다', async () => {
+      mockApi({ ...regionApi, ...mapApi({ restaurantId: null, placeName: '골목포차' }) });
       renderRoute('/');
       await screen.findByRole('button', { name: '내가찜한집 (미정복)' });
 
       await tapMapCenter();
-
-      const list = await screen.findByRole('dialog', { name: '이 자리의 가게' });
       expect(
-        within(list)
-          .getAllByRole('button')
-          .map((b) => b.textContent),
-      ).toEqual(['옆집국밥한식', '2층카페한식']);
-      fireEvent.click(within(list).getByRole('button', { name: /2층카페/ }));
-      const sheet = await screen.findByRole('dialog', { name: '가게 미리보기' });
-      expect(await within(sheet).findByText('2층카페')).toBeInTheDocument();
-      expect(screen.queryByRole('dialog', { name: '이 자리의 가게' })).not.toBeInTheDocument();
+        await screen.findByText('골목포차는 아직 먹장깨기에 없는 가게예요'),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: '가게 미리보기' })).not.toBeInTheDocument();
     });
 
     it('없으면 안내하고, 핀을 누른 것은 지도를 누른 것으로 치지 않는다', async () => {
       const server = mockApi({
         ...regionApi,
-        ...mapApi([]),
+        ...mapApi({ restaurantId: null, placeName: null }),
         'GET /restaurants/:id/preview': previewOf(9, '내가찜한집'),
       });
       renderRoute('/');
 
       fireEvent.click(await screen.findByRole('button', { name: '내가찜한집 (미정복)' }));
       await screen.findByRole('dialog', { name: '가게 미리보기' });
-      expect(server.calls('GET /map/restaurants').every((c) => c.query.has('mineOnly'))).toBe(true);
+      expect(server.calls('GET /map/nearest-restaurant')).toHaveLength(0);
 
       await tapMapCenter();
       expect(await screen.findByText('이 자리에서 가게를 찾지 못했어요')).toBeInTheDocument();
@@ -324,18 +306,15 @@ describe('홈 지도 (MAP-01·02)', () => {
       let release!: () => void;
       const held = new Promise<void>((resolve) => (release = resolve));
       const names: Record<number, string> = { 5: '지난집', 6: '새집', 9: '내가찜한집' };
-      const reply = (items: ReturnType<typeof pin>[]) =>
-        ok({ items, totalCount: 0, truncated: false });
       let taps = 0;
       mockApi({
         ...regionApi,
-        'GET /map/restaurants': async ({ query }: { query: URLSearchParams }) => {
-          if (query.get('mineOnly') === 'true')
-            return reply([pin(9, '내가찜한집', 'NOT_CONQUERED')]);
+        ...mapApi({ restaurantId: null, placeName: null }),
+        'GET /map/nearest-restaurant': async () => {
           taps += 1;
-          if (taps > 1) return reply([here(6, '새집')]);
+          if (taps > 1) return ok({ restaurantId: 6, placeName: '새집' });
           await held;
-          return reply([here(5, '지난집')]);
+          return ok({ restaurantId: 5, placeName: '지난집' });
         },
         'GET /restaurants/:id/preview': ({ path }: { path: string }) => {
           const id = Number(path.split('/')[2]);
@@ -373,16 +352,6 @@ describe('홈 지도 (MAP-01·02)', () => {
       await tapMapCenter();
       fireEvent.click(myPin);
       await expectPreviewStays(release, '내가찜한집');
-    });
-
-    it('찾는 네모의 모서리처럼 30m 밖에 있는 가게는 치지 않는다', async () => {
-      mockApi({ ...regionApi, ...mapApi([here(5, '모서리집', 25)]) });
-      renderRoute('/');
-      await screen.findByRole('button', { name: '내가찜한집 (미정복)' });
-
-      await tapMapCenter();
-      expect(await screen.findByText('이 자리에서 가게를 찾지 못했어요')).toBeInTheDocument();
-      expect(screen.queryByRole('dialog', { name: '가게 미리보기' })).not.toBeInTheDocument();
     });
   });
 

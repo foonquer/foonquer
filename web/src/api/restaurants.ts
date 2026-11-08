@@ -47,6 +47,17 @@ export const getMapRestaurants = (query: Bounds & { mineOnly?: boolean }, signal
     signal,
   );
 
+/**
+ * MAP-03 누른 자리에서 가장 가까운 음식점 (카카오 음식점·카페 기준).
+ * 그 카카오 가게가 우리 가게가 아니면 restaurantId null, placeName에 카카오 이름만 온다
+ */
+export const getNearestRestaurant = (query: Coords & { radiusM: number }, signal?: AbortSignal) =>
+  api.get<{ restaurantId: number | null; placeName: string | null }>(
+    '/map/nearest-restaurant',
+    query,
+    signal,
+  );
+
 /** MAP-02 가게 미리보기 */
 export type RestaurantPreview = {
   restaurantId: number;
