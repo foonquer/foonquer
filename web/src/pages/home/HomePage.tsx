@@ -108,6 +108,8 @@ export function HomePage() {
           boundsAround(point, TAP_RADIUS_M),
           controller.signal,
         );
+        // 응답이 이미 와 있던 이전 요청은 abort로 못 막으니 결과를 버린다
+        if (controller.signal.aborted) return;
         // 서버가 누른 자리에서 가까운 순으로 준다
         const near = items.filter((r) => metersBetween(point, r) <= TAP_RADIUS_M);
         if (near.length === 0) {
