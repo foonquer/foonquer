@@ -237,6 +237,13 @@ describe('홈 지도 (MAP-01·02)', () => {
       fireEvent.click(map, { clientX: 200, clientY: 300 });
     }
 
+    /** 지도 가운데(가양동 중심)에서 북쪽·동쪽으로 offsetM씩 떨어진 가게 (거리는 offsetM·√2) */
+    const here = (restaurantId: number, name: string, offsetM = 0) => ({
+      ...pin(restaurantId, name, 'NOT_CONQUERED'),
+      lat: GAYANG.centerLat + offsetM / 111_320,
+      lng: GAYANG.centerLng + offsetM / (111_320 * Math.cos((GAYANG.centerLat * Math.PI) / 180)),
+    });
+
     /** 내 가게 핀(mineOnly)과 누른 자리 찾기(mineOnly 없음)를 따로 답한다 */
     const mapApi = (tapped: ReturnType<typeof pin>[]) => ({
       'GET /map/restaurants': ({ query }: { query: URLSearchParams }) =>
@@ -251,7 +258,7 @@ describe('홈 지도 (MAP-01·02)', () => {
     it('한 곳이면 바로 미리보기. 누른 자리 30m 안을 찜·정복과 상관없이 찾는다', async () => {
       const server = mockApi({
         ...regionApi,
-        ...mapApi([pin(5, '옆집국밥', 'NOT_CONQUERED')]),
+        ...mapApi([here(5, '옆집국밥')]),
         'GET /restaurants/:id/preview': previewOf(5, '옆집국밥'),
       });
       renderRoute('/');
@@ -276,7 +283,7 @@ describe('홈 지도 (MAP-01·02)', () => {
     it('여러 곳이면 가까운 순 목록에서 고른다', async () => {
       mockApi({
         ...regionApi,
-        ...mapApi([pin(5, '옆집국밥', 'NOT_CONQUERED'), pin(6, '2층카페', 'NOT_CONQUERED')]),
+        ...mapApi([here(5, '옆집국밥'), here(6, '2층카페', 10)]),
         'GET /restaurants/:id/preview': previewOf(6, '2층카페'),
       });
       renderRoute('/');
@@ -310,6 +317,16 @@ describe('홈 지도 (MAP-01·02)', () => {
 
       await tapMapCenter();
       expect(await screen.findByText('이 자리에서 가게를 찾지 못했어요')).toBeInTheDocument();
+    });
+
+    it('찾는 네모의 모서리처럼 30m 밖에 있는 가게는 치지 않는다', async () => {
+      mockApi({ ...regionApi, ...mapApi([here(5, '모서리집', 25)]) });
+      renderRoute('/');
+      await screen.findByRole('button', { name: '내가찜한집 (미정복)' });
+
+      await tapMapCenter();
+      expect(await screen.findByText('이 자리에서 가게를 찾지 못했어요')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: '가게 미리보기' })).not.toBeInTheDocument();
     });
   });
 
