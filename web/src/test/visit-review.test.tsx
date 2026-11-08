@@ -142,6 +142,8 @@ describe('방문 인증', () => {
         value: { getCurrentPosition: (done: (p: object) => void) => done({ coords: ME }) },
       });
     });
+    // 단언이 실패해도 Date.now 등 스파이가 다음 테스트로 새지 않게
+    afterEach(() => vi.restoreAllMocks());
 
     it('내 위치 100m 안 가게를 가까운 순으로 고르면, 그 위치로 바로 매장 위치를 확인한다', async () => {
       const server = mockApi({
@@ -227,7 +229,6 @@ describe('방문 인증', () => {
         ),
       ).toBeInTheDocument();
       expect(server.calls('POST /visit-verifications/location-checks')).toHaveLength(0);
-      vi.restoreAllMocks();
     });
 
     it('찾는 중에 화면을 떠나면 늦게 온 결과와 오류 안내를 버린다', async () => {
@@ -248,6 +249,32 @@ describe('방문 인증', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(server.calls('GET /map/restaurants')).toHaveLength(0);
       expect(screen.queryByText('서버 오류예요')).not.toBeInTheDocument();
+    });
+
+    it('위치 권한을 막았으면 켜는 방법을 알려 주고 다시 시도할 수 있다', async () => {
+      Object.defineProperty(navigator, 'geolocation', {
+        configurable: true,
+        value: {
+          getCurrentPosition: (_done: unknown, fail: (e: object) => void) =>
+            fail({ code: 1, PERMISSION_DENIED: 1 }),
+        },
+      });
+      const server = mockApi({});
+      renderRoute('/visits/new/on-site');
+      fireEvent.click(await screen.findByRole('button', { name: '위치 권한 허용하기' }));
+
+      expect(await screen.findByText('위치 권한이 꺼져 있어요')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '다시 시도하기' })).toBeEnabled();
+      expect(server.calls('GET /map/restaurants')).toHaveLength(0);
+    });
+
+    it('가게를 못 불러오면 알려 주고 처음으로 돌아간다', async () => {
+      mockApi({ 'GET /map/restaurants': fail(500, 'INTERNAL_ERROR', '서버 오류예요') });
+      renderRoute('/visits/new/on-site');
+      fireEvent.click(await screen.findByRole('button', { name: '위치 권한 허용하기' }));
+
+      expect(await screen.findByText('서버 오류예요')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '위치 권한 허용하기' })).toBeEnabled();
     });
 
     it('100m 안에 가게가 없으면 알려 주고 다시 찾거나 검색할 수 있다', async () => {
