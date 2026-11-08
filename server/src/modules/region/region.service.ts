@@ -21,8 +21,6 @@ interface RegionIndex {
   byCode: Map<string, RegionNode>;
   /** 서울 법정동(level 3) 목록 */
   seoulDongs: RegionNode[];
-  /** '강서구 가양동' → 서울 법정동 (카카오 지번 주소로 동을 찾을 때) */
-  seoulDongByName: Map<string, RegionNode>;
 }
 
 // 서울 구·동(약 500행)은 거의 바뀌지 않아 서버 메모리에 한 번 읽어 둔다 (REGION-01 명세 비고).
@@ -45,16 +43,10 @@ async function loadIndex(): Promise<RegionIndex> {
   }));
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const seoulDongs = nodes.filter((n) => n.level === 3 && isSeoulCode(n.code));
-  const seoulDongByName = new Map<string, RegionNode>();
-  for (const dong of seoulDongs) {
-    const gu = dong.parentId === null ? undefined : byId.get(dong.parentId);
-    if (gu) seoulDongByName.set(`${gu.name} ${dong.name}`, dong);
-  }
   const index: RegionIndex = {
     byId,
     byCode: new Map(nodes.map((n) => [n.code, n])),
     seoulDongs,
-    seoulDongByName,
   };
   // 아직 seed 전이면 캐시하지 않는다.
   if (nodes.length > 0) cache = { index, loadedAt: Date.now() };
@@ -82,14 +74,13 @@ export async function requireSeoulDong(regionId: number): Promise<DongWithSigung
   return { dong: region, sigungu };
 }
 
-/** 구·동 이름으로 서울 법정동 찾기. 예) ('강서구', '가양동'). 없으면 null */
-export async function findSeoulDongByName(sigunguName: string, dongName: string) {
+/** 서울 구(level 2) 목록 (주기 작업 store-import) */
+export async function listSeoulSigungus() {
   const index = await loadIndex();
-  const dong = index.seoulDongByName.get(`${sigunguName} ${dongName}`);
-  return dong ? withSigungu(index, dong) : null;
+  return [...index.byId.values()].filter((n) => n.level === 2 && isSeoulCode(n.code));
 }
 
-/** 법정동 코드(카카오 B 코드)로 서울 법정동 찾기. 없거나 동이 아니면 null */
+/** 법정동 코드(10자리, 공공데이터 ldongCd)로 서울 법정동 찾기. 없거나 동이 아니면 null */
 export async function findSeoulDongByCode(code: string) {
   const index = await loadIndex();
   const dong = index.byCode.get(code);

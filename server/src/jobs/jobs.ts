@@ -7,6 +7,7 @@ import { KEEP_DAYS } from '../modules/notification/notification.service';
 import { notify } from '../modules/notification/notify';
 import { runSeasonJob } from '../modules/ranking/season-job';
 import { analyzeReview, reviewAiEnabled } from '../modules/review/review-ai';
+import { runStoreImportJob } from '../modules/restaurant/store-import';
 import { purgeMemberFiles } from '../modules/user/member-files';
 import {
   loadRatingParams,
@@ -335,6 +336,7 @@ export const JOBS = {
   cleanup: runCleanupJob,
   'saved-reminder': runSavedReminderJob,
   'review-ai': runReviewAiJob,
+  'store-import': runStoreImportJob,
 } as const;
 
 export type JobName = keyof typeof JOBS;

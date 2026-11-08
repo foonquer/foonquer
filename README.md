@@ -37,7 +37,7 @@
 | **Server** | ![Node.js](https://img.shields.io/badge/Node.js_24-5FA04E?style=for-the-badge&logo=nodedotjs&logoColor=white) ![Express](https://img.shields.io/badge/Express_5-000000?style=for-the-badge&logo=express&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) | 팀원 모두 Node.js 경험이 있고, Express 5는 async 에러를 기본으로 처리해 구조가 단순하다 |
 | **DB · ORM** | ![MySQL](https://img.shields.io/badge/MySQL_8-4479A1?style=for-the-badge&logo=mysql&logoColor=white) ![Prisma](https://img.shields.io/badge/Prisma_7-2D3748?style=for-the-badge&logo=prisma&logoColor=white) | 랭킹·집계 쿼리가 많아 관계형 DB, 타입 안전한 쿼리와 마이그레이션 관리를 위해 Prisma |
 | **Web** | ![React](https://img.shields.io/badge/React_19-61DAFB?style=for-the-badge&logo=react&logoColor=black) ![Vite](https://img.shields.io/badge/Vite_PWA-646CFF?style=for-the-badge&logo=vite&logoColor=white) ![Kakao](https://img.shields.io/badge/Kakao_Map_SDK-FFCD00?style=for-the-badge&logo=kakao&logoColor=black) | 앱 설치 없이 모바일 웹으로 카메라·위치를 쓰기 위해 PWA, 지도는 카카오맵 |
-| **외부 API** | ![Kakao](https://img.shields.io/badge/Kakao_Local_API-FFCD00?style=for-the-badge&logo=kakao&logoColor=black) ![Naver](https://img.shields.io/badge/CLOVA_OCR-03C75A?style=for-the-badge&logo=naver&logoColor=white) ![Gemini](https://img.shields.io/badge/Gemini_API-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white) | 가게 검색, 영수증 인식(영수증 특화 모델), AI 리뷰 분석(무료 티어) |
+| **외부 API** | ![공공데이터](https://img.shields.io/badge/공공데이터_상가(상권)정보-0B4EA2?style=for-the-badge) ![Kakao](https://img.shields.io/badge/Kakao_Local_API-FFCD00?style=for-the-badge&logo=kakao&logoColor=black) ![Naver](https://img.shields.io/badge/CLOVA_OCR-03C75A?style=for-the-badge&logo=naver&logoColor=white) ![Gemini](https://img.shields.io/badge/Gemini_API-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white) | 가게 기본 정보(소상공인시장진흥공단, 저장 가능), 상세 화면 전화번호·카카오맵 링크(카카오는 실시간 표시만), 영수증 인식(영수증 특화 모델), AI 리뷰 분석(무료 티어) |
 | **Infra** | ![GCP](https://img.shields.io/badge/GCP_Compute_Engine·Cloud_Storage-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white) | 서버는 GCP Compute Engine에 Docker로, 웹은 Vercel로 배포. 이미지는 Cloud Storage |
 | **Tooling** | ![pnpm](https://img.shields.io/badge/pnpm_10.12.1-F69220?style=for-the-badge&logo=pnpm&logoColor=white) ![ESLint](https://img.shields.io/badge/ESLint-4B32C3?style=for-the-badge&logo=eslint&logoColor=white) ![Prettier](https://img.shields.io/badge/Prettier-F7B93E?style=for-the-badge&logo=prettier&logoColor=black) ![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white) | 모노레포(pnpm workspace), 커밋 전 husky + lint-staged로 자동 검사 |
 
@@ -61,14 +61,13 @@ foonquer/
 │   │   │   ├── middlewares/ # validate(), rateLimit(), notFound, errorHandler
 │   │   │   ├── time.ts      # KST 시각 변환
 │   │   │   ├── pagination.ts
-│   │   │   ├── geo.ts       # 두 좌표 사이 거리(m)
-│   │   │   └── ttl-cache.ts # 정해진 시간 동안만 기억하는 메모리 캐시 (카카오 응답 캐시)
+│   │   │   └── geo.ts       # 두 좌표 사이 거리(m)
 │   │   ├── modules/         # 도메인별 router · service · schema · errors
 │   │   │   ├── auth/        # 카카오 로그인, 약관 동의, 토큰
 │   │   │   ├── user/        # 프로필, 내 동네
 │   │   │   ├── region/      # 동 검색 (data/seoul-regions.json = 서울 구·법정동 원본)
 │   │   │   ├── map/         # 지도 영역 음식점
-│   │   │   ├── restaurant/  # 가게 미리보기·상세, 카카오 가게 저장 규칙, 카테고리 매핑, 내 정복 상태
+│   │   │   ├── restaurant/  # 가게 미리보기·상세, 공공데이터 가게 가져오기(store-import), 상세의 카카오 장소 찾기, 카테고리 매핑, 내 정복 상태
 │   │   │   ├── search/      # 검색 홈, 맛집 검색, 추천 (data/similar-keywords.json = 비슷한 메뉴표)
 │   │   │   └── health/
 │   │   ├── types/           # Express Request 타입 확장 (req.auth)
@@ -187,7 +186,8 @@ Copy-Item web\.env.example web\.env.local
 
 | 기능 | 넣을 값 | 비워 두면 |
 | --- | --- | --- |
-| 지도·맛집 검색에 카카오 가게 불러오기, 카카오 로그인 | `server/.env`의 `KAKAO_REST_API_KEY` | DB에 있는 가게만 보이고(처음엔 없음) 카카오 로그인이 안 된다 |
+| 가게 가져오기 (지도·검색에 보이는 가게) | `server/.env`의 `DATA_GO_KR_SERVICE_KEY`, 그다음 `pnpm -C server job store-import` | 가게가 하나도 없다 |
+| 카카오 로그인, 음식점 상세의 전화번호·카카오맵 링크 | `server/.env`의 `KAKAO_REST_API_KEY` | 카카오 로그인이 안 되고 상세에 전화번호·링크가 없다 |
 | 홈 카카오 지도 | `web/.env.local`의 `VITE_KAKAO_MAP_KEY` | 가게 위치만 점으로 보여 주는 간단한 지도 |
 
 로그인은 카카오 하나만 있으므로, 로컬에서 로그인해 보려면 `KAKAO_REST_API_KEY`가 있어야 한다.
@@ -255,6 +255,7 @@ pnpm add -D -w some-tool            # 루트(모노레포 공통) 개발 의존�
 | `season` | 끝난 시즌 확정(순위·티어 확정, 시즌 결과, 먹포인트·방망이 보상, 업적과 업적 보상 아이템(왕관·밤하늘 먹깨비), 알림), 다음 시즌 열기 |
 | `cleanup` | 30일 지난 알림, 만료된 로그인 토큰·카카오 결과 교환 코드 삭제, 탈퇴할 때 사진 삭제가 실패한 회원(`member.files_purged_at` 없음)의 영수증·현장·문의·프로필 사진 폴더를 다 지울 때까지 다시 지우기, 올린 지 하루가 지나도 어디에도 저장되지 않은 사진(profile·review·receipt·site·inquiry 폴더) 지우기 |
 | `saved-reminder` | 저장한 지 12일 지난 가게(알림 켬, 아직 정복 안 함)에 한 번 알림 |
+| `store-import` | 공공데이터 상가(상권)정보 API에서 서울 25개 구의 음식 업종 상가를 가져와 `restaurant`에 반영. 상가업소번호(`bizes_id`)가 같으면 바뀐 것만 갱신, 새 가게는 추가, 목록에서 빠진 가게는 폐업(`C`), 다시 나오면 영업(`A`, 운영자가 숨긴 `H`는 그대로). 구내식당·출장 뷔페·유흥 주점은 가져오지 않는다. 카카오에서 저장했던 옛 가게(`bizes_id` 없음)는 이름이 맞고 100m 안이면 그 행을 이어 쓰고(방문·리뷰 유지), 이어지지 않은 것은 방문·리뷰 등 기록이 없으면 지운다(기록이 있어 남긴 수는 결과의 `legacyKept`). 구 하나를 끝까지 받지 못하면 그 구는 건너뛰고 실패로 센다. `DATA_GO_KR_SERVICE_KEY`가 없으면 건너뛴다 |
 | `review-ai` | 아직 분석하지 않은 공개 리뷰 글을 Gemini로 분석(한 번에 50개, 4초 간격). 협찬·리뷰 이벤트 문구를 찾으면 `review.ad_suspected` → 운영자 마패 확인 목록(ADMIN-03 `adSuspected=true`). 결과는 `review.ai_result`(근거 문장, AI 같은 말투, 글 길이, 사진 수). 별점 계산에는 넣지 않는다. 호출 한도(429)에 걸리면 멈추고 다음 실행에서 이어서 한다. 일시적 실패(5xx·시간 초과)는 다음 실행에서 다시 하고, 200인데 답을 읽을 수 없는 글(안전 필터 등)은 `ai_result`에 `unreadable`을 남기고 다시 보내지 않는다. 키·모델 설정이 틀린 응답(401·403·404, 400 `API_KEY_INVALID`)이면 바로 멈추고 실패(종료 코드 1)로 끝난다. `GEMINI_API_KEY`가 없으면 건너뛴다 |
 
 운영 VM에는 Node.js·pnpm을 설치하지 않으므로(서버는 Docker 컨테이너), 돌고 있는 `app` 컨테이너 안에서 빌드 결과를 실행한다. deploy 사용자 crontab에 넣는다. 예) 매일 새벽 4시(KST), VM 시간대가 UTC일 때
@@ -334,11 +335,12 @@ pnpm -C server db:migrate                                       # 적용
 | `GEMINI_API_KEY` | Gemini API 키 (주기 작업 `review-ai`의 리뷰 글 분석). 비우면 분석하지 않는다 | 비워 둔다 |
 | `GEMINI_MODEL` | 리뷰 분석 모델 | `gemini-3.5-flash-lite` |
 | `API_BASE_URL` | 이 API 서버의 바깥 주소. 카카오 로그인 redirect_uri를 만든다 | `http://localhost:3000` |
+| `DATA_GO_KR_SERVICE_KEY` | 공공데이터포털 일반 인증키 (상가(상권)정보 API, 주기 작업 `store-import`). Decoding 키를 넣는다(Encoding 키를 넣어도 서버가 풀어서 쓴다) | 공공데이터포털 > 마이페이지 |
 | `KAKAO_REST_API_KEY` | 카카오 REST API 키 (카카오 로그인 client_id, 카카오 로컬 API) | 카카오 개발자 콘솔 |
 | `KAKAO_CLIENT_SECRET` | 카카오 로그인 Client Secret (콘솔에서 켰을 때만) | 비워 둔다 |
 | `KAKAO_LOCAL_API_KEY` | 카카오 로컬 API만 다른 앱의 REST 키로 부를 때 (카카오맵 무료 쿼터는 계정에서 처음 카카오맵을 켠 앱에만 있다). 비우면 `KAKAO_REST_API_KEY` | 비워 둔다 |
 
-> **카카오 로컬 API**: 지도(MAP-01)·맛집 검색(SEARCH-02)은 카카오 장소 검색으로 우리 DB에 없는 가게를 저장한 뒤 DB 기준으로 응답한다. 같은 영역·같은 검색어는 24시간 동안 서버 메모리에 캐시해 카카오를 다시 부르지 않는다(하루 호출 한도). 카카오가 실패해도 에러 대신 DB 결과만 준다. 홈 지도는 `mineOnly=true`로 내가 찜한 곳·정복한 곳만 불러서 카카오를 부르지 않는다(새 가게는 검색으로 들어온다). 카카오는 한 번 검색에 분류(음식점·카페)마다 최대 45곳까지만 주므로, 가게가 아주 많은 동네에서 지도를 넓게 보면 일부 가게는 지도를 확대해 그 영역을 다시 볼 때 저장된다. 카카오 개발자 콘솔에서 이 앱의 **카카오맵 API(지도·로컬)를 활성화**해야 로컬 API가 응답한다.
+> **가게 정보와 카카오 로컬 API**: 카카오 로컬 API 결과는 실시간으로 보여 주는 데만 쓸 수 있고, 장소 ID·장소 URL 말고는 저장하면 안 된다(카카오 데브톡 공식 답변). 그래서 가게 기본 정보(상호·업종·주소·좌표)는 이용허락범위 제한이 없는 공공데이터 [소상공인시장진흥공단 상가(상권)정보](https://www.data.go.kr/data/15012005/openapi.do)를 주기 작업 `store-import`로 DB에 넣고, 지도(MAP-01)·맛집 검색(SEARCH-02)은 DB만 본다(검색은 가게 이름·업종 소분류·영수증 메뉴). 카카오는 음식점 상세(REST-01)에서만 부른다: 가게 이름으로 그 좌표 100m 안을 찾아 이름이 맞는 곳의 전화번호는 응답에만 쓰고, 장소 ID만 `restaurant.kakao_place_id`에 저장한다(카카오맵 링크용). 카카오가 실패해도 에러 대신 전화번호 없이 준다. REGION-02(현재 위치로 동 찾기)의 좌표 → 법정동 변환도 실시간 호출이다. 카카오 개발자 콘솔에서 이 앱의 **카카오맵 API(지도·로컬)를 활성화**해야 로컬 API가 응답한다.
 
 > **카카오 로그인 Redirect URI**: 카카오 개발자 콘솔에 `{API_BASE_URL}/api/v1/auth/oauth/kakao/callback`을 글자 하나까지 똑같이 등록한다. 동의 항목(이메일·닉네임 등)은 켜지 않는다 — 카카오 회원번호만 쓴다. 로그인이 끝나면 서버가 `{FRONTEND_URL}/oauth/callback?code=…`(실패 시 `?error=…`)로 보내므로 웹에 그 페이지가 있어야 한다. 웹은 받은 code로 `POST /api/v1/auth/oauth/exchange`를 부른다.
 
@@ -624,6 +626,7 @@ GCP에서 준비할 것:
 | `JWT_ACCESS_SECRET` | 32자 이상 임의 문자열 (로컬과 다르게) |
 | `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET` | 카카오 개발자 콘솔 먹짱깨기 앱의 REST API 키와 카카오 로그인 Client Secret. 그 키에 카카오 로그인 리다이렉트 URI `https://api.foonquer.me/api/v1/auth/oauth/kakao/callback` 등록 |
 | `KAKAO_LOCAL_API_KEY` | 카카오맵 무료 쿼터가 있는 앱의 REST API 키 `foonquer-server` (먹짱깨기 앱은 카카오맵을 켜면 유료라서) |
+| `DATA_GO_KR_SERVICE_KEY` | 공공데이터포털 상가(상권)정보 API 활용신청 후 받은 일반 인증키 (Decoding) |
 | `GCS_BUCKET`, `GCS_PRIVATE_BUCKET`, `IMAGE_BASE_URL` | 버킷 이름, `https://storage.googleapis.com/<공개 버킷>` |
 | `CLOVA_OCR_URL`, `CLOVA_OCR_SECRET`, `GEMINI_API_KEY` | 각 콘솔 값 (비우면 그 기능만 꺼진다) |
 

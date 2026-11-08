@@ -11,7 +11,7 @@ import {
   createRestaurant,
   createVisit,
 } from '../helpers/fixtures';
-import { kakaoCalls, kakaoPlace, stubKakao } from '../helpers/kakao';
+import { stubKakao } from '../helpers/kakao';
 
 const app = createApp();
 
@@ -195,48 +195,21 @@ describe('SEARCH-02 GET /restaurants/search', () => {
     ]);
   });
 
-  it('카카오 키워드 검색으로 찾은 가게를 저장해 결과에 넣고, 같은 검색은 24시간 캐시한다', async () => {
-    const fetchMock = stubKakao({
-      keyword: (params) =>
-        params.get('category_group_code') === 'FD6'
-          ? [kakaoPlace({ id: '777', place_name: '명동교자 가양점', x: '126.8447', y: '37.5664' })]
-          : [],
-    });
-    const me = await memberInGayang();
-
-    const first = await search(me.id, { keyword: '칼국수' });
-    expect(names(first)).toEqual(['명동교자 가양점']);
-    expect(first.body.data.items[0]).toMatchObject({ matchedBy: 'NAME', matchedMenuName: null });
-
-    const calls = kakaoCalls(fetchMock, '/v2/local/search/keyword.json');
-    expect(calls.map((p) => p.get('category_group_code')).sort()).toEqual(['CE7', 'FD6']);
-    expect(calls[0].get('query')).toBe('칼국수');
-    // 가양동 경계 사각형 (서,남,동,북)
-    expect(calls[0].get('rect')).toBe('126.8212887,37.5566996,126.8676631,37.5792703');
-
-    const second = await search(me.id, { keyword: '칼국수' });
-    expect(names(second)).toEqual(['명동교자 가양점']);
-    expect(kakaoCalls(fetchMock, '/v2/local/search/keyword.json')).toHaveLength(2);
-
-    // 범위가 바뀌면 다시 부른다 (구 전체)
-    await search(me.id, { keyword: '칼국수', scope: 'SIGUNGU' });
-    const guCalls = kakaoCalls(fetchMock, '/v2/local/search/keyword.json');
-    expect(guCalls).toHaveLength(4);
-    expect(guCalls[2].get('rect')).toBe('126.7645806,37.5264926,126.8808069,37.605034');
-  });
-
-  it('카카오가 실패해도 DB 결과만 준다', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    stubKakao({ keyword: () => 500 });
-    const me = await memberInGayang();
-    await createRestaurant({ name: '옛날손칼국수' });
-    const res = await search(me.id, { keyword: '칼국수' });
-    expect(res.status).toBe(200);
-    expect(names(res)).toEqual(['옛날손칼국수']);
-  });
-
-  it('카테고리만으로 찾으면 카카오를 부르지 않고 matchedBy는 null', async () => {
+  it('업종 소분류(공공데이터)로도 찾고, 카카오는 부르지 않는다 (카카오 결과는 저장할 수 없다)', async () => {
     const fetchMock = stubKakao();
+    const me = await memberInGayang();
+    await createRestaurant({ name: '명동교자 가양점', categoryDetail: '국수/칼국수' });
+    await createRestaurant({ name: '가양김밥', categoryDetail: '김밥/만두/분식' });
+
+    const res = await search(me.id, { keyword: '칼국수' });
+
+    expect(names(res)).toEqual(['명동교자 가양점']);
+    expect(res.body.data.items[0]).toMatchObject({ matchedBy: 'NAME', matchedMenuName: null });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('카테고리만으로 찾으면 matchedBy는 null', async () => {
+    stubKakao();
     const me = await memberInGayang();
     await createRestaurant({ name: '한식집', categoryId: 1 });
     await createRestaurant({ name: '중식집', categoryId: 2 });
@@ -245,7 +218,6 @@ describe('SEARCH-02 GET /restaurants/search', () => {
     expect(res.body.data.items).toEqual([
       expect.objectContaining({ name: '중식집', matchedBy: null, matchedMenuName: null }),
     ]);
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('검색어와 카테고리를 같이 주면 둘 다 맞는 가게만', async () => {
