@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import eggArt from '../assets/illust/mukkaebi-egg.svg';
 import { resetViewRegionForTest } from '../lib/region';
@@ -119,6 +119,31 @@ describe('홈 지도 (MAP-01·02)', () => {
     expect(Number(q.get('neLng'))).toBeGreaterThan(GAYANG.centerLng);
     // 홈 지도는 내가 찜한 곳·정복한 곳만
     expect(q.get('mineOnly')).toBe('true');
+  });
+
+  it('다른 앱에 갔다 돌아오면 안 읽은 알림 수를 다시 받는다', async () => {
+    let unread = 0;
+    mockApi({
+      ...regionApi,
+      'GET /map/restaurants': ok({ items: [], totalCount: 0, truncated: false }),
+      'GET /home/summary': () =>
+        ok({
+          mukkaebi: { level: 1, stage: 'EGG', stageName: '알', equipped: {} },
+          title: null,
+          season: null,
+          rank: { conquestCount: 0, main: null },
+          unreadNotificationCount: unread,
+          celebrationCount: 0,
+        }),
+    });
+    renderRoute('/');
+    expect(await screen.findByRole('link', { name: '알림' })).toBeInTheDocument();
+
+    unread = 3;
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    expect(
+      await screen.findByRole('link', { name: '알림 (안 읽은 알림 3개)' }),
+    ).toBeInTheDocument();
   });
 
   it('홈 검색창을 누르고 들어가면 검색 입력칸에 바로 커서가 있다', async () => {

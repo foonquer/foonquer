@@ -57,6 +57,15 @@ export function HomePage() {
   const me = useAsync(getMe, []);
   // 레벨·칭호 — 못 받아도 홈은 그대로 쓴다
   const summary = useAsync(getHomeSummary, []);
+  // 다른 앱에 갔다가 돌아오면 안 읽은 알림 수·레벨을 다시 받는다 (reload 중에는 이전 값을 그대로 보여 준다)
+  const reloadSummary = summary.reload;
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') reloadSummary();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [reloadSummary]);
   const title = summary.data ? (summary.data.title ?? summary.data.rank.main?.tierTitle) : null;
   const { region, error: regionError, retry } = useViewRegion();
   const { coords } = useMyCoords();
