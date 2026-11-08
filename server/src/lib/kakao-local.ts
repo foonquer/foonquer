@@ -105,7 +105,12 @@ export async function nearestFoodPlace(lat: number, lng: number, radiusM: number
       ),
     ),
   );
-  const places = bodies.flatMap((b) => b.documents ?? []);
+  // 타입은 런타임에 보장되지 않으니 좌표·거리가 숫자인 곳만 쓴다 (빈 문자열·누락이면 버림)
+  const isNumber = (v: unknown) =>
+    typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v));
+  const places = bodies
+    .flatMap((b) => b.documents ?? [])
+    .filter((p) => isNumber(p.x) && isNumber(p.y) && isNumber(p.distance));
   places.sort((a, b) => Number(a.distance) - Number(b.distance));
   return places[0] ?? null;
 }

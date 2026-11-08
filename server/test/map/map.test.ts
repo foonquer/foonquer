@@ -339,6 +339,20 @@ describe('MAP-03 GET /map/nearest-restaurant — 누른 자리의 가장 가까�
     });
   });
 
+  it('카카오 응답의 좌표·거리가 숫자가 아니면 그 곳은 버린다 (DB 오류 대신 다음 후보·DB로)', async () => {
+    const me = await createMember();
+    const near = await createRestaurant({ name: '가까운집', ...at(10, 0) });
+    stubKakao({
+      category: (p) =>
+        p.get('category_group_code') === 'FD6'
+          ? [{ id: '555', place_name: '좌표없는집', x: '', y: '', distance: '3' }]
+          : [],
+    });
+    const res = await nearest(me.id);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ restaurantId: Number(near.id), placeName: null });
+  });
+
   it('서울 밖이면 카카오를 부르지 않는다', async () => {
     const me = await createMember();
     const fetchMock = stubKakao();
@@ -357,5 +371,26 @@ describe('MAP-03 GET /map/nearest-restaurant — 누른 자리의 가장 가까�
     const res = await nearest(me.id, query);
     expect(res.status).toBe(400);
     expect(res.body.code).toBe(code);
+  });
+});
+
+describe('MAP-03 요청 횟수 제한', () => {
+  it('카카오를 부르는 API라 같은 IP는 1분에 30번까지, 넘으면 429', async () => {
+    const me = await createMember();
+    stubKakao();
+    const query = { lat: String(CENTER.lat), lng: String(CENTER.lng) };
+    for (let i = 0; i < 30; i += 1) {
+      const res = await request(app)
+        .get('/api/v1/map/nearest-restaurant')
+        .query(query)
+        .set('Authorization', bearer(me.id));
+      expect(res.status).toBe(200);
+    }
+    const res = await request(app)
+      .get('/api/v1/map/nearest-restaurant')
+      .query(query)
+      .set('Authorization', bearer(me.id));
+    expect(res.status).toBe(429);
+    expect(res.body.code).toBe('TOO_MANY_REQUESTS');
   });
 });

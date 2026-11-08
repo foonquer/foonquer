@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getAuthUser, requireAuth } from '../../common/auth/require-auth';
 import { validate } from '../../common/middlewares/validate';
+import { rateLimit } from '../../common/middlewares/rate-limit';
 import { ok } from '../../common/response';
 import {
   type MapRestaurantsQuery,
@@ -25,10 +26,11 @@ mapRouter.get(
   },
 );
 
-// MAP-03 누른 자리에서 가장 가까운 음식점
+// MAP-03 누른 자리에서 가장 가까운 음식점. 한 번에 카카오를 2번 부르므로 같은 IP는 1분에 30번까지
 mapRouter.get(
   '/nearest-restaurant',
   requireAuth(),
+  rateLimit({ windowMs: 60_000, limit: 30 }),
   validate({ query: nearestRestaurantQuery }),
   async (req, res) => {
     const query = req.query as unknown as NearestRestaurantQuery;
