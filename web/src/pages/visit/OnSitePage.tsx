@@ -26,7 +26,7 @@ import styles from './Visit.module.css';
 const NEARBY_RADIUS_M = 100;
 /** 가까운 순으로 이만큼만 보여 준다 */
 const NEARBY_MAX_ITEMS = 20;
-/** 근처 가게 고르기에서 잰 위치를 이 시간(ms) 안에만 위치 확인에 그대로 쓴다 */
+/** 근처 가게 고르기에서 잰 위치를 잰 뒤 이 시간(ms) 안에만 위치 확인에 그대로 쓴다 */
 const PASSED_COORDS_MAX_AGE_MS = 60_000;
 
 type PreciseCoords = Coords & { accuracyM: number };
@@ -75,7 +75,7 @@ type PickStep =
   | { kind: 'start' }
   | { kind: 'checking' }
   | { kind: 'denied' }
-  | { kind: 'list'; me: PreciseCoords; items: NearbyItem[] };
+  | { kind: 'list'; me: PreciseCoords; measuredAt: number; items: NearbyItem[] };
 
 /** 홈에서 바로 현장인증: 내 위치 100m 안 가게를 가까운 순으로 보여 주고, 고르면 그 위치로 바로 확인한다 */
 function PickNearby() {
@@ -83,20 +83,33 @@ function PickNearby() {
   const toast = useToast();
   const [step, setStep] = useState<PickStep>({ kind: 'start' });
   const [pickedId, setPickedId] = useState<number | null>(null);
+  // 화면을 떠나면 진행 중인 찾기를 멈추고 결과·오류 안내를 버린다
+  const findRequest = useRef<AbortController>(undefined);
+  useEffect(() => () => findRequest.current?.abort(), []);
 
   const find = async () => {
+    findRequest.current?.abort();
+    const controller = new AbortController();
+    findRequest.current = controller;
     setStep({ kind: 'checking' });
     try {
       const me = await getPreciseCoords();
+      const measuredAt = Date.now();
+      if (controller.signal.aborted) return;
       // 서버가 가운데(내 위치)에서 가까운 순으로 준다
-      const { items } = await getMapRestaurants(boundsAround(me, NEARBY_RADIUS_M));
+      const { items } = await getMapRestaurants(
+        boundsAround(me, NEARBY_RADIUS_M),
+        controller.signal,
+      );
+      if (controller.signal.aborted) return;
       const near = items
         .map((r) => ({ ...r, distanceM: Math.round(metersBetween(me, r)) }))
         .filter((r) => r.distanceM <= NEARBY_RADIUS_M)
         .slice(0, NEARBY_MAX_ITEMS);
       setPickedId(near[0]?.restaurantId ?? null);
-      setStep({ kind: 'list', me, items: near });
+      setStep({ kind: 'list', me, measuredAt, items: near });
     } catch (err) {
+      if (controller.signal.aborted) return;
       if (err === 'DENIED') return setStep({ kind: 'denied' });
       toast(
         err === 'UNAVAILABLE'
@@ -151,7 +164,8 @@ function PickNearby() {
   const picked = step.items.find((r) => r.restaurantId === pickedId) ?? null;
   const go = () => {
     if (!picked) return;
-    const passed: PassedCoords = { me: step.me, at: Date.now() };
+    // 고른 때가 아니라 잰 때를 넘겨, 목록을 오래 보고 있었으면 현장인증에서 다시 잰다
+    const passed: PassedCoords = { me: step.me, at: step.measuredAt };
     navigate(`/visits/new/on-site?restaurantId=${picked.restaurantId}`, { state: passed });
   };
   return (

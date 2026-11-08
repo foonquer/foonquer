@@ -200,6 +200,56 @@ describe('방문 인증', () => {
       });
     });
 
+    it('목록을 1분 넘게 보다 고르면 그때 잰 위치는 쓰지 않고 현장인증에서 다시 잰다', async () => {
+      const server = mockApi({
+        'GET /map/restaurants': ok({
+          items: [shop(7, '옆집국밥', 33, 0)],
+          totalCount: 1,
+          truncated: false,
+        }),
+        'GET /restaurants/:id': ok({
+          restaurantId: 7,
+          name: '옆집국밥',
+          lat: 37.563,
+          lng: 126.857,
+        }),
+      });
+      renderRoute('/visits/new/on-site');
+      fireEvent.click(await screen.findByRole('button', { name: '위치 권한 허용하기' }));
+      await screen.findByRole('radiogroup', { name: '지금 있는 가게' });
+
+      vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 61_000);
+      fireEvent.click(screen.getByRole('button', { name: '옆집국밥에서 인증하기' }));
+
+      expect(
+        await screen.findByText(
+          '옆집국밥 근처에 있는지 확인할 수 있도록 위치 접근을 허용해주세요.',
+        ),
+      ).toBeInTheDocument();
+      expect(server.calls('POST /visit-verifications/location-checks')).toHaveLength(0);
+      vi.restoreAllMocks();
+    });
+
+    it('찾는 중에 화면을 떠나면 늦게 온 결과와 오류 안내를 버린다', async () => {
+      let located: ((p: object) => void) | undefined;
+      Object.defineProperty(navigator, 'geolocation', {
+        configurable: true,
+        value: { getCurrentPosition: (done: (p: object) => void) => (located = done) },
+      });
+      const server = mockApi({
+        'GET /map/restaurants': fail(500, 'INTERNAL_ERROR', '서버 오류예요'),
+      });
+      const { router } = renderRoute('/visits/new/on-site');
+      fireEvent.click(await screen.findByRole('button', { name: '위치 권한 허용하기' }));
+      await act(() => router.navigate('/visits/new'));
+      expect(await screen.findByText('어떻게 방문을 인증할까요?')).toBeInTheDocument();
+
+      act(() => located?.({ coords: ME }));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(server.calls('GET /map/restaurants')).toHaveLength(0);
+      expect(screen.queryByText('서버 오류예요')).not.toBeInTheDocument();
+    });
+
     it('100m 안에 가게가 없으면 알려 주고 다시 찾거나 검색할 수 있다', async () => {
       mockApi({ 'GET /map/restaurants': ok({ items: [], totalCount: 0, truncated: false }) });
       renderRoute('/visits/new/on-site');
