@@ -7,7 +7,7 @@ import {
   type RestaurantDetail,
 } from '../../api/restaurants';
 import { IMAGE_ACCEPT, uploadImage } from '../../api/uploads';
-import { checkLocation, completeOnSite } from '../../api/visits';
+import { checkLocation, completeOnSite, getVerification } from '../../api/visits';
 import mealThumb from '../../assets/illust/meal-thumb.svg';
 import { AppHeader } from '../../components/AppHeader';
 import { Button, ButtonLink } from '../../components/Button';
@@ -16,9 +16,10 @@ import { EmptyState, Loading } from '../../components/StateViews';
 import { useToast } from '../../components/Toast';
 import { ApiError, errorMessage } from '../../lib/api';
 import { readPhotoMeta, type PhotoMeta } from '../../lib/exif';
-import { formatDistance, joinDot } from '../../lib/format';
+import { formatDistance, formatTime, joinDot } from '../../lib/format';
 import { boundsAround, metersBetween } from '../../lib/geo';
 import { type Coords, getPreciseCoords } from '../../lib/geolocation';
+import { pendingOnSite } from '../../lib/pendingOnSite';
 import { useAsync } from '../../lib/useAsync';
 import styles from './Visit.module.css';
 
@@ -32,7 +33,14 @@ const PASSED_COORDS_MAX_AGE_MS = 60_000;
 type PreciseCoords = Coords & { accuracyM: number };
 /** 근처 가게 고르기 → 현장인증으로 넘기는 위치 (라우터 state) */
 type PassedCoords = { me: PreciseCoords; at: number };
-type Check = { verificationId: number; distanceM: number; allowedM: number; me: Coords };
+type Check = {
+  verificationId: number;
+  distanceM: number;
+  allowedM: number;
+  /** 이때까지 사진을 올려야 한다 (KST ISO) */
+  expiresAt: string;
+  me: Coords;
+};
 type Photo = { file: File; url: string };
 
 type Step =
@@ -257,14 +265,21 @@ function toPassedCoords(state: unknown): PassedCoords | null {
 function OnSite({ r, passed }: { r: RestaurantDetail; passed: PassedCoords | null }) {
   const navigate = useNavigate();
   const toast = useToast();
+  // 이 가게에서 위치를 확인해 두고 사진을 아직 안 올렸으면 사진부터 (식사 뒤 다시 들어온 경우)
+  const [resumed] = useState(() => {
+    const pending = pendingOnSite.get();
+    return pending?.restaurantId === r.restaurantId ? pending.check : null;
+  });
   // 근처 가게 고르기에서 막 잰 위치. 오래됐으면(새로고침 등) 쓰지 않고 처음부터 잰다
   const [autoCoords] = useState(() => {
-    if (!passed) return null;
+    if (resumed || !passed) return null;
     // 기기 시계를 되돌렸거나 history에 남은 미래 시각이면 쓰지 않는다
     const age = Date.now() - passed.at;
     return age >= 0 && age < PASSED_COORDS_MAX_AGE_MS ? passed.me : null;
   });
-  const [step, setStep] = useState<Step>({ kind: autoCoords ? 'checking' : 'start' });
+  const [step, setStep] = useState<Step>(
+    resumed ? { kind: 'photo', check: resumed } : { kind: autoCoords ? 'checking' : 'start' },
+  );
   const [busy, setBusy] = useState(false);
   const photoUrl = 'photo' in step ? step.photo.url : null;
   useEffect(
@@ -285,7 +300,9 @@ function OnSite({ r, passed }: { r: RestaurantDetail; passed: PassedCoords | nul
         lng: me.lng,
         accuracyM: me.accuracyM,
       });
-      setStep({ kind: 'near', check: { ...result, me } });
+      const checked = { ...result, me };
+      pendingOnSite.save(r.restaurantId, r.name, checked);
+      setStep({ kind: 'near', check: checked });
     } catch (err) {
       if (err === 'DENIED') return setStep({ kind: 'denied' });
       if (err === 'UNAVAILABLE') {
@@ -303,6 +320,25 @@ function OnSite({ r, passed }: { r: RestaurantDetail; passed: PassedCoords | nul
       setStep({ kind: 'blocked', message: errorMessage(err), pendingVisitId });
     }
   };
+
+  // 이어서 하는 위치 확인이 다른 기기·탭에서 이미 쓰였거나 지났으면 사진을 고르기 전에 처음부터
+  useEffect(() => {
+    if (!resumed) return;
+    let alive = true;
+    getVerification(resumed.verificationId).then(
+      (v) => {
+        if (!alive || (v.status === 'LOCATION_CHECKED' && !v.isExpired)) return;
+        pendingOnSite.clear(resumed.verificationId);
+        setStep({ kind: 'start' });
+      },
+      () => {
+        // 확인하지 못하면 그대로 둔다 (사진을 보낼 때 서버가 다시 확인한다)
+      },
+    );
+    return () => {
+      alive = false;
+    };
+  }, [resumed]);
 
   // 근처 가게 고르기에서 왔으면 그때 잰 위치로 바로 확인한다 (StrictMode에서 두 번 부르지 않게 한 번만)
   const autoChecked = useRef(false);
@@ -344,6 +380,7 @@ function OnSite({ r, passed }: { r: RestaurantDetail; passed: PassedCoords | nul
         photoLat: s.meta.lat,
         photoLng: s.meta.lng,
       });
+      pendingOnSite.clear(s.check.verificationId);
       if (result.reward.point > 0)
         toast({ message: `방문 인증 +${result.reward.point}P`, check: true });
       navigate(`/visits/${result.verificationId}/follow`, { replace: true });
@@ -353,8 +390,14 @@ function OnSite({ r, passed }: { r: RestaurantDetail; passed: PassedCoords | nul
         return setStep({ kind: 'photo', check: s.check, unclear: true });
       }
       toast(errorMessage(err));
-      if (err instanceof ApiError && err.code === 'LOCATION_CHECK_EXPIRED')
+      // 위치 확인이 지났거나 이미 처리됐으면 처음부터
+      if (
+        err instanceof ApiError &&
+        (err.code === 'LOCATION_CHECK_EXPIRED' || err.code === 'INVALID_VISIT_STATE')
+      ) {
+        pendingOnSite.clear(s.check.verificationId);
         setStep({ kind: 'start' });
+      }
     }
   };
 
@@ -492,6 +535,15 @@ function OnSite({ r, passed }: { r: RestaurantDetail; passed: PassedCoords | nul
               step.unclear
                 ? '사진을 확인하기 어려워요'
                 : '갤러리에서 음식이나 식사 장면 사진을 골라주세요',
+            )}
+            {!step.unclear && (
+              <p className={styles.until}>
+                ✓ 위치 확인 완료 ·{' '}
+                {formatTime(step.check.expiresAt)
+                  ? `${formatTime(step.check.expiresAt)}까지 올리면 돼요. `
+                  : ''}
+                다 먹고 올려도 괜찮아요
+              </p>
             )}
             {step.unclear && (
               <div className={styles.status}>

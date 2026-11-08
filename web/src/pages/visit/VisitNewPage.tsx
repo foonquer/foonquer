@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import location from '../../assets/icons/location.svg';
 import receipt from '../../assets/icons/receipt.svg';
 import { AppHeader } from '../../components/AppHeader';
 import { Screen } from '../../components/Screen';
+import { formatTime } from '../../lib/format';
+import { pendingOnSite } from '../../lib/pendingOnSite';
 import styles from './Visit.module.css';
 
 /**
@@ -13,6 +16,9 @@ export function VisitNewPage() {
   const [params] = useSearchParams();
   const id = Number(params.get('restaurantId'));
   const query = Number.isInteger(id) && id > 0 ? `?restaurantId=${id}` : '';
+  // 위치만 확인해 두고 사진을 아직 안 올린 현장인증이 있으면 이어서 하기
+  const [pending] = useState(() => pendingOnSite.get());
+  const until = formatTime(pending?.check.expiresAt);
 
   return (
     <Screen>
@@ -20,6 +26,21 @@ export function VisitNewPage() {
       <div className={styles.content}>
         <h2 className={styles.title}>어떻게 방문을 인증할까요?</h2>
         <p className={styles.description}>내 상황에 맞는 방법으로 맛집을 정복해요.</p>
+
+        {pending && (
+          <Link
+            to={`/visits/new/on-site?restaurantId=${pending.restaurantId}`}
+            className={styles.resume}
+          >
+            <span>
+              <span className={styles.resumeTitle}>{pending.restaurantName} 이어서 인증하기</span>
+              <span className={styles.resumeText}>
+                위치 확인 완료 · {until ? `${until}까지 ` : ''}음식 사진만 올리면 돼요
+              </span>
+            </span>
+            <span aria-hidden="true">›</span>
+          </Link>
+        )}
 
         <Link to={`/visits/new/on-site${query}`} className={styles.method}>
           <span className={styles.recommend}>추천 방법</span>

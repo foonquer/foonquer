@@ -25,7 +25,7 @@ export const VisitError = defineErrors({
   LOCATION_CHECK_EXPIRED: {
     status: 409,
     code: 'LOCATION_CHECK_EXPIRED',
-    message: '위치 확인 후 10분이 지났어요. 위치를 다시 확인해 주세요.',
+    message: '위치 확인 후 2시간이 지났어요. 위치를 다시 확인해 주세요.',
   },
   INVALID_VISIT_STATE: {
     status: 409,
