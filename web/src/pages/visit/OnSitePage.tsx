@@ -94,7 +94,8 @@ function PickNearby() {
     setStep({ kind: 'checking' });
     try {
       const me = await getPreciseCoords();
-      const measuredAt = Date.now();
+      // 기기가 잰 시각 (없는 브라우저면 받은 지금)
+      const measuredAt = Number.isFinite(me.measuredAt) ? me.measuredAt : Date.now();
       if (controller.signal.aborted) return;
       // 서버가 가운데(내 위치)에서 가까운 순으로 준다
       const { items } = await getMapRestaurants(

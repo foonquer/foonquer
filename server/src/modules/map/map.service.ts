@@ -6,7 +6,7 @@ import { type BBox, SEOUL } from '../region/seoul-regions';
 import { requireCategory } from '../restaurant/category';
 import { saveKakaoPlaceId } from '../restaurant/kakao-link';
 import { loadMyStates, myStateOf } from '../restaurant/my-state';
-import { storeNameMatches } from '../visit/visit.service';
+import { normalizeStoreName, storeNameMatches } from '../visit/visit.service';
 import type { MapRestaurantsQuery, NearestRestaurantQuery } from './map.schema';
 
 /** 한 번에 돌려주는 최대 가게 수. 넘으면 truncated = true ("지도를 확대해 보세요") */
@@ -146,7 +146,13 @@ async function restaurantForPlace(place: KakaoNearPlace): Promise<bigint | null>
     Prisma.sql`AND r.kakao_place_id IS NULL`,
     SAME_STORE_MAX_CANDIDATES,
   );
-  const match = near.find((r) => storeNameMatches(place.place_name, r.name));
+  // 이름이 똑같은 가게가 있으면 그 중 가장 가까운 곳. 한쪽이 다른 쪽을 포함하는 이름(옛날손칼국수 ↔ 옛날손칼국수 가양점)만
+  // 맞으면 그런 가게가 딱 한 곳일 때만 잇는다 (둘 이상이면 어느 가게인지 알 수 없어 장소 ID를 잘못 저장할 수 있다)
+  const key = normalizeStoreName(place.place_name);
+  const matches = near.filter((r) => storeNameMatches(place.place_name, r.name));
+  const match =
+    matches.find((r) => normalizeStoreName(r.name) === key) ??
+    (matches.length === 1 ? matches[0] : undefined);
   if (!match) return null;
   const id = BigInt(match.id);
   await saveKakaoPlaceId(id, place.id);

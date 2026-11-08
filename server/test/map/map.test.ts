@@ -303,6 +303,29 @@ describe('MAP-03 GET /map/nearest-restaurant — 누른 자리의 가장 가까�
     expect(saved.kakaoPlaceId).toBe('333');
   });
 
+  it('이름이 똑같은 가게를 먼저 고르고, 포함 관계만 맞는 가게가 여럿이면 잇지 않는다', async () => {
+    const me = await createMember();
+    await createRestaurant({ name: '옛날손칼국수 가양점', ...at(10, 0) });
+    const exact = await createRestaurant({ name: '옛날손칼국수', ...at(50, 0) });
+    stubKakao({
+      category: (p) =>
+        p.get('category_group_code') === 'FD6' ? [place('777', '옛날손칼국수', 4)] : [],
+    });
+    expect((await nearest(me.id)).body.data.restaurantId).toBe(Number(exact.id));
+
+    // 카카오는 "옛날손칼국수 본점", 이름이 그 안에 들어가는 우리 가게가 두 곳 → 어느 가게인지 몰라 잇지 않는다
+    await createRestaurant({ name: '손칼국수', ...at(0, 30) });
+    await createRestaurant({ name: '칼국수 본점', ...at(0, 60) });
+    stubKakao({
+      category: (p) =>
+        p.get('category_group_code') === 'FD6' ? [place('888', '옛날손칼국수 본점', 4)] : [],
+    });
+    const res = await nearest(me.id);
+    expect(res.body.data).toEqual({ restaurantId: null, placeName: '옛날손칼국수 본점' });
+    const linked = await prisma.restaurant.findMany({ where: { kakaoPlaceId: '888' } });
+    expect(linked).toHaveLength(0);
+  });
+
   it('카카오 장소 가까이에 이름이 다른 가게가 많아도 100m 안 이름이 맞는 가게를 찾는다', async () => {
     const me = await createMember();
     // 빽빽한 건물: 이름이 다른 가게 60곳이 카카오 장소 바로 옆에 있다
