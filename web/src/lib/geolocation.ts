@@ -23,7 +23,9 @@ export function getCurrentCoords(timeoutMs = 10_000): Promise<Coords> {
 }
 
 /** 방문 인증용 정확한 지금 위치 (오래된 위치를 쓰지 않는다). 정확도(m)도 같이 */
-export function getPreciseCoords(timeoutMs = 15_000): Promise<Coords & { accuracyM: number }> {
+export function getPreciseCoords(
+  timeoutMs = 15_000,
+): Promise<Coords & { accuracyM: number; measuredAt: number }> {
   return new Promise((resolve, reject) => {
     if (!('geolocation' in navigator)) {
       reject('UNAVAILABLE' satisfies LocationError);
@@ -35,6 +37,8 @@ export function getPreciseCoords(timeoutMs = 15_000): Promise<Coords & { accurac
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
           accuracyM: Math.min(5000, Math.round(pos.coords.accuracy)),
+          /** 기기가 위치를 잰 시각 (ms) — 콜백이 늦게 와도 이 시각으로 얼마나 지났는지 본다 */
+          measuredAt: pos.timestamp,
         }),
       (err) =>
         reject(

@@ -13,7 +13,7 @@ import {
   createRestaurant,
   createVisit,
 } from '../helpers/fixtures';
-import { stubKakao } from '../helpers/kakao';
+import { kakaoCalls, stubKakao } from '../helpers/kakao';
 
 const app = createApp();
 
@@ -243,5 +243,191 @@ describe('MAP-01 GET /map/restaurants — 입력 검증', () => {
     const res = await getMap(me.id);
     expect(res.status).toBe(403);
     expect(res.body.code).toBe('PROFILE_REQUIRED');
+  });
+});
+
+describe('MAP-03 GET /map/nearest-restaurant — 누른 자리의 가장 가까운 음식점', () => {
+  /** CENTER에서 북쪽 dLatM, 동쪽 dLngM 떨어진 좌표 */
+  const at = (dLatM: number, dLngM: number) => ({
+    lat: CENTER.lat + dLatM / 111_320,
+    lng: CENTER.lng + dLngM / (111_320 * Math.cos((CENTER.lat * Math.PI) / 180)),
+  });
+  /** 카카오 카테고리 검색 결과 한 곳 */
+  const place = (id: string, name: string, distance: number, dLatM = 0, dLngM = 0) => {
+    const p = at(dLatM, dLngM);
+    return { id, place_name: name, x: String(p.lng), y: String(p.lat), distance: String(distance) };
+  };
+  const tap = { lat: String(CENTER.lat), lng: String(CENTER.lng) };
+
+  async function nearest(userId: bigint, query: Record<string, string> = tap) {
+    return request(app)
+      .get('/api/v1/map/nearest-restaurant')
+      .query(query)
+      .set('Authorization', bearer(userId));
+  }
+
+  it('음식점·카페 중 가장 가까운 카카오 장소의 가게를 준다 (장소 ID로 이어진 가게)', async () => {
+    const me = await createMember();
+    const cafe = await createRestaurant({ name: '모퉁이카페', kakaoPlaceId: '111', ...at(12, 0) });
+    await createRestaurant({ name: '쌀국수집', ...at(0, 25) });
+    const fetchMock = stubKakao({
+      category: (p) =>
+        p.get('category_group_code') === 'CE7'
+          ? [place('111', '모퉁이카페', 12, 12, 0)]
+          : [place('222', '쌀국수집', 25, 0, 25)],
+    });
+
+    const res = await nearest(me.id, { ...tap, radiusM: '40' });
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ restaurantId: Number(cafe.id), placeName: '모퉁이카페' });
+    const calls = kakaoCalls(fetchMock, '/v2/local/search/category.json');
+    expect(calls.map((c) => c.get('category_group_code')).sort()).toEqual(['CE7', 'FD6']);
+    expect(calls[0].get('radius')).toBe('40');
+    expect(calls[0].get('sort')).toBe('distance');
+    expect(Number(calls[0].get('y'))).toBeCloseTo(CENTER.lat, 6);
+  });
+
+  it('아직 이어지지 않았으면 카카오 장소 100m 안 이름이 맞는 가게와 잇고 장소 ID만 저장한다', async () => {
+    const me = await createMember();
+    // 공공데이터 좌표는 카카오와 60m 어긋나 있고, 더 가까운 다른 가게가 있다
+    const shop = await createRestaurant({ name: '옛날손칼국수 가양점', ...at(60, 20) });
+    await createRestaurant({ name: '옆집분식', ...at(5, 20) });
+    stubKakao({
+      category: (p) =>
+        p.get('category_group_code') === 'FD6' ? [place('333', '옛날손칼국수', 8, 0, 20)] : [],
+    });
+
+    const res = await nearest(me.id);
+    expect(res.body.data).toEqual({ restaurantId: Number(shop.id), placeName: '옛날손칼국수' });
+    const saved = await prisma.restaurant.findUniqueOrThrow({ where: { id: shop.id } });
+    expect(saved.kakaoPlaceId).toBe('333');
+  });
+
+  it('이름이 똑같은 가게를 먼저 고르고, 포함 관계만 맞는 가게가 여럿이면 잇지 않는다', async () => {
+    const me = await createMember();
+    await createRestaurant({ name: '옛날손칼국수 가양점', ...at(10, 0) });
+    const exact = await createRestaurant({ name: '옛날손칼국수', ...at(50, 0) });
+    stubKakao({
+      category: (p) =>
+        p.get('category_group_code') === 'FD6' ? [place('777', '옛날손칼국수', 4)] : [],
+    });
+    expect((await nearest(me.id)).body.data.restaurantId).toBe(Number(exact.id));
+
+    // 카카오는 "옛날손칼국수 본점", 이름이 그 안에 들어가는 우리 가게가 두 곳 → 어느 가게인지 몰라 잇지 않는다
+    await createRestaurant({ name: '손칼국수', ...at(0, 30) });
+    await createRestaurant({ name: '칼국수 본점', ...at(0, 60) });
+    stubKakao({
+      category: (p) =>
+        p.get('category_group_code') === 'FD6' ? [place('888', '옛날손칼국수 본점', 4)] : [],
+    });
+    const res = await nearest(me.id);
+    expect(res.body.data).toEqual({ restaurantId: null, placeName: '옛날손칼국수 본점' });
+    const linked = await prisma.restaurant.findMany({ where: { kakaoPlaceId: '888' } });
+    expect(linked).toHaveLength(0);
+  });
+
+  it('카카오 장소 가까이에 이름이 다른 가게가 많아도 100m 안 이름이 맞는 가게를 찾는다', async () => {
+    const me = await createMember();
+    // 빽빽한 건물: 이름이 다른 가게 60곳이 카카오 장소 바로 옆에 있다
+    for (let i = 0; i < 60; i += 1) await createRestaurant({ name: `다른가게${i}`, ...at(0, 1) });
+    const shop = await createRestaurant({ name: '골목끝국밥', ...at(80, 0) });
+    stubKakao({
+      category: (p) =>
+        p.get('category_group_code') === 'FD6' ? [place('666', '골목끝국밥', 5)] : [],
+    });
+
+    const res = await nearest(me.id);
+    expect(res.body.data).toEqual({ restaurantId: Number(shop.id), placeName: '골목끝국밥' });
+  });
+
+  it('카카오 가게가 우리 가게가 아니면 이름만 알려 준다 (다른 가게를 대신 보여 주지 않는다)', async () => {
+    const me = await createMember();
+    await createRestaurant({ name: '옆집분식', ...at(5, 0) });
+    stubKakao({
+      category: (p) =>
+        p.get('category_group_code') === 'FD6' ? [place('444', '골목포차', 6, 6, 0)] : [],
+    });
+
+    const res = await nearest(me.id);
+    expect(res.body.data).toEqual({ restaurantId: null, placeName: '골목포차' });
+  });
+
+  it('카카오가 실패하거나 근처에 아무것도 없으면 우리 가게 중 반경 안 가장 가까운 곳', async () => {
+    const me = await createMember();
+    const near = await createRestaurant({ name: '가까운집', ...at(20, 0) });
+    await createRestaurant({ name: '조금먼집', ...at(0, 25) });
+    await createRestaurant({ name: '반경밖', ...at(40, 0) });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    stubKakao({ category: () => 500 });
+    expect((await nearest(me.id)).body.data).toEqual({
+      restaurantId: Number(near.id),
+      placeName: null,
+    });
+    stubKakao({ category: () => [] });
+    expect((await nearest(me.id)).body.data).toEqual({
+      restaurantId: Number(near.id),
+      placeName: null,
+    });
+    stubKakao({ category: () => [] });
+    expect((await nearest(me.id, { ...tap, radiusM: '10' })).body.data).toEqual({
+      restaurantId: null,
+      placeName: null,
+    });
+  });
+
+  it('카카오 응답의 좌표·거리가 숫자가 아니면 그 곳은 버린다 (DB 오류 대신 다음 후보·DB로)', async () => {
+    const me = await createMember();
+    const near = await createRestaurant({ name: '가까운집', ...at(10, 0) });
+    stubKakao({
+      category: (p) =>
+        p.get('category_group_code') === 'FD6'
+          ? [{ id: '555', place_name: '좌표없는집', x: '', y: '', distance: '3' }]
+          : [],
+    });
+    const res = await nearest(me.id);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ restaurantId: Number(near.id), placeName: null });
+  });
+
+  it('서울 밖이면 카카오를 부르지 않는다', async () => {
+    const me = await createMember();
+    const fetchMock = stubKakao();
+    const res = await nearest(me.id, { lat: '35.1796', lng: '129.0756' });
+    expect(res.body.data).toEqual({ restaurantId: null, placeName: null });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ lat: 'abc', lng: tap.lng }, 'INVALID_COORDINATE'],
+    [{ lat: tap.lat }, 'INVALID_COORDINATE'],
+    [{ ...tap, radiusM: '500' }, 'VALIDATION_ERROR'],
+  ])('잘못된 값이면 400 (%o)', async (query, code) => {
+    const me = await createMember();
+    stubKakao();
+    const res = await nearest(me.id, query);
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe(code);
+  });
+});
+
+describe('MAP-03 요청 횟수 제한', () => {
+  it('카카오를 부르는 API라 같은 IP는 1분에 30번까지, 넘으면 429', async () => {
+    const me = await createMember();
+    stubKakao();
+    const query = { lat: String(CENTER.lat), lng: String(CENTER.lng) };
+    for (let i = 0; i < 30; i += 1) {
+      const res = await request(app)
+        .get('/api/v1/map/nearest-restaurant')
+        .query(query)
+        .set('Authorization', bearer(me.id));
+      expect(res.status).toBe(200);
+    }
+    const res = await request(app)
+      .get('/api/v1/map/nearest-restaurant')
+      .query(query)
+      .set('Authorization', bearer(me.id));
+    expect(res.status).toBe(429);
+    expect(res.body.code).toBe('TOO_MANY_REQUESTS');
   });
 });

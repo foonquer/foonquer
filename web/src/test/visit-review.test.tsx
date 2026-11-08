@@ -231,6 +231,39 @@ describe('방문 인증', () => {
       expect(server.calls('POST /visit-verifications/location-checks')).toHaveLength(0);
     });
 
+    it('기기가 위치를 잰 지 1분이 넘었으면(콜백이 늦게 와도) 현장인증에서 다시 잰다', async () => {
+      Object.defineProperty(navigator, 'geolocation', {
+        configurable: true,
+        value: {
+          getCurrentPosition: (done: (p: object) => void) =>
+            done({ coords: ME, timestamp: Date.now() - 61_000 }),
+        },
+      });
+      const server = mockApi({
+        'GET /map/restaurants': ok({
+          items: [shop(7, '옆집국밥', 33, 0)],
+          totalCount: 1,
+          truncated: false,
+        }),
+        'GET /restaurants/:id': ok({
+          restaurantId: 7,
+          name: '옆집국밥',
+          lat: 37.563,
+          lng: 126.857,
+        }),
+      });
+      renderRoute('/visits/new/on-site');
+      fireEvent.click(await screen.findByRole('button', { name: '위치 권한 허용하기' }));
+      fireEvent.click(await screen.findByRole('button', { name: '옆집국밥에서 인증하기' }));
+
+      expect(
+        await screen.findByText(
+          '옆집국밥 근처에 있는지 확인할 수 있도록 위치 접근을 허용해주세요.',
+        ),
+      ).toBeInTheDocument();
+      expect(server.calls('POST /visit-verifications/location-checks')).toHaveLength(0);
+    });
+
     it('찾는 중에 화면을 떠나면 늦게 온 결과와 오류 안내를 버린다', async () => {
       let located: ((p: object) => void) | undefined;
       Object.defineProperty(navigator, 'geolocation', {

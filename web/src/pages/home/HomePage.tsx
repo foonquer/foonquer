@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { getHomeSummary } from '../../api/home';
-import { getMapRestaurants, type Bounds, type MapRestaurant } from '../../api/restaurants';
+import {
+  getMapRestaurants,
+  getNearestRestaurant,
+  type Bounds,
+  type MapRestaurant,
+} from '../../api/restaurants';
 import { getMe } from '../../api/users';
 import bellIcon from '../../assets/icons/bell.svg';
 import flagIcon from '../../assets/icons/flag.svg';
@@ -14,21 +19,33 @@ import { RegionSelectSheet } from '../../components/RegionSelectSheet';
 import { EmptyState, Loading } from '../../components/StateViews';
 import { useToast } from '../../components/Toast';
 import { ApiError, errorMessage } from '../../lib/api';
-import { boundsAround, metersBetween } from '../../lib/geo';
+import { metersBetween } from '../../lib/geo';
+import { eunNeun } from '../../lib/korean';
 import type { Coords } from '../../lib/geolocation';
 import { SEOUL_CENTER, useViewRegion } from '../../lib/region';
 import { useAsync } from '../../lib/useAsync';
 import { useMyCoords } from '../../lib/useMyCoords';
-import { NearbySheet } from './NearbySheet';
 import { PreviewSheet } from './PreviewSheet';
 import styles from './HomePage.module.css';
 
 /** 지도를 멈추고 이만큼 기다렸다가 가게를 다시 불러온다 (ms) */
 const FETCH_DELAY_MS = 300;
-/** 지도를 누른 자리에서 가게를 찾는 반경 (m). 카카오 지도의 가게 이름 위치와 공공데이터 좌표가 조금씩 다르다 */
-const TAP_RADIUS_M = 30;
-/** 여러 곳이면 가까운 순으로 이만큼만 보여 준다 */
-const TAP_MAX_ITEMS = 10;
+/** 지도를 누른 자리에서 가게를 찾는 반경 = 보이는 지도 가로의 6% (390px 화면이면 손가락 한 개쯤) */
+const TAP_RADIUS_RATIO = 0.06;
+/** 반경 범위 (m). 서버 MAP-03은 10~100m를 받는다 */
+const TAP_RADIUS_MIN_M = 20;
+const TAP_RADIUS_MAX_M = 100;
+
+/** 지금 보이는 지도에 맞춘 누르기 반경 (m). 아직 영역을 모르면 30m */
+function tapRadius(bounds: Bounds | undefined) {
+  if (!bounds) return 30;
+  const lat = (bounds.swLat + bounds.neLat) / 2;
+  const widthM = metersBetween({ lat, lng: bounds.swLng }, { lat, lng: bounds.neLng });
+  return Math.min(
+    TAP_RADIUS_MAX_M,
+    Math.max(TAP_RADIUS_MIN_M, Math.round(widthM * TAP_RADIUS_RATIO)),
+  );
+}
 
 /** 홈: 프로필 줄(HOME-01) + 음식점 검색 + 지도(MAP-01) + 가게 미리보기(MAP-02). 지도의 빈 곳을 누르면 그 자리 가게를 찾는다 */
 export function HomePage() {
@@ -42,14 +59,15 @@ export function HomePage() {
   const [pins, setPins] = useState<MapRestaurant[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [nearby, setNearby] = useState<MapRestaurant[] | null>(null);
   const [regionOpen, setRegionOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const request = useRef<AbortController>(undefined);
   const tapRequest = useRef<AbortController>(undefined);
+  const viewBounds = useRef<Bounds>(undefined);
 
   const loadPins = useCallback(
     (bounds: Bounds) => {
+      viewBounds.current = bounds;
       clearTimeout(timer.current);
       timer.current = setTimeout(async () => {
         request.current?.abort();
@@ -80,30 +98,23 @@ export function HomePage() {
     [toast],
   );
 
-  // 핀이 아닌 곳을 누르면 그 자리 가게(찜·정복 여부와 상관없이)를 찾아 미리보기, 여러 곳이면 고르기
+  // 핀이 아닌 곳을 누르면 그 자리에서 가장 가까운 음식점 1곳(찜·정복 여부와 상관없이)을 미리보기.
+  // 카카오 지도에 그려진 가게 이름은 카카오 좌표에 있어서 서버가 카카오 음식점 기준으로 찾는다 (MAP-03)
   const findAt = useCallback(
     async (point: Coords) => {
       tapRequest.current?.abort();
       const controller = new AbortController();
       tapRequest.current = controller;
       try {
-        const { items } = await getMapRestaurants(
-          boundsAround(point, TAP_RADIUS_M),
+        const { restaurantId, placeName } = await getNearestRestaurant(
+          { ...point, radiusM: tapRadius(viewBounds.current) },
           controller.signal,
         );
         // 응답이 이미 와 있던 이전 요청은 abort로 못 막으니 결과를 버린다
         if (controller.signal.aborted) return;
-        // 서버가 누른 자리에서 가까운 순으로 준다
-        const near = items.filter((r) => metersBetween(point, r) <= TAP_RADIUS_M);
-        if (near.length === 0) {
-          toast('이 자리에서 가게를 찾지 못했어요');
-        } else if (near.length === 1) {
-          setNearby(null);
-          setSelectedId(near[0].restaurantId);
-        } else {
-          setSelectedId(null);
-          setNearby(near.slice(0, TAP_MAX_ITEMS));
-        }
+        if (restaurantId !== null) setSelectedId(restaurantId);
+        else if (placeName) toast(`${eunNeun(placeName)} 아직 먹장깨기에 없는 가게예요`);
+        else toast('이 자리에서 가게를 찾지 못했어요');
       } catch (err) {
         if (!controller.signal.aborted) toast(errorMessage(err));
       }
@@ -121,11 +132,9 @@ export function HomePage() {
   );
 
   const closePreview = useCallback(() => setSelectedId(null), []);
-  const closeNearby = useCallback(() => setNearby(null), []);
-  // 핀이나 목록에서 고르거나 지역 시트를 열면, 아직 오는 중인 지도 누르기 결과는 버린다
+  // 핀을 고르거나 지역 시트를 열면, 아직 오는 중인 지도 누르기 결과는 버린다
   const pickRestaurant = useCallback((restaurantId: number) => {
     tapRequest.current?.abort();
-    setNearby(null);
     setSelectedId(restaurantId);
   }, []);
   const openRegion = useCallback(() => {
@@ -194,7 +203,6 @@ export function HomePage() {
         </Link>
       </section>
 
-      <NearbySheet items={nearby} onPick={pickRestaurant} onClose={closeNearby} />
       <PreviewSheet restaurantId={selectedId} coords={coords} onClose={closePreview} />
       <RegionSelectSheet open={regionOpen} onClose={() => setRegionOpen(false)} />
     </div>

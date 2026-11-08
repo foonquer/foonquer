@@ -73,6 +73,48 @@ export async function searchPlacesNear(query: string, lat: number, lng: number, 
   return body.documents ?? [];
 }
 
+/**
+ * 카테고리 검색 결과 한 곳 (필요한 필드만). 좌표·이름·거리는 응답을 만드는 데만 쓰고 저장하지 않는다.
+ * x·y·distance는 카카오가 문자열로 준다
+ */
+export interface KakaoNearPlace {
+  id: string;
+  place_name: string;
+  /** 경도 */
+  x: string;
+  /** 위도 */
+  y: string;
+  /** 기준 좌표에서 거리(m) */
+  distance: string;
+}
+
+/** 음식점(FD6)·카페(CE7). 우리 가게(공공데이터 음식 업종)에 카페가 들어 있어 둘 다 본다 */
+const FOOD_CATEGORY_CODES = ['FD6', 'CE7'];
+
+/**
+ * 좌표 둘레 radiusM 안의 음식점·카페 중 가장 가까운 곳 (MAP-03). 없으면 null.
+ * https://developers.kakao.com/docs/latest/ko/local/dev-guide#search-by-category
+ */
+export async function nearestFoodPlace(lat: number, lng: number, radiusM: number) {
+  const bodies = await Promise.all(
+    FOOD_CATEGORY_CODES.map((code) =>
+      kakaoGet<{ documents: KakaoNearPlace[] }>(
+        '/v2/local/search/category.json',
+        { category_group_code: code, x: lng, y: lat, radius: radiusM, sort: 'distance', size: 1 },
+        PLACE_TIMEOUT_MS,
+      ),
+    ),
+  );
+  // 타입은 런타임에 보장되지 않으니 좌표·거리가 숫자인 곳만 쓴다 (빈 문자열·누락이면 버림)
+  const isNumber = (v: unknown) =>
+    typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v));
+  const places = bodies
+    .flatMap((b) => b.documents ?? [])
+    .filter((p) => isNumber(p.x) && isNumber(p.y) && isNumber(p.distance));
+  places.sort((a, b) => Number(a.distance) - Number(b.distance));
+  return places[0] ?? null;
+}
+
 interface RegionCodeResponse {
   documents: { region_type: string; code: string }[];
 }

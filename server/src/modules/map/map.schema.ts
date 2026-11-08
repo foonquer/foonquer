@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { distanceBetween } from '../../common/geo';
-import { coordinateQuery } from '../region/region.schema';
+import { coordinateQuery, latQuery, lngQuery } from '../region/region.schema';
 
 /** 화면 대각선이 이보다 길면 MAP_BOUNDS_TOO_LARGE (카카오 호출량·지도 성능을 위한 초안 값) */
 export const MAX_MAP_DIAGONAL_M = 3000;
@@ -33,3 +33,12 @@ export const mapRestaurantsQuery = z
   });
 
 export type MapRestaurantsQuery = z.infer<typeof mapRestaurantsQuery>;
+
+/** MAP-03. radiusM은 누른 곳에서 찾을 반경(m), 지도 확대 수준에 맞춰 웹이 정한다 */
+export const nearestRestaurantQuery = z.object({
+  lat: latQuery,
+  lng: lngQuery,
+  radiusM: z.coerce.number().int().min(10).max(100).default(30),
+});
+
+export type NearestRestaurantQuery = z.infer<typeof nearestRestaurantQuery>;
