@@ -31,7 +31,7 @@ function AlbumButton({
 }
 
 /**
- * 영수증 인증 /visits/new/receipt?restaurantId= (홈에서 바로 찍으면 /visits/new, 가게 없음)
+ * 영수증 인증 /visits/new/receipt?restaurantId= (홈에서 바로 찍으면 가게 없음)
  * 화면 안 카메라(권한 안내·꺼짐 안내) 또는 앨범 → 촬영 확인 → 업로드 + VISIT-03 → 결과 화면(/visits/:id)에서 읽는 중·성공·실패.
  * 화면 안 카메라를 못 쓰는 브라우저면 휴대폰 카메라 앱으로 찍는다
  */
