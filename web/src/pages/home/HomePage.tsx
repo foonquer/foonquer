@@ -189,10 +189,8 @@ export function HomePage() {
         )}
 
         <Link to="/visits/new" className={styles.fab}>
-          <span className={styles.fabCircle}>
-            <img src={flagIcon} alt="" width={28} height={28} />
-          </span>
-          <span className={styles.fabLabel}>정복하기</span>
+          <img src={flagIcon} alt="" width={22} height={22} />
+          정복하기
         </Link>
       </section>
 
