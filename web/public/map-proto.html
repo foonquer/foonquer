@@ -28,13 +28,16 @@
 <div id="map"></div>
 <div class="bar">
   <span class="chip">강서구 · 가양동</span>
-  <span class="note">시안: 지도 바탕의 가게 아이콘·이름을 끄고 우리 핀만 · 핀 위치는 OpenStreetMap 음식점 예시</span>
+  <button class="chip" id="toggle" type="button">다른 장소 끄기</button>
+  <span class="note">시안: 음식점·카페 아이콘만 끄고 우리 핀으로 · 역·학교·병원 같은 다른 장소는 남김 · 핀 위치는 OpenStreetMap 음식점 예시</span>
 </div>
 <div class="sheet" id="sheet"></div>
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 const MK = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTMzIiBoZWlnaHQ9IjE0Mi41IiB2aWV3Qm94PSIwIDAgMTMzIDE0Mi41IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Zz4KPGVsbGlwc2UgY3g9IjY2LjUiIGN5PSIxMzcuNzUiIHJ4PSIyOC41IiByeT0iMy44IiBmaWxsPSIjMjQyODI0IiBmaWxsLW9wYWNpdHk9IjAuMDgiLz4KPHBhdGggZD0iTTM3LjkyNCA2MC41MTVDMzcuOTI0IDUxLjAxNSAzOS40NDQgNDUuMzA1NSA0MS4wNCA0Mi42NDU1QzQxLjYxIDQxLjUwNTUgNDIuNzUgNDEuNTA1NSA0My4zMiA0Mi42NDU1QzQ3LjM0OCA0Ni44MjU1IDUzLjEyNCA1My4yOTUgNTMuMTI0IDYwLjUxNUgzNy45MjRaIiBmaWxsPSIjRjJDNzVDIi8+CjxwYXRoIGQ9Ik05NS4wNzYgNjAuNTE1Qzk1LjA3NiA1MS4wMTUgOTMuNTU2IDQ1LjMwNTUgOTEuOTYgNDIuNjQ1NUM5MS4zOSA0MS41MDU1IDkwLjI1IDQxLjUwNTUgODkuNjggNDIuNjQ1NUM4NS42NTIgNDYuODI1NSA3OS44NzYgNTMuMjk1IDc5Ljg3NiA2MC41MTVIOTUuMDc2WiIgZmlsbD0iI0YyQzc1QyIvPgo8ZWxsaXBzZSBjeD0iNDIuNzk3NSIgY3k9IjQ1LjkwOTIiIHJ4PSIyLjEzNzUiIHJ5PSIyLjg1IiBmaWxsPSIjRkZFN0EzIiBmaWxsLW9wYWNpdHk9IjAuOSIvPgo8ZWxsaXBzZSBjeD0iODkuNjEzNSIgY3k9IjQ1LjkwOTIiIHJ4PSIyLjEzNzUiIHJ5PSIyLjg1IiBmaWxsPSIjRkZFN0EzIiBmaWxsLW9wYWNpdHk9IjAuOSIvPgo8ZWxsaXBzZSBjeD0iMjUuNjUiIGN5PSI5Ny41ODQiIHJ4PSIxMS40IiByeT0iNy42IiBmaWxsPSIjRUE3QjY2Ii8+CjxlbGxpcHNlIGN4PSIxMDcuMzUiIGN5PSI5Ny41ODQiIHJ4PSIxMS40IiByeT0iNy42IiBmaWxsPSIjRUE3QjY2Ii8+CjxlbGxpcHNlIGN4PSI1My40MjgiIGN5PSIxMjkuNjc1IiByeD0iMTEuNCIgcnk9IjcuMTI1IiBmaWxsPSIjRDg2NDRGIi8+CjxlbGxpcHNlIGN4PSI3OS41NzIiIGN5PSIxMjkuNjc1IiByeD0iMTEuNCIgcnk9IjcuMTI1IiBmaWxsPSIjRDg2NDRGIi8+CjxlbGxpcHNlIGN4PSI2Ni41IiBjeT0iODguMzUiIHJ4PSI0My43IiByeT0iNDAuODUiIGZpbGw9IiNFQTdCNjYiLz4KPGVsbGlwc2UgY3g9IjQyLjc1ODIiIGN5PSI2Ni4wODQzIiByeD0iMTEuNCIgcnk9IjYuMTc1IiB0cmFuc2Zvcm09InJvdGF0ZSgyNSA0Mi43NTgyIDY2LjA4NDMpIiBmaWxsPSJ3aGl0ZSIgZmlsbC1vcGFjaXR5PSIwLjM1Ii8+CjxlbGxpcHNlIGN4PSI2Ni41IiBjeT0iMTA3Ljk1OCIgcng9IjIwLjk3NiIgcnk9IjEzLjA3MiIgZmlsbD0iI0ZGRjFEOSIvPgo8ZWxsaXBzZSBjeD0iNTQuMjY0IiBjeT0iODAuMjk0IiByeD0iNS4yMjUiIHJ5PSI2LjY1IiBmaWxsPSIjM0UyQTIyIi8+CjxjaXJjbGUgY3g9IjUzLjA3NjUiIGN5PSI3Ny42ODE1IiByPSIyLjEzNzUiIGZpbGw9IndoaXRlIi8+CjxjaXJjbGUgY3g9IjU2LjYzOSIgY3k9IjgzLjE0NCIgcj0iMC45NSIgZmlsbD0id2hpdGUiLz4KPGVsbGlwc2UgY3g9Ijc4LjczNiIgY3k9IjgwLjI5NCIgcng9IjUuMjI1IiByeT0iNi42NSIgZmlsbD0iIzNFMkEyMiIvPgo8Y2lyY2xlIGN4PSI3Ny41NDg1IiBjeT0iNzcuNjgxNSIgcj0iMi4xMzc1IiBmaWxsPSJ3aGl0ZSIvPgo8Y2lyY2xlIGN4PSI4MS4xMTEiIGN5PSI4My4xNDQiIHI9IjAuOTUiIGZpbGw9IndoaXRlIi8+CjxlbGxpcHNlIGN4PSI0MS43NjIiIGN5PSI5My4xMTkiIHJ4PSI3LjYiIHJ5PSI0LjI3NSIgZmlsbD0iI0Y3QTk5QiIgZmlsbC1vcGFjaXR5PSIwLjg1Ii8+CjxlbGxpcHNlIGN4PSI5MS4yMzgiIGN5PSI5My4xMTkiIHJ4PSI3LjYiIHJ5PSI0LjI3NSIgZmlsbD0iI0Y3QTk5QiIgZmlsbC1vcGFjaXR5PSIwLjg1Ii8+CjxwYXRoIGQ9Ik01OS44NSA4OS43OTRDNjQuMjgzMyA5Ni43NjA3IDY4LjcxNjcgOTYuNzYwNyA3My4xNSA4OS43OTRINTkuODVaIiBmaWxsPSIjN0EzRTMwIi8+CjxlbGxpcHNlIGN4PSI2Ni41IiBjeT0iOTUuNDk0IiByeD0iMy44IiByeT0iMS45IiBmaWxsPSIjRjI4QzhDIi8+CjwvZz4KPC9zdmc+Cg==', PIN_U = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDkiIGhlaWdodD0iNTciIHZpZXdCb3g9IjE0IDExIDQ5IDU3IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB4PSIxNiIgeT0iMTEiIHdpZHRoPSI0NCIgaGVpZ2h0PSI0NSIgcng9IjE1IiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMzIgNTFINDRMMzggNjNMMzIgNTFaIiBmaWxsPSJ3aGl0ZSIvPgo8cmVjdCB4PSIyNiIgeT0iMzAiIHdpZHRoPSIyNCIgaGVpZ2h0PSIxOCIgcng9IjQiIGZpbGw9IiNGRkYxRDkiLz4KPHJlY3QgeD0iMjMiIHk9IjIxIiB3aWR0aD0iMzAiIGhlaWdodD0iMTIiIHJ4PSI0IiBmaWxsPSIjRUE3QjY2Ii8+CjxyZWN0IHg9IjM1IiB5PSIzNyIgd2lkdGg9IjciIGhlaWdodD0iMTEiIHJ4PSIyIiBmaWxsPSIjRUE3QjY2Ii8+CjxjaXJjbGUgY3g9IjU0LjUiIGN5PSIxOS41IiByPSI4LjUiIGZpbGw9IiNFQTdCNjYiLz4KPHBhdGggZD0iTTUxLjc5MTcgMTQuNjI1VjE3Ljg3NU01My45NTg0IDE0LjYyNVYxNy44NzVNNTAuNzA4NCAxNC42MjVWMTcuODc1QzUwLjcwODQgMTkuMzE5NCA1MS40MzA2IDIwLjA0MTcgNTIuODc1IDIwLjA0MTdWMjQuMzc1TTU3Ljc1IDI0LjM3NVYxNC42MjVDNTUuOTQ0NSAxNi40MzA2IDU1Ljk0NDUgMTguMjM2MSA1Ny43NSAyMC4wNDE3IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjAuOTc1IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg==', PIN_C = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDkiIGhlaWdodD0iNTciIHZpZXdCb3g9IjE0IDExIDQ5IDU3IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB4PSIxNiIgeT0iMTEiIHdpZHRoPSI0NCIgaGVpZ2h0PSI0NSIgcng9IjE1IiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMzIgNTFINDRMMzggNjNMMzIgNTFaIiBmaWxsPSJ3aGl0ZSIvPgo8cmVjdCB4PSIyNiIgeT0iMzAiIHdpZHRoPSIyNCIgaGVpZ2h0PSIxOCIgcng9IjQiIGZpbGw9IiNGRkYxRDkiLz4KPHJlY3QgeD0iMjMiIHk9IjIxIiB3aWR0aD0iMzAiIGhlaWdodD0iMTIiIHJ4PSI0IiBmaWxsPSIjNTlBODY0Ii8+CjxyZWN0IHg9IjM1IiB5PSIzNyIgd2lkdGg9IjciIGhlaWdodD0iMTEiIHJ4PSIyIiBmaWxsPSIjNTlBODY0Ii8+CjxjaXJjbGUgY3g9IjU0LjUiIGN5PSIxOS41IiByPSI4LjUiIGZpbGw9IiM1OUE4NjQiLz4KPHBhdGggZD0iTTUwLjcwODQgMTkuNUw1Mi44NzUgMjEuNjY2N0w1OC4yOTE3IDE2LjI1IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjAuOTc1IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg==';
 const CENTER = [126.8545, 37.5617];
+const poiLayers = [];
+let othersOn = true;
 const FOOD = ['restaurant', 'cafe', 'fast_food', 'bar', 'pub', 'ice_cream', 'bakery', 'food_court'];
 const map = new maplibregl.Map({
   container: 'map',
@@ -46,8 +49,13 @@ const map = new maplibregl.Map({
 map.on('load', () => {
   for (const layer of map.getStyle().layers) {
     const id = layer.id;
-    // 1) 바탕 지도의 가게·장소 아이콘과 이름 끄기 (우리 핀과 겹치지 않게)
-    if (/^poi/.test(id)) { map.setLayoutProperty(id, 'visibility', 'none'); continue; }
+    // 1) 바탕 지도의 음식점·카페 아이콘과 이름만 끈다 (우리 핀과 겹치지 않게). 역·학교 등은 길 찾기에 남긴다
+    if (/^poi/.test(id)) {
+      const base = layer.filter;
+      const notFood = ['!', ['any', ['in', ['get', 'class'], ['literal', FOOD]], ['in', ['get', 'subclass'], ['literal', FOOD]]]];
+      map.setFilter(id, base ? ['all', base, notFood] : notFood);
+      poiLayers.push(id);
+    }
     // 2) 이름은 한국어로
     if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
       map.setLayoutProperty(id, 'text-field', ['coalesce', ['get', 'name:ko'], ['get', 'name']]);
@@ -106,6 +114,11 @@ function show(name, conquered) {
   s.style.display = 'block';
 }
 map.on('click', () => { document.getElementById('sheet').style.display = 'none'; });
+document.getElementById('toggle').addEventListener('click', (e) => {
+  othersOn = !othersOn;
+  poiLayers.forEach((id) => map.setLayoutProperty(id, 'visibility', othersOn ? 'visible' : 'none'));
+  e.currentTarget.textContent = othersOn ? '다른 장소 끄기' : '다른 장소 켜기';
+});
 map.on('idle', draw);
 </script>
 </body>
