@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
-import { getRestaurant, type RestaurantDetail } from '../../api/restaurants';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
+import {
+  getMapRestaurants,
+  getRestaurant,
+  type MapRestaurant,
+  type RestaurantDetail,
+} from '../../api/restaurants';
 import { IMAGE_ACCEPT, uploadImage } from '../../api/uploads';
 import { checkLocation, completeOnSite } from '../../api/visits';
 import mealThumb from '../../assets/illust/meal-thumb.svg';
@@ -12,10 +17,21 @@ import { useToast } from '../../components/Toast';
 import { ApiError, errorMessage } from '../../lib/api';
 import { readPhotoMeta, type PhotoMeta } from '../../lib/exif';
 import { formatDistance, joinDot } from '../../lib/format';
+import { boundsAround, metersBetween } from '../../lib/geo';
 import { type Coords, getPreciseCoords } from '../../lib/geolocation';
 import { useAsync } from '../../lib/useAsync';
 import styles from './Visit.module.css';
 
+/** 홈에서 바로 왔을 때 가게를 찾는 반경 (m). 현장인증 범위(서버 ALLOWED_DISTANCE_M)와 같다 */
+const NEARBY_RADIUS_M = 100;
+/** 가까운 순으로 이만큼만 보여 준다 */
+const NEARBY_MAX_ITEMS = 20;
+/** 근처 가게 고르기에서 잰 위치를 이 시간(ms) 안에만 위치 확인에 그대로 쓴다 */
+const PASSED_COORDS_MAX_AGE_MS = 60_000;
+
+type PreciseCoords = Coords & { accuracyM: number };
+/** 근처 가게 고르기 → 현장인증으로 넘기는 위치 (라우터 state) */
+type PassedCoords = { me: PreciseCoords; at: number };
 type Check = { verificationId: number; distanceM: number; allowedM: number; me: Coords };
 type Photo = { file: File; url: string };
 
@@ -30,10 +46,170 @@ type Step =
   | { kind: 'confirm'; check: Check; photo: Photo }
   | { kind: 'ready'; check: Check; photo: Photo; key: string; meta: PhotoMeta };
 
-/** 현장인증 /visits/new/on-site?restaurantId= — 정복 미션 1 위치 확인(VISIT-01) → 2 음식 사진(VISIT-02) */
+/**
+ * 현장인증 /visits/new/on-site?restaurantId= — 정복 미션 1 위치 확인(VISIT-01) → 2 음식 사진(VISIT-02).
+ * 가게 없이(홈에서 바로) 오면 먼저 내 위치 근처 가게를 고른다
+ */
 export function OnSitePage() {
   const restaurantId = Number(useSearchParams()[0].get('restaurantId'));
+  if (!Number.isInteger(restaurantId) || restaurantId <= 0) return <PickNearby />;
+  return <OnSiteLoader restaurantId={restaurantId} />;
+}
+
+/** 정복 미션 n / 2 머리말 */
+function Mission({ no, text }: { no: 1 | 2; text: string }) {
+  return (
+    <>
+      <p className={styles.mission}>정복 미션 {no} / 2</p>
+      <p className={styles.missionText}>{text}</p>
+      <div className={styles.progress} aria-hidden="true">
+        <span data-done="true" />
+        <span data-done={no === 2} />
+      </div>
+    </>
+  );
+}
+
+type NearbyItem = MapRestaurant & { distanceM: number };
+type PickStep =
+  | { kind: 'start' }
+  | { kind: 'checking' }
+  | { kind: 'denied' }
+  | { kind: 'list'; me: PreciseCoords; items: NearbyItem[] };
+
+/** 홈에서 바로 현장인증: 내 위치 100m 안 가게를 가까운 순으로 보여 주고, 고르면 그 위치로 바로 확인한다 */
+function PickNearby() {
+  const navigate = useNavigate();
+  const toast = useToast();
+  const [step, setStep] = useState<PickStep>({ kind: 'start' });
+  const [pickedId, setPickedId] = useState<number | null>(null);
+
+  const find = async () => {
+    setStep({ kind: 'checking' });
+    try {
+      const me = await getPreciseCoords();
+      // 서버가 가운데(내 위치)에서 가까운 순으로 준다
+      const { items } = await getMapRestaurants(boundsAround(me, NEARBY_RADIUS_M));
+      const near = items
+        .map((r) => ({ ...r, distanceM: Math.round(metersBetween(me, r)) }))
+        .filter((r) => r.distanceM <= NEARBY_RADIUS_M)
+        .slice(0, NEARBY_MAX_ITEMS);
+      setPickedId(near[0]?.restaurantId ?? null);
+      setStep({ kind: 'list', me, items: near });
+    } catch (err) {
+      if (err === 'DENIED') return setStep({ kind: 'denied' });
+      toast(
+        err === 'UNAVAILABLE'
+          ? '지금 위치를 찾지 못했어요. 잠시 후 다시 시도해 주세요'
+          : errorMessage(err),
+      );
+      setStep({ kind: 'start' });
+    }
+  };
+
+  if (step.kind !== 'list') {
+    return (
+      <Screen
+        footer={
+          <Button onClick={() => find()} disabled={step.kind === 'checking'}>
+            {step.kind === 'checking'
+              ? '근처 가게를 찾는 중…'
+              : step.kind === 'denied'
+                ? '다시 시도하기'
+                : '위치 권한 허용하기'}
+          </Button>
+        }
+      >
+        <AppHeader title="현장인증" />
+        <div className={styles.content}>
+          <Mission no={1} text="먼저 현재 위치를 확인할게요" />
+          {step.kind === 'denied' ? (
+            <div className={styles.status}>
+              <p className={styles.statusTitle} data-tone="warn">
+                위치 권한이 꺼져 있어요
+              </p>
+              <p className={styles.statusText}>
+                주소창 왼쪽의 자물쇠 아이콘을 눌러 위치를 ‘허용’으로 바꾼 뒤 다시 시도해 주세요.
+              </p>
+            </div>
+          ) : (
+            <div className={styles.status}>
+              <p className={styles.statusTitle}>지금 있는 가게를 찾아요</p>
+              <p className={styles.statusText}>
+                내 위치 {NEARBY_RADIUS_M}m 안의 가게를 보여 드릴게요. 위치 접근을 허용해주세요.
+              </p>
+              <p className={styles.statusText}>· 매장과의 거리 확인</p>
+              <p className={styles.statusText}>· 현장인증 중에만 위치 사용</p>
+            </div>
+          )}
+          <p className={styles.caption}>위치 정보는 방문 확인 용도로만 사용돼요.</p>
+        </div>
+      </Screen>
+    );
+  }
+
+  const picked = step.items.find((r) => r.restaurantId === pickedId) ?? null;
+  const go = () => {
+    if (!picked) return;
+    const passed: PassedCoords = { me: step.me, at: Date.now() };
+    navigate(`/visits/new/on-site?restaurantId=${picked.restaurantId}`, { state: passed });
+  };
+  return (
+    <Screen
+      footer={
+        step.items.length > 0 ? (
+          <Button onClick={go} disabled={!picked}>
+            {picked ? `${picked.name}에서 인증하기` : '가게를 골라 주세요'}
+          </Button>
+        ) : (
+          <Button onClick={() => find()}>다시 찾기</Button>
+        )
+      }
+    >
+      <AppHeader title="현장인증" />
+      <div className={styles.content}>
+        <Mission no={1} text="지금 있는 가게를 골라 주세요" />
+        {step.items.length > 0 ? (
+          <div role="radiogroup" aria-label="지금 있는 가게" className={styles.candidates}>
+            <p className={styles.sectionTitle}>내 위치 {NEARBY_RADIUS_M}m 안의 가게</p>
+            {step.items.map((c) => (
+              <button
+                key={c.restaurantId}
+                type="button"
+                role="radio"
+                aria-checked={c.restaurantId === pickedId}
+                className={styles.candidate}
+                onClick={() => setPickedId(c.restaurantId)}
+              >
+                <span className={styles.candidateName}>{c.name}</span>
+                <span className={styles.candidateMeta}>
+                  {joinDot([c.categoryName, formatDistance(c.distanceM)])}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.status}>
+            <p className={styles.statusTitle} data-tone="warn">
+              {NEARBY_RADIUS_M}m 안에서 가게를 찾지 못했어요
+            </p>
+            <p className={styles.statusText}>
+              매장 안이라면 잠시 뒤 다시 찾거나, 검색해서 가게를 골라 주세요.
+            </p>
+          </div>
+        )}
+        <Link to="/search" className={styles.searchLink}>
+          <span>검색해서 직접 찾기</span>
+          <span aria-hidden="true">›</span>
+        </Link>
+      </div>
+    </Screen>
+  );
+}
+
+function OnSiteLoader({ restaurantId }: { restaurantId: number }) {
   const { data: r, error, reload } = useAsync(() => getRestaurant(restaurantId), [restaurantId]);
+  const passed = useLocation().state as PassedCoords | null;
 
   if (error) {
     return (
@@ -51,13 +227,17 @@ export function OnSitePage() {
       </Screen>
     );
   }
-  return <OnSite r={r} />;
+  return <OnSite r={r} passed={passed?.me && passed.at ? passed : null} />;
 }
 
-function OnSite({ r }: { r: RestaurantDetail }) {
+function OnSite({ r, passed }: { r: RestaurantDetail; passed: PassedCoords | null }) {
   const navigate = useNavigate();
   const toast = useToast();
-  const [step, setStep] = useState<Step>({ kind: 'start' });
+  // 근처 가게 고르기에서 막 잰 위치. 오래됐으면(새로고침 등) 쓰지 않고 처음부터 잰다
+  const [autoCoords] = useState(() =>
+    passed && Date.now() - passed.at < PASSED_COORDS_MAX_AGE_MS ? passed.me : null,
+  );
+  const [step, setStep] = useState<Step>({ kind: autoCoords ? 'checking' : 'start' });
   const [busy, setBusy] = useState(false);
   const photoUrl = 'photo' in step ? step.photo.url : null;
   useEffect(
@@ -67,10 +247,11 @@ function OnSite({ r }: { r: RestaurantDetail }) {
     [photoUrl],
   );
 
-  const check = async () => {
+  /** 위치 확인 (VISIT-01). known은 근처 가게 고르기에서 막 잰 위치 */
+  const check = async (known?: PreciseCoords) => {
     setStep({ kind: 'checking' });
     try {
-      const me = await getPreciseCoords();
+      const me = known ?? (await getPreciseCoords());
       const result = await checkLocation({
         restaurantId: r.restaurantId,
         lat: me.lat,
@@ -95,6 +276,16 @@ function OnSite({ r }: { r: RestaurantDetail }) {
       setStep({ kind: 'blocked', message: errorMessage(err), pendingVisitId });
     }
   };
+
+  // 근처 가게 고르기에서 왔으면 그때 잰 위치로 바로 확인한다 (StrictMode에서 두 번 부르지 않게 한 번만)
+  const autoChecked = useRef(false);
+  useEffect(() => {
+    if (!autoCoords || autoChecked.current) return;
+    autoChecked.current = true;
+    void check(autoCoords);
+    // 처음 한 번만
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const pickPhoto = (c: Check, files: FileList | null) => {
     const file = files?.[0];
@@ -157,16 +348,7 @@ function OnSite({ r }: { r: RestaurantDetail }) {
       </div>
     </div>
   );
-  const mission = (no: 1 | 2, text: string) => (
-    <>
-      <p className={styles.mission}>정복 미션 {no} / 2</p>
-      <p className={styles.missionText}>{text}</p>
-      <div className={styles.progress} aria-hidden="true">
-        <span data-done="true" />
-        <span data-done={no === 2} />
-      </div>
-    </>
-  );
+  const mission = (no: 1 | 2, text: string) => <Mission no={no} text={text} />;
 
   switch (step.kind) {
     case 'start':
@@ -175,7 +357,7 @@ function OnSite({ r }: { r: RestaurantDetail }) {
       return (
         <Screen
           footer={
-            <Button onClick={check} disabled={step.kind === 'checking'}>
+            <Button onClick={() => check()} disabled={step.kind === 'checking'}>
               {step.kind === 'checking'
                 ? '위치를 확인하는 중…'
                 : step.kind === 'denied'
@@ -238,7 +420,7 @@ function OnSite({ r }: { r: RestaurantDetail }) {
       );
     case 'far':
       return (
-        <Screen footer={<Button onClick={check}>매장 위치 다시 확인</Button>}>
+        <Screen footer={<Button onClick={() => check()}>매장 위치 다시 확인</Button>}>
           <AppHeader title="현장인증" />
           <div className={styles.content}>
             {mission(1, `${r.name} 근처인지 확인해요`)}

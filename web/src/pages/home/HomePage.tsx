@@ -14,6 +14,8 @@ import { RegionSelectSheet } from '../../components/RegionSelectSheet';
 import { EmptyState, Loading } from '../../components/StateViews';
 import { useToast } from '../../components/Toast';
 import { ApiError, errorMessage } from '../../lib/api';
+import { boundsAround, metersBetween } from '../../lib/geo';
+import type { Coords } from '../../lib/geolocation';
 import { SEOUL_CENTER, useViewRegion } from '../../lib/region';
 import { useAsync } from '../../lib/useAsync';
 import { useMyCoords } from '../../lib/useMyCoords';
@@ -21,31 +23,12 @@ import { NearbySheet } from './NearbySheet';
 import { PreviewSheet } from './PreviewSheet';
 import styles from './HomePage.module.css';
 
-type LatLng = { lat: number; lng: number };
-
 /** 지도를 멈추고 이만큼 기다렸다가 가게를 다시 불러온다 (ms) */
 const FETCH_DELAY_MS = 300;
 /** 지도를 누른 자리에서 가게를 찾는 반경 (m). 카카오 지도의 가게 이름 위치와 공공데이터 좌표가 조금씩 다르다 */
 const TAP_RADIUS_M = 30;
 /** 여러 곳이면 가까운 순으로 이만큼만 보여 준다 */
 const TAP_MAX_ITEMS = 10;
-
-/** 위도 1도의 길이 (m). 경도 1도는 여기에 cos(위도)를 곱한다 */
-const M_PER_DEG = 111_320;
-
-/** 한 점 둘레 radiusM 정사각형 영역. 모서리는 radiusM보다 멀어서 받은 뒤 metersBetween으로 다시 거른다 */
-function boundsAround({ lat, lng }: LatLng, radiusM: number): Bounds {
-  const dLat = radiusM / M_PER_DEG;
-  const dLng = radiusM / (M_PER_DEG * Math.cos((lat * Math.PI) / 180));
-  return { swLat: lat - dLat, swLng: lng - dLng, neLat: lat + dLat, neLng: lng + dLng };
-}
-
-/** 두 점 사이 거리 (m). 수십 m 안이라 평면으로 계산해도 충분하다 */
-function metersBetween(a: LatLng, b: LatLng): number {
-  const dy = (a.lat - b.lat) * M_PER_DEG;
-  const dx = (a.lng - b.lng) * M_PER_DEG * Math.cos((a.lat * Math.PI) / 180);
-  return Math.hypot(dx, dy);
-}
 
 /** 홈: 프로필 줄(HOME-01) + 음식점 검색 + 지도(MAP-01) + 가게 미리보기(MAP-02). 지도의 빈 곳을 누르면 그 자리 가게를 찾는다 */
 export function HomePage() {
@@ -99,7 +82,7 @@ export function HomePage() {
 
   // 핀이 아닌 곳을 누르면 그 자리 가게(찜·정복 여부와 상관없이)를 찾아 미리보기, 여러 곳이면 고르기
   const findAt = useCallback(
-    async (point: LatLng) => {
+    async (point: Coords) => {
       tapRequest.current?.abort();
       const controller = new AbortController();
       tapRequest.current = controller;

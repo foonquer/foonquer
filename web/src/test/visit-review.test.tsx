@@ -107,6 +107,113 @@ describe('방문 인증', () => {
     );
   });
 
+  it('홈에서 바로 오면(가게 없음) 현장인증은 근처 가게 고르기로, 영수증 인증은 영수증 촬영으로', async () => {
+    mockApi({});
+    renderRoute('/visits/new');
+    expect(await screen.findByText('어떻게 방문을 인증할까요?')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /현장인증/ })).toHaveAttribute(
+      'href',
+      '/visits/new/on-site',
+    );
+    expect(screen.getByRole('link', { name: /영수증 인증/ })).toHaveAttribute(
+      'href',
+      '/visits/new/receipt',
+    );
+  });
+
+  describe('홈에서 바로 현장인증', () => {
+    const ME = { latitude: 37.5627, longitude: 126.8572, accuracy: 12 };
+    /** 내 위치에서 북쪽 dLatM, 동쪽 dLngM 떨어진 가게 */
+    const shop = (restaurantId: number, name: string, dLatM: number, dLngM: number) => ({
+      restaurantId,
+      name,
+      categoryId: 1,
+      categoryName: '한식',
+      lat: ME.latitude + dLatM / 111_320,
+      lng: ME.longitude + dLngM / (111_320 * Math.cos((ME.latitude * Math.PI) / 180)),
+      conquestState: 'NOT_CONQUERED',
+      conqueredInPastSeason: false,
+      isSaved: false,
+    });
+
+    beforeEach(() => {
+      Object.defineProperty(navigator, 'geolocation', {
+        configurable: true,
+        value: { getCurrentPosition: (done: (p: object) => void) => done({ coords: ME }) },
+      });
+    });
+
+    it('내 위치 100m 안 가게를 가까운 순으로 고르면, 그 위치로 바로 매장 위치를 확인한다', async () => {
+      const server = mockApi({
+        'GET /map/restaurants': ok({
+          // 네모 모서리의 114m 가게는 빠진다
+          items: [shop(7, '옆집국밥', 33, 0), shop(8, '2층카페', 0, 71), shop(9, '먼집', 89, 71)],
+          totalCount: 3,
+          truncated: false,
+        }),
+        'GET /restaurants/:id': ok({
+          restaurantId: 8,
+          name: '2층카페',
+          categoryName: '카페',
+          dongName: '가양동',
+          lat: 37.5627,
+          lng: 126.858,
+        }),
+        'POST /visit-verifications/location-checks': ok({
+          verificationId: 41,
+          restaurantId: 8,
+          distanceM: 71,
+          allowedM: 100,
+          expiresAt: '2026-09-25T12:50:00+09:00',
+        }),
+      });
+      const { router } = renderRoute('/visits/new');
+      fireEvent.click(await screen.findByRole('link', { name: /현장인증/ }));
+      fireEvent.click(await screen.findByRole('button', { name: '위치 권한 허용하기' }));
+
+      const list = await screen.findByRole('radiogroup', { name: '지금 있는 가게' });
+      const options = within(list).getAllByRole('radio');
+      expect(options.map((o) => o.textContent)).toEqual([
+        '옆집국밥한식 · 33m',
+        '2층카페한식 · 71m',
+      ]);
+      expect(options[0]).toHaveAttribute('aria-checked', 'true');
+      const [find] = server.calls('GET /map/restaurants');
+      expect(find.query.has('mineOnly')).toBe(false);
+      expect((Number(find.query.get('swLat')) + Number(find.query.get('neLat'))) / 2).toBeCloseTo(
+        ME.latitude,
+        6,
+      );
+
+      fireEvent.click(options[1]);
+      fireEvent.click(screen.getByRole('button', { name: '2층카페에서 인증하기' }));
+
+      expect(await screen.findByText('매장 위치 확인 완료')).toBeInTheDocument();
+      expect(router.state.location.search).toBe('?restaurantId=8');
+      expect(screen.queryByRole('button', { name: '위치 권한 허용하기' })).not.toBeInTheDocument();
+      expect(server.calls('POST /visit-verifications/location-checks')).toHaveLength(1);
+      expect(server.calls('POST /visit-verifications/location-checks')[0].body).toEqual({
+        restaurantId: 8,
+        lat: ME.latitude,
+        lng: ME.longitude,
+        accuracyM: 12,
+      });
+    });
+
+    it('100m 안에 가게가 없으면 알려 주고 다시 찾거나 검색할 수 있다', async () => {
+      mockApi({ 'GET /map/restaurants': ok({ items: [], totalCount: 0, truncated: false }) });
+      renderRoute('/visits/new/on-site');
+      fireEvent.click(await screen.findByRole('button', { name: '위치 권한 허용하기' }));
+
+      expect(await screen.findByText('100m 안에서 가게를 찾지 못했어요')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '다시 찾기' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /검색해서 직접 찾기/ })).toHaveAttribute(
+        'href',
+        '/search',
+      );
+    });
+  });
+
   it('영수증을 찍어 올리면 읽는 중 → 인증 성공 → 별점 화면', async () => {
     let reads = 0;
     const server = mockApi({
@@ -224,6 +331,24 @@ describe('방문 인증', () => {
     fireEvent.click(screen.getByRole('button', { name: '다른 영수증 촬영하기' }));
     expect(router.state.location.pathname + router.state.location.search).toBe(
       '/visits/new/receipt?restaurantId=7',
+    );
+  });
+
+  it('홈에서 찍은 영수증이 실패하면 다시 찍기는 바로 영수증 촬영으로', async () => {
+    mockApi({
+      'GET /visit-verifications/:id': ok(
+        verification({
+          status: 'FAILED',
+          failReason: 'DUPLICATE',
+          canRate: false,
+          restaurant: null,
+        }),
+      ),
+    });
+    const { router } = renderRoute('/visits/31');
+    fireEvent.click(await screen.findByRole('button', { name: '다른 영수증 촬영하기' }));
+    expect(router.state.location.pathname + router.state.location.search).toBe(
+      '/visits/new/receipt',
     );
   });
 

@@ -370,7 +370,7 @@ function Failed({ v }: { v: Verification }) {
   const navigate = useNavigate();
   const toast = useToast();
   const copy = failCopy(v);
-  const retake = `/visits/new${v.restaurant ? `/receipt?restaurantId=${v.restaurant.restaurantId}` : ''}`;
+  const retake = `/visits/new/receipt${v.restaurant ? `?restaurantId=${v.restaurant.restaurantId}` : ''}`;
 
   const run = async (action: FailCopy['primary']['action'] | FailCopy['secondary']['action']) => {
     switch (action) {

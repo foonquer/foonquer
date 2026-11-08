@@ -133,8 +133,8 @@ export const routes: RouteObject[] = [
           { path: '/ranking/sigungus/:sigunguId/status', element: <SigunguStatusPage /> },
 
           // 방문 인증 → 별점 → 정복 → 세부평가 → 적립
-          { path: '/visits/new', element: <VisitNewPage /> }, // ?restaurantId= (없으면 홈 영수증)
-          { path: '/visits/new/on-site', element: <OnSitePage /> }, // ?restaurantId=
+          { path: '/visits/new', element: <VisitNewPage /> }, // ?restaurantId= (없으면 홈에서 바로)
+          { path: '/visits/new/on-site', element: <OnSitePage /> }, // ?restaurantId= (없으면 근처 가게 고르기)
           { path: '/visits/new/receipt', element: <ReceiptPage /> }, // ?restaurantId=
           { path: '/visits/:visitId', element: <VerificationPage /> },
           { path: '/visits/:visitId/follow', element: <FollowPage /> },

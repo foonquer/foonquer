@@ -3,17 +3,16 @@ import location from '../../assets/icons/location.svg';
 import receipt from '../../assets/icons/receipt.svg';
 import { AppHeader } from '../../components/AppHeader';
 import { Screen } from '../../components/Screen';
-import { ReceiptPage } from './ReceiptPage';
 import styles from './Visit.module.css';
 
 /**
- * 방문 인증 시작 /visits/new?restaurantId=
- * 가게를 정하고 왔으면 인증 방식을 고르고, 홈에서 바로 왔으면(가게 없음) 영수증부터 찍는다.
+ * 방문 인증 시작 /visits/new?restaurantId= — 현장인증과 영수증 인증 중에서 고른다.
+ * 홈에서 바로 왔으면(가게 없음) 현장인증은 내 위치로 가게를 찾고, 영수증 인증은 영수증으로 가게를 찾는다.
  */
 export function VisitNewPage() {
   const [params] = useSearchParams();
-  const restaurantId = Number(params.get('restaurantId'));
-  if (!Number.isInteger(restaurantId) || restaurantId <= 0) return <ReceiptPage />;
+  const id = Number(params.get('restaurantId'));
+  const query = Number.isInteger(id) && id > 0 ? `?restaurantId=${id}` : '';
 
   return (
     <Screen>
@@ -22,7 +21,7 @@ export function VisitNewPage() {
         <h2 className={styles.title}>어떻게 방문을 인증할까요?</h2>
         <p className={styles.description}>내 상황에 맞는 방법으로 맛집을 정복해요.</p>
 
-        <Link to={`/visits/new/on-site?restaurantId=${restaurantId}`} className={styles.method}>
+        <Link to={`/visits/new/on-site${query}`} className={styles.method}>
           <span className={styles.recommend}>추천 방법</span>
           <span className={styles.methodTitle}>
             <img src={location} alt="" width={20} height={24} />
@@ -32,7 +31,7 @@ export function VisitNewPage() {
           <span className={styles.methodText}>영수증이 없어도 방문을 확인할 수 있어요.</span>
         </Link>
 
-        <Link to={`/visits/new/receipt?restaurantId=${restaurantId}`} className={styles.method}>
+        <Link to={`/visits/new/receipt${query}`} className={styles.method}>
           <span className={styles.methodTitle}>
             <img src={receipt} alt="" width={20} height={22} />
             영수증 인증
