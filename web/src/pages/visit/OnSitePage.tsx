@@ -7,7 +7,7 @@ import {
   type RestaurantDetail,
 } from '../../api/restaurants';
 import { IMAGE_ACCEPT, uploadImage } from '../../api/uploads';
-import { checkLocation, completeOnSite } from '../../api/visits';
+import { checkLocation, completeOnSite, getVerification } from '../../api/visits';
 import mealThumb from '../../assets/illust/meal-thumb.svg';
 import { AppHeader } from '../../components/AppHeader';
 import { Button, ButtonLink } from '../../components/Button';
@@ -321,6 +321,25 @@ function OnSite({ r, passed }: { r: RestaurantDetail; passed: PassedCoords | nul
     }
   };
 
+  // 이어서 하는 위치 확인이 다른 기기·탭에서 이미 쓰였거나 지났으면 사진을 고르기 전에 처음부터
+  useEffect(() => {
+    if (!resumed) return;
+    let alive = true;
+    getVerification(resumed.verificationId).then(
+      (v) => {
+        if (!alive || (v.status === 'LOCATION_CHECKED' && !v.isExpired)) return;
+        pendingOnSite.clear();
+        setStep({ kind: 'start' });
+      },
+      () => {
+        // 확인하지 못하면 그대로 둔다 (사진을 보낼 때 서버가 다시 확인한다)
+      },
+    );
+    return () => {
+      alive = false;
+    };
+  }, [resumed]);
+
   // 근처 가게 고르기에서 왔으면 그때 잰 위치로 바로 확인한다 (StrictMode에서 두 번 부르지 않게 한 번만)
   const autoChecked = useRef(false);
   useEffect(() => {
@@ -519,8 +538,11 @@ function OnSite({ r, passed }: { r: RestaurantDetail; passed: PassedCoords | nul
             )}
             {!step.unclear && (
               <p className={styles.until}>
-                ✓ 위치 확인 완료 · {formatTime(step.check.expiresAt)}까지 올리면 돼요. 다 먹고
-                올려도 괜찮아요
+                ✓ 위치 확인 완료 ·{' '}
+                {formatTime(step.check.expiresAt)
+                  ? `${formatTime(step.check.expiresAt)}까지 올리면 돼요. `
+                  : ''}
+                다 먹고 올려도 괜찮아요
               </p>
             )}
             {step.unclear && (

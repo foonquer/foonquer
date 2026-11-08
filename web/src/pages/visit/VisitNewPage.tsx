@@ -18,6 +18,7 @@ export function VisitNewPage() {
   const query = Number.isInteger(id) && id > 0 ? `?restaurantId=${id}` : '';
   // 위치만 확인해 두고 사진을 아직 안 올린 현장인증이 있으면 이어서 하기
   const [pending] = useState(() => pendingOnSite.get());
+  const until = formatTime(pending?.check.expiresAt);
 
   return (
     <Screen>
@@ -34,7 +35,7 @@ export function VisitNewPage() {
             <span>
               <span className={styles.resumeTitle}>{pending.restaurantName} 이어서 인증하기</span>
               <span className={styles.resumeText}>
-                위치 확인 완료 · {formatTime(pending.check.expiresAt)}까지 음식 사진만 올리면 돼요
+                위치 확인 완료 · {until ? `${until}까지 ` : ''}음식 사진만 올리면 돼요
               </span>
             </span>
             <span aria-hidden="true">›</span>

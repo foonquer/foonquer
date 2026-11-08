@@ -680,6 +680,23 @@ describe('방문 인증', () => {
       expect(server.calls('POST /visit-verifications/location-checks')).toHaveLength(1);
     });
 
+    it('다른 기기에서 이미 인증을 마친 위치 확인이면 사진 전에 처음부터 한다', async () => {
+      mockApi({
+        ...onSiteApi(kstAfter(120)),
+        'GET /visit-verifications/:id': ok(
+          verification({ verificationId: 40, status: 'VERIFIED' }),
+        ),
+      });
+      const { router } = renderRoute('/visits/new/on-site?restaurantId=7');
+      fireEvent.click(await screen.findByRole('button', { name: '위치 권한 허용하기' }));
+      await screen.findByText('매장 위치 확인 완료');
+
+      await act(() => router.navigate('/visits/new/on-site?restaurantId=8'));
+      await act(() => router.navigate('/visits/new/on-site?restaurantId=7'));
+      expect(await screen.findByRole('button', { name: '위치 권한 허용하기' })).toBeInTheDocument();
+      expect(localStorage.getItem('mk:pending-onsite')).toBeNull();
+    });
+
     it('2시간이 지난 위치 확인은 잊고 처음부터 한다', async () => {
       mockApi(onSiteApi(kstAfter(-1)));
       const { router } = renderRoute('/visits/new/on-site?restaurantId=7');
