@@ -14,6 +14,8 @@ let shared: Seen | null = null;
  */
 function fakeKakao() {
   if (shared) {
+    // 앞 테스트 지도의 핀(body에 붙인 오버레이)이 남아 있으면 치운다
+    document.body.replaceChildren();
     shared.fits.length = 0;
     shared.levels.length = 0;
     shared.listeners = {};
@@ -160,6 +162,12 @@ describe('MapView 지도 누르기 (홈)', () => {
     seen.listeners.click({ latLng: new LatLng(37.5612, 126.8534) });
     seen.listeners.click({ latLng: new LatLng(37.5612, 126.8534) });
     seen.listeners.dblclick();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(onMapClick).not.toHaveBeenCalled();
+
+    // 누르고 곧바로 핀을 누르면 지도 누르기는 취소된다
+    seen.listeners.click({ latLng: new LatLng(37.5612, 126.8534) });
+    fireEvent.click(screen.getByRole('button', { name: '새맛집 (미정복)' }));
     await new Promise((resolve) => setTimeout(resolve, 400));
     expect(onMapClick).not.toHaveBeenCalled();
   });

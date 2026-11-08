@@ -127,6 +127,8 @@ function KakaoMapView(props: Props & { maps: KakaoMaps }) {
   const overlays = useRef<KakaoOverlay[]>([]);
   // 이벤트 안에서 최신 함수를 부르도록
   const callbacks = useRef({ onPinClick, onBoundsChange, onMapClick });
+  // 지도를 누르고 두 번 누르기를 기다리는 중 (그 사이 핀을 누르면 취소)
+  const pendingClick = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => {
     callbacks.current = { onPinClick, onBoundsChange, onMapClick };
   });
@@ -153,13 +155,12 @@ function KakaoMapView(props: Props & { maps: KakaoMaps }) {
     maps.event.addListener(m, 'idle', emit);
     emit();
     // 두 번 눌러 확대할 때는 가게를 찾지 않는다
-    let pendingClick: ReturnType<typeof setTimeout> | undefined;
     const click: KakaoEventHandler = ({ latLng }) => {
-      clearTimeout(pendingClick);
+      clearTimeout(pendingClick.current);
       const point = { lat: latLng.getLat(), lng: latLng.getLng() };
-      pendingClick = setTimeout(() => callbacks.current.onMapClick?.(point), DOUBLE_TAP_MS);
+      pendingClick.current = setTimeout(() => callbacks.current.onMapClick?.(point), DOUBLE_TAP_MS);
     };
-    const dblclick = () => clearTimeout(pendingClick);
+    const dblclick = () => clearTimeout(pendingClick.current);
     maps.event.addListener(m, 'click', click);
     maps.event.addListener(m, 'dblclick', dblclick);
     const resize = () => m.relayout();
@@ -169,7 +170,7 @@ function KakaoMapView(props: Props & { maps: KakaoMaps }) {
       maps.event.removeListener(m, 'idle', emit);
       maps.event.removeListener(m, 'click', click);
       maps.event.removeListener(m, 'dblclick', dblclick);
-      clearTimeout(pendingClick);
+      clearTimeout(pendingClick.current);
       map.current = null;
     };
     // 처음 위치만 쓴다. 이후 center 변경은 아래 effect가 옮긴다.
@@ -206,9 +207,10 @@ function KakaoMapView(props: Props & { maps: KakaoMaps }) {
     overlays.current = pins.map((pin) => {
       const overlay = new maps.CustomOverlay({
         position: new maps.LatLng(pin.lat, pin.lng),
-        content: pinElement(pin, pin.restaurantId === selectedId, () =>
-          callbacks.current.onPinClick(pin.restaurantId),
-        ),
+        content: pinElement(pin, pin.restaurantId === selectedId, () => {
+          clearTimeout(pendingClick.current);
+          callbacks.current.onPinClick(pin.restaurantId);
+        }),
         xAnchor: 0.5,
         yAnchor: 1,
         clickable: true,

@@ -319,6 +319,62 @@ describe('홈 지도 (MAP-01·02)', () => {
       expect(await screen.findByText('이 자리에서 가게를 찾지 못했어요')).toBeInTheDocument();
     });
 
+    /** 첫 번째 누르기 응답(지난집)은 release()까지 붙잡아 둔다. 가짜 서버는 취소된 요청에도 답한다 */
+    function holdFirstTap() {
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      const names: Record<number, string> = { 5: '지난집', 6: '새집', 9: '내가찜한집' };
+      const reply = (items: ReturnType<typeof pin>[]) =>
+        ok({ items, totalCount: 0, truncated: false });
+      let taps = 0;
+      mockApi({
+        ...regionApi,
+        'GET /map/restaurants': async ({ query }: { query: URLSearchParams }) => {
+          if (query.get('mineOnly') === 'true')
+            return reply([pin(9, '내가찜한집', 'NOT_CONQUERED')]);
+          taps += 1;
+          if (taps > 1) return reply([here(6, '새집')]);
+          await held;
+          return reply([here(5, '지난집')]);
+        },
+        'GET /restaurants/:id/preview': ({ path }: { path: string }) => {
+          const id = Number(path.split('/')[2]);
+          return previewOf(id, names[id]);
+        },
+      });
+      return release;
+    }
+
+    /** 붙잡아 둔 지난 응답을 보내고도 미리보기가 name 그대로인지 */
+    async function expectPreviewStays(release: () => void, name: string) {
+      const sheet = await screen.findByRole('dialog', { name: '가게 미리보기' });
+      expect(await within(sheet).findByText(name)).toBeInTheDocument();
+      release();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(within(sheet).getByText(name)).toBeInTheDocument();
+      expect(screen.queryByText('지난집')).not.toBeInTheDocument();
+    }
+
+    it('다시 누르면 지난 누르기의 늦은 응답은 버린다', async () => {
+      const release = holdFirstTap();
+      renderRoute('/');
+      await screen.findByRole('button', { name: '내가찜한집 (미정복)' });
+
+      await tapMapCenter();
+      await tapMapCenter();
+      await expectPreviewStays(release, '새집');
+    });
+
+    it('응답을 기다리는 사이 핀을 고르면 늦은 응답은 버린다', async () => {
+      const release = holdFirstTap();
+      renderRoute('/');
+      const myPin = await screen.findByRole('button', { name: '내가찜한집 (미정복)' });
+
+      await tapMapCenter();
+      fireEvent.click(myPin);
+      await expectPreviewStays(release, '내가찜한집');
+    });
+
     it('찾는 네모의 모서리처럼 30m 밖에 있는 가게는 치지 않는다', async () => {
       mockApi({ ...regionApi, ...mapApi([here(5, '모서리집', 25)]) });
       renderRoute('/');

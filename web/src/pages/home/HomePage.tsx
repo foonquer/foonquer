@@ -139,9 +139,15 @@ export function HomePage() {
 
   const closePreview = useCallback(() => setSelectedId(null), []);
   const closeNearby = useCallback(() => setNearby(null), []);
-  const pickNearby = useCallback((restaurantId: number) => {
+  // 핀이나 목록에서 고르거나 지역 시트를 열면, 아직 오는 중인 지도 누르기 결과는 버린다
+  const pickRestaurant = useCallback((restaurantId: number) => {
+    tapRequest.current?.abort();
     setNearby(null);
     setSelectedId(restaurantId);
+  }, []);
+  const openRegion = useCallback(() => {
+    tapRequest.current?.abort();
+    setRegionOpen(true);
   }, []);
   const center = region?.lat && region.lng ? { lat: region.lat, lng: region.lng } : SEOUL_CENTER;
 
@@ -176,7 +182,7 @@ export function HomePage() {
             center={center}
             pins={pins}
             selectedId={selectedId}
-            onPinClick={setSelectedId}
+            onPinClick={pickRestaurant}
             onMapClick={findAt}
             onBoundsChange={loadPins}
           />
@@ -187,7 +193,7 @@ export function HomePage() {
         )}
 
         <div className={styles.overlayTop}>
-          <RegionChip region={region} variant="map" onClick={() => setRegionOpen(true)} />
+          <RegionChip region={region} variant="map" onClick={openRegion} />
           <p className={styles.legend}>
             <span className={styles.legendConquered}>● 정복 완료</span>
             <span className={styles.legendUnconquered}>● 미정복</span>
@@ -207,7 +213,7 @@ export function HomePage() {
         </Link>
       </section>
 
-      <NearbySheet items={nearby} onPick={pickNearby} onClose={closeNearby} />
+      <NearbySheet items={nearby} onPick={pickRestaurant} onClose={closeNearby} />
       <PreviewSheet restaurantId={selectedId} coords={coords} onClose={closePreview} />
       <RegionSelectSheet open={regionOpen} onClose={() => setRegionOpen(false)} />
     </div>
