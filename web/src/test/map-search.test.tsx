@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetViewRegionForTest } from '../lib/region';
 import { setMyCoordsForTest } from '../lib/useMyCoords';
 import { fail, mockApi, ok } from './http';
@@ -83,6 +83,10 @@ const regionApi = {
 beforeEach(() => {
   resetViewRegionForTest();
   setMyCoordsForTest(null);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('홈 지도 (MAP-01·02)', () => {
@@ -193,6 +197,120 @@ describe('홈 지도 (MAP-01·02)', () => {
     fireEvent.click(within(sheet).getByRole('button', { name: '방문 인증' }));
     expect(router.state.location.pathname).toBe('/visits/new');
     expect(router.state.location.search).toBe('?restaurantId=4');
+  });
+
+  describe('핀이 아닌 곳을 누르면 그 자리 가게를 찾는다', () => {
+    const previewOf = (restaurantId: number, name: string) =>
+      ok({
+        restaurantId,
+        name,
+        categoryId: 1,
+        categoryName: '한식',
+        sigunguName: '강서구',
+        dongName: '가양동',
+        distanceM: null,
+        rating: { score: null, reviewCount: 0 },
+        businessStatus: null,
+        currentSeasonConquerorCount: 0,
+        conquestState: 'NOT_CONQUERED',
+        conqueredInPastSeason: false,
+        isSaved: false,
+        myConquest: null,
+        moving: null,
+      });
+
+    /** 홈 지도의 정가운데를 누른다 (간단한 지도: 화면 비율로 좌표를 구한다) */
+    async function tapMapCenter() {
+      const area = await screen.findByRole('region', { name: '동네 지도' });
+      const map = area.firstElementChild as HTMLElement;
+      vi.spyOn(map, 'getBoundingClientRect').mockReturnValue({
+        x: 0,
+        y: 0,
+        left: 0,
+        top: 0,
+        width: 400,
+        height: 600,
+        right: 400,
+        bottom: 600,
+        toJSON: () => ({}),
+      });
+      fireEvent.click(map, { clientX: 200, clientY: 300 });
+    }
+
+    /** 내 가게 핀(mineOnly)과 누른 자리 찾기(mineOnly 없음)를 따로 답한다 */
+    const mapApi = (tapped: ReturnType<typeof pin>[]) => ({
+      'GET /map/restaurants': ({ query }: { query: URLSearchParams }) =>
+        ok({
+          items:
+            query.get('mineOnly') === 'true' ? [pin(9, '내가찜한집', 'NOT_CONQUERED')] : tapped,
+          totalCount: 0,
+          truncated: false,
+        }),
+    });
+
+    it('한 곳이면 바로 미리보기. 누른 자리 30m 안을 찜·정복과 상관없이 찾는다', async () => {
+      const server = mockApi({
+        ...regionApi,
+        ...mapApi([pin(5, '옆집국밥', 'NOT_CONQUERED')]),
+        'GET /restaurants/:id/preview': previewOf(5, '옆집국밥'),
+      });
+      renderRoute('/');
+      await screen.findByRole('button', { name: '내가찜한집 (미정복)' });
+
+      await tapMapCenter();
+
+      const sheet = await screen.findByRole('dialog', { name: '가게 미리보기' });
+      expect(await within(sheet).findByText('옆집국밥')).toBeInTheDocument();
+      const tap = server.calls('GET /map/restaurants').find((c) => !c.query.has('mineOnly'));
+      if (!tap) throw new Error('누른 자리 찾기 요청이 없다');
+      const [swLat, swLng, neLat, neLng] = ['swLat', 'swLng', 'neLat', 'neLng'].map((k) =>
+        Number(tap.query.get(k)),
+      );
+      // 가양동 중심(= 지도 가운데) 둘레 위아래 30m씩
+      expect((swLat + neLat) / 2).toBeCloseTo(GAYANG.centerLat, 6);
+      expect((swLng + neLng) / 2).toBeCloseTo(GAYANG.centerLng, 6);
+      expect((neLat - swLat) * 111_320).toBeCloseTo(60, 0);
+      expect(neLng - swLng).toBeGreaterThan(neLat - swLat);
+    });
+
+    it('여러 곳이면 가까운 순 목록에서 고른다', async () => {
+      mockApi({
+        ...regionApi,
+        ...mapApi([pin(5, '옆집국밥', 'NOT_CONQUERED'), pin(6, '2층카페', 'NOT_CONQUERED')]),
+        'GET /restaurants/:id/preview': previewOf(6, '2층카페'),
+      });
+      renderRoute('/');
+      await screen.findByRole('button', { name: '내가찜한집 (미정복)' });
+
+      await tapMapCenter();
+
+      const list = await screen.findByRole('dialog', { name: '이 자리의 가게' });
+      expect(
+        within(list)
+          .getAllByRole('button')
+          .map((b) => b.textContent),
+      ).toEqual(['옆집국밥한식', '2층카페한식']);
+      fireEvent.click(within(list).getByRole('button', { name: /2층카페/ }));
+      const sheet = await screen.findByRole('dialog', { name: '가게 미리보기' });
+      expect(await within(sheet).findByText('2층카페')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: '이 자리의 가게' })).not.toBeInTheDocument();
+    });
+
+    it('없으면 안내하고, 핀을 누른 것은 지도를 누른 것으로 치지 않는다', async () => {
+      const server = mockApi({
+        ...regionApi,
+        ...mapApi([]),
+        'GET /restaurants/:id/preview': previewOf(9, '내가찜한집'),
+      });
+      renderRoute('/');
+
+      fireEvent.click(await screen.findByRole('button', { name: '내가찜한집 (미정복)' }));
+      await screen.findByRole('dialog', { name: '가게 미리보기' });
+      expect(server.calls('GET /map/restaurants').every((c) => c.query.has('mineOnly'))).toBe(true);
+
+      await tapMapCenter();
+      expect(await screen.findByText('이 자리에서 가게를 찾지 못했어요')).toBeInTheDocument();
+    });
   });
 
   it('지역 선택 시트에서 동네를 바꾸면 그 동네 지도를 다시 불러온다', async () => {

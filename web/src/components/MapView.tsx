@@ -1,9 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react';
 import type { Bounds, MapRestaurant } from '../api/restaurants';
 import pinConquered from '../assets/illust/pin-conquered.svg';
 import pinUnconquered from '../assets/illust/pin-unconquered.svg';
 import { KAKAO_MAP_KEY } from '../lib/config';
-import { loadKakaoMaps, type KakaoMap, type KakaoMaps, type KakaoOverlay } from '../lib/kakaoMaps';
+import {
+  loadKakaoMaps,
+  type KakaoEventHandler,
+  type KakaoMap,
+  type KakaoMaps,
+  type KakaoOverlay,
+} from '../lib/kakaoMaps';
 import styles from './MapView.module.css';
 
 type LatLng = { lat: number; lng: number };
@@ -15,6 +21,8 @@ type Props = {
   pins: MapPin[];
   selectedId: number | null;
   onPinClick: (restaurantId: number) => void;
+  /** 핀이 아닌 곳을 눌렀을 때 그 자리 좌표 (홈: 그 자리 가게 찾기) */
+  onMapClick?: (point: LatLng) => void;
 } & (
   | {
       /** 홈: 이 위치에서 시작하고 */
@@ -30,6 +38,8 @@ type Props = {
 
 /** 카카오 지도 확대 수준 (작을수록 가깝다). 4는 화면 가로가 약 800m */
 const LEVEL = 4;
+/** 지도를 한 번 누른 것으로 보기 전에 두 번 누르기(확대)를 기다리는 시간 (ms) */
+const DOUBLE_TAP_MS = 250;
 
 /** 핀들이 놓인 범위 */
 function spanOf(pins: MapPin[]) {
@@ -99,12 +109,16 @@ function pinElement(pin: MapPin, selected: boolean, onClick: () => void) {
   label.className = styles.pinLabel;
   label.textContent = pin.name;
   button.append(img, label);
-  button.addEventListener('click', onClick);
+  button.addEventListener('click', (event) => {
+    // 핀을 누른 것은 지도를 누른 것으로 치지 않는다 (간단한 지도)
+    event.stopPropagation();
+    onClick();
+  });
   return button;
 }
 
 function KakaoMapView(props: Props & { maps: KakaoMaps }) {
-  const { maps, pins, selectedId, onPinClick } = props;
+  const { maps, pins, selectedId, onPinClick, onMapClick } = props;
   const fit = 'fit' in props;
   const center = 'center' in props ? props.center : spanOf(pins).center;
   const onBoundsChange = 'onBoundsChange' in props ? props.onBoundsChange : undefined;
@@ -112,9 +126,9 @@ function KakaoMapView(props: Props & { maps: KakaoMaps }) {
   const map = useRef<KakaoMap | null>(null);
   const overlays = useRef<KakaoOverlay[]>([]);
   // 이벤트 안에서 최신 함수를 부르도록
-  const callbacks = useRef({ onPinClick, onBoundsChange });
+  const callbacks = useRef({ onPinClick, onBoundsChange, onMapClick });
   useEffect(() => {
-    callbacks.current = { onPinClick, onBoundsChange };
+    callbacks.current = { onPinClick, onBoundsChange, onMapClick };
   });
 
   // 지도 만들기 (한 번)
@@ -138,11 +152,24 @@ function KakaoMapView(props: Props & { maps: KakaoMaps }) {
     };
     maps.event.addListener(m, 'idle', emit);
     emit();
+    // 두 번 눌러 확대할 때는 가게를 찾지 않는다
+    let pendingClick: ReturnType<typeof setTimeout> | undefined;
+    const click: KakaoEventHandler = ({ latLng }) => {
+      clearTimeout(pendingClick);
+      const point = { lat: latLng.getLat(), lng: latLng.getLng() };
+      pendingClick = setTimeout(() => callbacks.current.onMapClick?.(point), DOUBLE_TAP_MS);
+    };
+    const dblclick = () => clearTimeout(pendingClick);
+    maps.event.addListener(m, 'click', click);
+    maps.event.addListener(m, 'dblclick', dblclick);
     const resize = () => m.relayout();
     window.addEventListener('resize', resize);
     return () => {
       window.removeEventListener('resize', resize);
       maps.event.removeListener(m, 'idle', emit);
+      maps.event.removeListener(m, 'click', click);
+      maps.event.removeListener(m, 'dblclick', dblclick);
+      clearTimeout(pendingClick);
       map.current = null;
     };
     // 처음 위치만 쓴다. 이후 center 변경은 아래 effect가 옮긴다.
@@ -218,7 +245,7 @@ const HALF_LAT = 0.0045;
 const HALF_LNG = 0.006;
 
 function SimpleMap(props: Props & { notice: string }) {
-  const { pins, selectedId, onPinClick, notice } = props;
+  const { pins, selectedId, onPinClick, onMapClick, notice } = props;
   const fit = 'fit' in props;
   // fit이면 핀 끝이 위아래 25~88%, 좌우 15~85% 안에 오게 한다 (핀 그림은 위로, 이름은 아래로 붙는다).
   // 한 곳이거나 모여 있으면 너무 확대하지 않는다
@@ -258,8 +285,18 @@ function SimpleMap(props: Props & { notice: string }) {
     );
   }, [pins, selectedId, center.lat, center.lng, halfLat, halfLng, onPinClick]);
 
+  // 누른 곳을 화면 비율로 좌표로 바꾼다 (핀 놓는 계산의 반대)
+  const click = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (!onMapClick || rect.width === 0 || rect.height === 0) return;
+    onMapClick({
+      lat: center.lat + halfLat - ((e.clientY - rect.top) / rect.height) * 2 * halfLat,
+      lng: center.lng - halfLng + ((e.clientX - rect.left) / rect.width) * 2 * halfLng,
+    });
+  };
+
   return (
-    <div className={`${styles.map} ${styles.simple}`}>
+    <div className={`${styles.map} ${styles.simple}`} onClick={click}>
       <div ref={layer} className={styles.layer} />
       <p className={styles.notice} data-fit={fit}>
         {notice}

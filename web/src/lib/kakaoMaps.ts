@@ -23,6 +23,9 @@ export type KakaoMap = {
 
 export type KakaoOverlay = { setMap(map: KakaoMap | null): void };
 
+/** 지도 이벤트 처리 함수. click은 누른 곳 좌표(latLng)를 준다 (idle은 인자 없음) */
+export type KakaoEventHandler = (event: { latLng: KakaoLatLng }) => void;
+
 export type KakaoMaps = {
   LatLng: new (lat: number, lng: number) => KakaoLatLng;
   LatLngBounds: new () => KakaoLatLngBounds;
@@ -36,8 +39,8 @@ export type KakaoMaps = {
     zIndex?: number;
   }) => KakaoOverlay;
   event: {
-    addListener(target: KakaoMap, type: string, handler: () => void): void;
-    removeListener(target: KakaoMap, type: string, handler: () => void): void;
+    addListener(target: KakaoMap, type: string, handler: KakaoEventHandler): void;
+    removeListener(target: KakaoMap, type: string, handler: KakaoEventHandler): void;
   };
   load(callback: () => void): void;
 };
