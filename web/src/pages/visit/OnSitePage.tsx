@@ -257,9 +257,12 @@ function OnSite({ r, passed }: { r: RestaurantDetail; passed: PassedCoords | nul
   const navigate = useNavigate();
   const toast = useToast();
   // 근처 가게 고르기에서 막 잰 위치. 오래됐으면(새로고침 등) 쓰지 않고 처음부터 잰다
-  const [autoCoords] = useState(() =>
-    passed && Date.now() - passed.at < PASSED_COORDS_MAX_AGE_MS ? passed.me : null,
-  );
+  const [autoCoords] = useState(() => {
+    if (!passed) return null;
+    // 기기 시계를 되돌렸거나 history에 남은 미래 시각이면 쓰지 않는다
+    const age = Date.now() - passed.at;
+    return age >= 0 && age < PASSED_COORDS_MAX_AGE_MS ? passed.me : null;
+  });
   const [step, setStep] = useState<Step>({ kind: autoCoords ? 'checking' : 'start' });
   const [busy, setBusy] = useState(false);
   const photoUrl = 'photo' in step ? step.photo.url : null;
