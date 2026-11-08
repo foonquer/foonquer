@@ -246,7 +246,7 @@ describe('MAP-01 GET /map/restaurants — 입력 검증', () => {
   });
 });
 
-describe('MAP-03 GET /map/nearest-restaurant — 누른 자리의 가장 가까운 음식점', () => {
+describe('MAP-03 GET /map/nearby-places — 누른 자리 근처 음식점', () => {
   /** CENTER에서 북쪽 dLatM, 동쪽 dLngM 떨어진 좌표 */
   const at = (dLatM: number, dLngM: number) => ({
     lat: CENTER.lat + dLatM / 111_320,
@@ -257,33 +257,54 @@ describe('MAP-03 GET /map/nearest-restaurant — 누른 자리의 가장 가까�
     const p = at(dLatM, dLngM);
     return { id, place_name: name, x: String(p.lng), y: String(p.lat), distance: String(distance) };
   };
+  /** 음식점(FD6)만 places를 주는 카카오 */
+  const foodOnly = (...places: ReturnType<typeof place>[]) =>
+    stubKakao({ category: (p) => (p.get('category_group_code') === 'FD6' ? places : []) });
   const tap = { lat: String(CENTER.lat), lng: String(CENTER.lng) };
 
-  async function nearest(userId: bigint, query: Record<string, string> = tap) {
+  async function nearby(userId: bigint, query: Record<string, string> = tap) {
     return request(app)
-      .get('/api/v1/map/nearest-restaurant')
+      .get('/api/v1/map/nearby-places')
       .query(query)
       .set('Authorization', bearer(userId));
   }
 
-  it('음식점·카페 중 가장 가까운 카카오 장소의 가게를 준다 (장소 ID로 이어진 가게)', async () => {
+  it('음식점·카페를 가까운 순으로 섞어 5곳까지, 우리 가게와 이어 업종과 함께 준다', async () => {
     const me = await createMember();
-    const cafe = await createRestaurant({ name: '모퉁이카페', kakaoPlaceId: '111', ...at(12, 0) });
-    await createRestaurant({ name: '쌀국수집', ...at(0, 25) });
+    const cafe = await createRestaurant({
+      name: '모퉁이카페',
+      kakaoPlaceId: '111',
+      categoryId: 2,
+      ...at(12, 0),
+    });
+    const pho = await createRestaurant({ name: '쌀국수집', ...at(0, 25) });
     const fetchMock = stubKakao({
       category: (p) =>
         p.get('category_group_code') === 'CE7'
-          ? [place('111', '모퉁이카페', 12, 12, 0)]
-          : [place('222', '쌀국수집', 25, 0, 25)],
+          ? [place('111', '모퉁이카페', 12, 12, 0), place('112', '뒷골목커피', 70, 70, 0)]
+          : [
+              place('201', '골목포차', 8, 8, 0),
+              place('222', '쌀국수집', 25, 0, 25),
+              place('203', '분식나라', 30, 0, 30),
+              place('204', '국밥천국', 40, 0, 40),
+              place('205', '마라탕집', 60, 0, 60),
+            ],
     });
 
-    const res = await nearest(me.id, { ...tap, radiusM: '40' });
+    const res = await nearby(me.id, { ...tap, radiusM: '80' });
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual({ restaurantId: Number(cafe.id), placeName: '모퉁이카페' });
+    expect(res.body.data.items).toEqual([
+      { name: '골목포차', restaurantId: null, categoryName: null },
+      { name: '모퉁이카페', restaurantId: Number(cafe.id), categoryName: '중식' },
+      { name: '쌀국수집', restaurantId: Number(pho.id), categoryName: '한식' },
+      { name: '분식나라', restaurantId: null, categoryName: null },
+      { name: '국밥천국', restaurantId: null, categoryName: null },
+    ]);
     const calls = kakaoCalls(fetchMock, '/v2/local/search/category.json');
     expect(calls.map((c) => c.get('category_group_code')).sort()).toEqual(['CE7', 'FD6']);
-    expect(calls[0].get('radius')).toBe('40');
+    expect(calls[0].get('radius')).toBe('80');
     expect(calls[0].get('sort')).toBe('distance');
+    expect(calls[0].get('size')).toBe('5');
     expect(Number(calls[0].get('y'))).toBeCloseTo(CENTER.lat, 6);
   });
 
@@ -292,13 +313,12 @@ describe('MAP-03 GET /map/nearest-restaurant — 누른 자리의 가장 가까�
     // 공공데이터 좌표는 카카오와 60m 어긋나 있고, 더 가까운 다른 가게가 있다
     const shop = await createRestaurant({ name: '옛날손칼국수 가양점', ...at(60, 20) });
     await createRestaurant({ name: '옆집분식', ...at(5, 20) });
-    stubKakao({
-      category: (p) =>
-        p.get('category_group_code') === 'FD6' ? [place('333', '옛날손칼국수', 8, 0, 20)] : [],
-    });
+    foodOnly(place('333', '옛날손칼국수', 8, 0, 20));
 
-    const res = await nearest(me.id);
-    expect(res.body.data).toEqual({ restaurantId: Number(shop.id), placeName: '옛날손칼국수' });
+    const res = await nearby(me.id);
+    expect(res.body.data.items).toEqual([
+      { name: '옛날손칼국수', restaurantId: Number(shop.id), categoryName: '한식' },
+    ]);
     const saved = await prisma.restaurant.findUniqueOrThrow({ where: { id: shop.id } });
     expect(saved.kakaoPlaceId).toBe('333');
   });
@@ -307,21 +327,17 @@ describe('MAP-03 GET /map/nearest-restaurant — 누른 자리의 가장 가까�
     const me = await createMember();
     await createRestaurant({ name: '옛날손칼국수 가양점', ...at(10, 0) });
     const exact = await createRestaurant({ name: '옛날손칼국수', ...at(50, 0) });
-    stubKakao({
-      category: (p) =>
-        p.get('category_group_code') === 'FD6' ? [place('777', '옛날손칼국수', 4)] : [],
-    });
-    expect((await nearest(me.id)).body.data.restaurantId).toBe(Number(exact.id));
+    foodOnly(place('777', '옛날손칼국수', 4));
+    expect((await nearby(me.id)).body.data.items[0].restaurantId).toBe(Number(exact.id));
 
     // 카카오는 "옛날손칼국수 본점", 이름이 그 안에 들어가는 우리 가게가 두 곳 → 어느 가게인지 몰라 잇지 않는다
     await createRestaurant({ name: '손칼국수', ...at(0, 30) });
     await createRestaurant({ name: '칼국수 본점', ...at(0, 60) });
-    stubKakao({
-      category: (p) =>
-        p.get('category_group_code') === 'FD6' ? [place('888', '옛날손칼국수 본점', 4)] : [],
-    });
-    const res = await nearest(me.id);
-    expect(res.body.data).toEqual({ restaurantId: null, placeName: '옛날손칼국수 본점' });
+    foodOnly(place('888', '옛날손칼국수 본점', 4));
+    const res = await nearby(me.id);
+    expect(res.body.data.items).toEqual([
+      { name: '옛날손칼국수 본점', restaurantId: null, categoryName: null },
+    ]);
     const linked = await prisma.restaurant.findMany({ where: { kakaoPlaceId: '888' } });
     expect(linked).toHaveLength(0);
   });
@@ -331,70 +347,69 @@ describe('MAP-03 GET /map/nearest-restaurant — 누른 자리의 가장 가까�
     // 빽빽한 건물: 이름이 다른 가게 60곳이 카카오 장소 바로 옆에 있다
     for (let i = 0; i < 60; i += 1) await createRestaurant({ name: `다른가게${i}`, ...at(0, 1) });
     const shop = await createRestaurant({ name: '골목끝국밥', ...at(80, 0) });
-    stubKakao({
-      category: (p) =>
-        p.get('category_group_code') === 'FD6' ? [place('666', '골목끝국밥', 5)] : [],
-    });
+    foodOnly(place('666', '골목끝국밥', 5));
 
-    const res = await nearest(me.id);
-    expect(res.body.data).toEqual({ restaurantId: Number(shop.id), placeName: '골목끝국밥' });
+    const res = await nearby(me.id);
+    expect(res.body.data.items[0].restaurantId).toBe(Number(shop.id));
   });
 
-  it('카카오 가게가 우리 가게가 아니면 이름만 알려 준다 (다른 가게를 대신 보여 주지 않는다)', async () => {
+  it('카카오 가게가 우리 가게가 아니면 restaurantId null (다른 가게를 대신 넣지 않는다)', async () => {
     const me = await createMember();
     await createRestaurant({ name: '옆집분식', ...at(5, 0) });
-    stubKakao({
-      category: (p) =>
-        p.get('category_group_code') === 'FD6' ? [place('444', '골목포차', 6, 6, 0)] : [],
-    });
+    foodOnly(place('444', '골목포차', 6, 6, 0));
 
-    const res = await nearest(me.id);
-    expect(res.body.data).toEqual({ restaurantId: null, placeName: '골목포차' });
+    const res = await nearby(me.id);
+    expect(res.body.data.items).toEqual([
+      { name: '골목포차', restaurantId: null, categoryName: null },
+    ]);
   });
 
-  it('카카오가 실패하거나 근처에 아무것도 없으면 우리 가게 중 반경 안 가장 가까운 곳', async () => {
+  it('이름이 같은 카카오 장소가 둘이면 우리 가게는 한 곳에만 잇는다', async () => {
+    const me = await createMember();
+    const shop = await createRestaurant({ name: '김밥천국', ...at(10, 0) });
+    foodOnly(place('901', '김밥천국', 5, 5, 0), place('902', '김밥천국', 9, 0, 9));
+
+    const res = await nearby(me.id);
+    expect(res.body.data.items.map((i: { restaurantId: number | null }) => i.restaurantId)).toEqual(
+      [Number(shop.id), null],
+    );
+  });
+
+  it('카카오가 실패하거나 근처에 아무것도 없으면 우리 가게 중 반경 안 가까운 곳', async () => {
     const me = await createMember();
     const near = await createRestaurant({ name: '가까운집', ...at(20, 0) });
-    await createRestaurant({ name: '조금먼집', ...at(0, 25) });
+    const next = await createRestaurant({ name: '조금먼집', categoryId: 2, ...at(0, 25) });
     await createRestaurant({ name: '반경밖', ...at(40, 0) });
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fromDb = [
+      { name: '가까운집', restaurantId: Number(near.id), categoryName: '한식' },
+      { name: '조금먼집', restaurantId: Number(next.id), categoryName: '중식' },
+    ];
 
     stubKakao({ category: () => 500 });
-    expect((await nearest(me.id)).body.data).toEqual({
-      restaurantId: Number(near.id),
-      placeName: null,
-    });
+    expect((await nearby(me.id)).body.data.items).toEqual(fromDb);
     stubKakao({ category: () => [] });
-    expect((await nearest(me.id)).body.data).toEqual({
-      restaurantId: Number(near.id),
-      placeName: null,
-    });
+    expect((await nearby(me.id)).body.data.items).toEqual(fromDb);
     stubKakao({ category: () => [] });
-    expect((await nearest(me.id, { ...tap, radiusM: '10' })).body.data).toEqual({
-      restaurantId: null,
-      placeName: null,
-    });
+    expect((await nearby(me.id, { ...tap, radiusM: '10' })).body.data.items).toEqual([]);
   });
 
   it('카카오 응답의 좌표·거리가 숫자가 아니면 그 곳은 버린다 (DB 오류 대신 다음 후보·DB로)', async () => {
     const me = await createMember();
     const near = await createRestaurant({ name: '가까운집', ...at(10, 0) });
-    stubKakao({
-      category: (p) =>
-        p.get('category_group_code') === 'FD6'
-          ? [{ id: '555', place_name: '좌표없는집', x: '', y: '', distance: '3' }]
-          : [],
-    });
-    const res = await nearest(me.id);
+    foodOnly({ id: '555', place_name: '좌표없는집', x: '', y: '', distance: '3' });
+    const res = await nearby(me.id);
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual({ restaurantId: Number(near.id), placeName: null });
+    expect(res.body.data.items).toEqual([
+      { name: '가까운집', restaurantId: Number(near.id), categoryName: '한식' },
+    ]);
   });
 
   it('서울 밖이면 카카오를 부르지 않는다', async () => {
     const me = await createMember();
     const fetchMock = stubKakao();
-    const res = await nearest(me.id, { lat: '35.1796', lng: '129.0756' });
-    expect(res.body.data).toEqual({ restaurantId: null, placeName: null });
+    const res = await nearby(me.id, { lat: '35.1796', lng: '129.0756' });
+    expect(res.body.data).toEqual({ items: [] });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -405,7 +420,7 @@ describe('MAP-03 GET /map/nearest-restaurant — 누른 자리의 가장 가까�
   ])('잘못된 값이면 400 (%o)', async (query, code) => {
     const me = await createMember();
     stubKakao();
-    const res = await nearest(me.id, query);
+    const res = await nearby(me.id, query);
     expect(res.status).toBe(400);
     expect(res.body.code).toBe(code);
   });
@@ -418,13 +433,13 @@ describe('MAP-03 요청 횟수 제한', () => {
     const query = { lat: String(CENTER.lat), lng: String(CENTER.lng) };
     for (let i = 0; i < 30; i += 1) {
       const res = await request(app)
-        .get('/api/v1/map/nearest-restaurant')
+        .get('/api/v1/map/nearby-places')
         .query(query)
         .set('Authorization', bearer(me.id));
       expect(res.status).toBe(200);
     }
     const res = await request(app)
-      .get('/api/v1/map/nearest-restaurant')
+      .get('/api/v1/map/nearby-places')
       .query(query)
       .set('Authorization', bearer(me.id));
     expect(res.status).toBe(429);
