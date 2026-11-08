@@ -7,6 +7,8 @@ export type KakaoLatLngBounds = { extend(latlng: KakaoLatLng): void };
 
 export type KakaoMap = {
   setCenter(latlng: KakaoLatLng): void;
+  /** 부드럽게 옮긴다 */
+  panTo(latlng: KakaoLatLng): void;
   getBounds(): { getSouthWest(): KakaoLatLng; getNorthEast(): KakaoLatLng };
   /** 범위가 모두 보이게 (여백 위·오른쪽·아래·왼쪽 px) */
   setBounds(
@@ -21,7 +23,11 @@ export type KakaoMap = {
   relayout(): void;
 };
 
-export type KakaoOverlay = { setMap(map: KakaoMap | null): void };
+export type KakaoOverlay = {
+  setMap(map: KakaoMap | null): void;
+  setPosition(latlng: KakaoLatLng): void;
+  getPosition(): KakaoLatLng;
+};
 
 /** 지도 이벤트 처리 함수. click은 누른 곳 좌표(latLng)를 준다 (idle은 인자 없음) */
 export type KakaoEventHandler = (event: { latLng: KakaoLatLng }) => void;

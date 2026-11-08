@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { MapView } from '../components/MapView';
 
@@ -69,9 +70,15 @@ function makeFakeKakao() {
   }
   class CustomOverlay {
     content: HTMLElement;
-    constructor(options: { content: HTMLElement }) {
+    position: LatLng;
+    constructor(options: { content: HTMLElement; position: LatLng }) {
       this.content = options.content;
+      this.position = options.position;
     }
+    setPosition(p: LatLng) {
+      this.position = p;
+    }
+    getPosition = () => this.position;
     setMap(map: unknown) {
       if (map) document.body.append(this.content);
       else this.content.remove();
@@ -135,6 +142,81 @@ describe('MapView fit (맛집 리스트·PICK 지도)', () => {
     fireEvent.click(screen.getByRole('button', { name: '지도 축소' }));
     fireEvent.click(screen.getByRole('button', { name: '지도 축소' }));
     expect(seen.levels).toEqual([3, 4, 5]);
+  });
+});
+
+describe('MapView 내 위치 (홈)', () => {
+  it('내 위치에 먹깨비를 놓고, 위치가 바뀌면 걸어서 그 자리로 옮긴다', async () => {
+    fakeKakao();
+    const props = {
+      center: { lat: 37.56, lng: 126.85 },
+      pins,
+      selectedId: null,
+      onPinClick: vi.fn(),
+      onBoundsChange: vi.fn(),
+    };
+    const marker = <span>내 먹깨비</span>;
+    const { rerender } = render(
+      <MapView {...props} me={{ coords: { lat: 37.56, lng: 126.85 }, marker }} />,
+    );
+    const label = await screen.findByText('내 먹깨비');
+    const box = label.parentElement as HTMLElement;
+    expect(box.dataset.walking).toBe('false');
+
+    // 북쪽으로 20m
+    const to = { lat: 37.56 + 20 / 111_320, lng: 126.85 };
+    rerender(<MapView {...props} me={{ coords: to, marker }} />);
+    expect(box.dataset.walking).toBe('true');
+    await waitFor(() => expect(box.dataset.walking).toBe('false'), { timeout: 3000 });
+    expect(screen.getAllByText('내 먹깨비')).toHaveLength(1);
+
+    // 위치를 못 쓰게 되면 치운다
+    rerender(<MapView {...props} me={null} />);
+    expect(screen.queryByText('내 먹깨비')).not.toBeInTheDocument();
+  });
+});
+
+describe('MapView 내 위치 걷기 멈추기', () => {
+  it('걷는 중에 위치를 못 쓰게 되면 걷기를 멈춘다', async () => {
+    fakeKakao();
+    const props = {
+      center: { lat: 37.56, lng: 126.85 },
+      pins,
+      selectedId: null,
+      onPinClick: vi.fn(),
+      onBoundsChange: vi.fn(),
+    };
+    const marker = <span>내 먹깨비</span>;
+    const { rerender } = render(
+      <MapView {...props} me={{ coords: { lat: 37.56, lng: 126.85 }, marker }} />,
+    );
+    const box = (await screen.findByText('내 먹깨비')).parentElement as HTMLElement;
+    rerender(
+      <MapView {...props} me={{ coords: { lat: 37.56 + 50 / 111_320, lng: 126.85 }, marker }} />,
+    );
+    expect(box.dataset.walking).toBe('true');
+
+    rerender(<MapView {...props} me={null} />);
+    expect(box.dataset.walking).toBe('false');
+  });
+});
+
+describe('MapView 내 위치 (StrictMode)', () => {
+  it('효과가 두 번 돌아도(개발 모드) 새 지도에 내 먹깨비를 다시 붙인다', async () => {
+    fakeKakao();
+    render(
+      <StrictMode>
+        <MapView
+          center={{ lat: 37.56, lng: 126.85 }}
+          pins={pins}
+          selectedId={null}
+          onPinClick={vi.fn()}
+          onBoundsChange={vi.fn()}
+          me={{ coords: { lat: 37.56, lng: 126.85 }, marker: <span>내 먹깨비</span> }}
+        />
+      </StrictMode>,
+    );
+    expect(await screen.findByText('내 먹깨비')).toBeInTheDocument();
   });
 });
 

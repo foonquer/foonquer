@@ -11,9 +11,11 @@ import { getMe } from '../../api/users';
 import bellIcon from '../../assets/icons/bell.svg';
 import flagIcon from '../../assets/icons/flag.svg';
 import gearIcon from '../../assets/icons/gear.svg';
+import locateIcon from '../../assets/icons/locate.svg';
 import searchIcon from '../../assets/icons/search.svg';
 import { MapView } from '../../components/MapView';
 import { MukkaebiAvatar } from '../../components/Mukkaebi';
+import { MyLocationMarker } from '../../components/MyLocationMarker';
 import { RegionChip } from '../../components/RegionChip';
 import { RegionSelectSheet } from '../../components/RegionSelectSheet';
 import { EmptyState, Loading } from '../../components/StateViews';
@@ -25,6 +27,8 @@ import type { Coords } from '../../lib/geolocation';
 import { SEOUL_CENTER, useViewRegion } from '../../lib/region';
 import { useAsync } from '../../lib/useAsync';
 import { useMyCoords } from '../../lib/useMyCoords';
+import { geolocationGranted, useWatchedCoords } from '../../lib/useWatchedCoords';
+import { wearingOf } from '../../lib/wearing';
 import { PreviewSheet } from './PreviewSheet';
 import styles from './HomePage.module.css';
 
@@ -64,6 +68,56 @@ export function HomePage() {
   const request = useRef<AbortController>(undefined);
   const tapRequest = useRef<AbortController>(undefined);
   const viewBounds = useRef<Bounds>(undefined);
+
+  // 내 위치 먹깨비: 권한을 이미 허용했으면 바로, 아니면 내 위치 버튼을 누르면 위치를 계속 받는다
+  const [watching, setWatching] = useState(false);
+  /** 내 위치 버튼을 누르고 첫 위치를 기다리는 중이면 그때 보던 동네 */
+  const wantFocus = useRef<{ regionId?: number } | null>(null);
+  /** 내 위치 버튼으로 옮긴 곳. 그 뒤 동네를 바꾸면 동네 중심으로 돌아간다 */
+  const [focus, setFocus] = useState<{ coords: Coords; regionId?: number; key: number } | null>(
+    null,
+  );
+  const focusOn = useCallback((coords: Coords, regionId?: number) => {
+    setFocus((f) => ({ coords, regionId, key: (f?.key ?? 0) + 1 }));
+  }, []);
+  const live = useWatchedCoords(watching, {
+    onFix: (c) => {
+      if (!wantFocus.current) return;
+      focusOn(c, wantFocus.current.regionId);
+      wantFocus.current = null;
+    },
+    onError: (error) => {
+      // 권한을 막으면 브라우저가 감시를 멈추므로 꺼 둔다 → 허용한 뒤 버튼을 다시 누르면 새로 시작
+      if (error === 'DENIED') setWatching(false);
+      // 버튼을 눌렀을 때만 알린다 (자동으로 켠 경우는 조용히)
+      if (!wantFocus.current) return;
+      wantFocus.current = null;
+      toast(
+        error === 'DENIED'
+          ? '위치 권한이 꺼져 있어요. 주소창 왼쪽 자물쇠에서 위치를 허용해 주세요'
+          : '지금 위치를 찾지 못했어요. 잠시 후 다시 시도해 주세요',
+      );
+    },
+  });
+  useEffect(() => {
+    let alive = true;
+    void geolocationGranted().then((granted) => alive && granted && setWatching(true));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const locate = () => {
+    if (!('geolocation' in navigator)) {
+      toast('이 브라우저에서는 위치를 쓸 수 없어요');
+      return;
+    }
+    if (live) {
+      focusOn(live, region?.regionId);
+      return;
+    }
+    wantFocus.current = { regionId: region?.regionId };
+    setWatching(true);
+  };
 
   const loadPins = useCallback(
     (bounds: Bounds) => {
@@ -141,7 +195,11 @@ export function HomePage() {
     tapRequest.current?.abort();
     setRegionOpen(true);
   }, []);
-  const center = region?.lat && region.lng ? { lat: region.lat, lng: region.lng } : SEOUL_CENTER;
+  const regionCenter =
+    region?.lat && region.lng ? { lat: region.lat, lng: region.lng } : SEOUL_CENTER;
+  const focused = focus && focus.regionId === region?.regionId ? focus : null;
+  const center = focused?.coords ?? regionCenter;
+  const myMukkaebi = summary.data?.mukkaebi;
 
   return (
     <div className={styles.page}>
@@ -177,6 +235,18 @@ export function HomePage() {
             onPinClick={pickRestaurant}
             onMapClick={findAt}
             onBoundsChange={loadPins}
+            recenterKey={focused?.key}
+            me={
+              live && {
+                coords: live,
+                marker: (
+                  <MyLocationMarker
+                    wearing={myMukkaebi ? wearingOf(myMukkaebi) : {}}
+                    stage={myMukkaebi?.stage}
+                  />
+                ),
+              }
+            }
           />
         ) : regionError ? (
           <EmptyState title="내 동네를 불러오지 못했어요" onRetry={retry} />
@@ -197,13 +267,25 @@ export function HomePage() {
           </p>
         )}
 
+        {region && (
+          <button
+            type="button"
+            className={styles.locate}
+            aria-label="내 위치로 이동"
+            data-on={Boolean(live)}
+            onClick={locate}
+          >
+            <img src={locateIcon} alt="" width={22} height={22} />
+          </button>
+        )}
+
         <Link to="/visits/new" className={styles.fab}>
           <img src={flagIcon} alt="" width={22} height={22} />
           정복하기
         </Link>
       </section>
 
-      <PreviewSheet restaurantId={selectedId} coords={coords} onClose={closePreview} />
+      <PreviewSheet restaurantId={selectedId} coords={live ?? coords} onClose={closePreview} />
       <RegionSelectSheet open={regionOpen} onClose={() => setRegionOpen(false)} />
     </div>
   );

@@ -1,0 +1,78 @@
+.marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.figure {
+  position: relative;
+  z-index: 1;
+  display: block;
+  transform-origin: 50% 100%;
+}
+
+/* 발밑 그림자 (피그마 58×14 → 몸 크기에 맞춰 48×12) */
+.shadow {
+  width: 48px;
+  height: 12px;
+  margin-top: -10px;
+  border-radius: 50%;
+  background: rgba(33, 61, 41, 0.18);
+}
+
+/* "내 먹깨비" 이름표 (피그마 56×21, 진초록 바탕) */
+.label {
+  margin-top: 2px;
+  padding: 3px 9px;
+  border-radius: 10px;
+  background: var(--mk-forest);
+  box-shadow: 0 3px 6px rgba(33, 61, 41, 0.18);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 14px;
+  color: var(--mk-white);
+  white-space: nowrap;
+}
+
+/* 걷기: 왼발 · 오른발로 몸을 기울이고 통통 튄다, 발이 땅에 닿을 때 그림자가 넓어진다 */
+:global([data-walking='true']) .figure {
+  animation: walk 0.56s ease-in-out infinite;
+}
+
+:global([data-walking='true']) .shadow {
+  animation: shadow 0.56s ease-in-out infinite;
+}
+
+@keyframes walk {
+  0%,
+  100% {
+    transform: rotate(-7deg) translateY(0);
+  }
+  25%,
+  75% {
+    transform: rotate(0deg) translateY(-4px);
+  }
+  50% {
+    transform: rotate(7deg) translateY(0);
+  }
+}
+
+@keyframes shadow {
+  0%,
+  50%,
+  100% {
+    transform: scaleX(1.12);
+  }
+  25%,
+  75% {
+    transform: scaleX(0.86);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global([data-walking='true']) .figure,
+  :global([data-walking='true']) .shadow {
+    animation: none;
+  }
+}

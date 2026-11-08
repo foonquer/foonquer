@@ -355,6 +355,110 @@ describe('홈 지도 (MAP-01·02)', () => {
     });
   });
 
+  describe('내 위치 먹깨비', () => {
+    const ME = { latitude: 37.5501, longitude: 126.8402, accuracy: 10 };
+    /** 브라우저 위치 흉내: 권한 상태와 watchPosition 결과 */
+    function fakeLocation(
+      permission: PermissionState,
+      watch: (ok: (p: object) => void, fail: (e: object) => void) => void,
+    ) {
+      const clearWatch = vi.fn();
+      Object.defineProperty(navigator, 'permissions', {
+        configurable: true,
+        value: { query: () => Promise.resolve({ state: permission }) },
+      });
+      Object.defineProperty(navigator, 'geolocation', {
+        configurable: true,
+        value: {
+          watchPosition: vi.fn((ok: (p: object) => void, fail: (e: object) => void) => {
+            watch(ok, fail);
+            return 1;
+          }),
+          clearWatch,
+        },
+      });
+      return { clearWatch };
+    }
+    const homeApi = {
+      ...regionApi,
+      'GET /map/restaurants': ok({ items: [], totalCount: 0, truncated: false }),
+      'GET /home/summary': ok({
+        mukkaebi: { level: 1, stage: 'EGG', stageName: '알', equipped: {} },
+        title: null,
+        season: null,
+        rank: { conquestCount: 0, main: null },
+        unreadNotificationCount: 0,
+        celebrationCount: 0,
+      }),
+    };
+
+    afterEach(() => {
+      Reflect.deleteProperty(navigator, 'permissions');
+      Reflect.deleteProperty(navigator, 'geolocation');
+    });
+
+    it('위치를 이미 허용했으면 들어오자마자 내 위치에 먹깨비를 보여 주고, 떠나면 그만 받는다', async () => {
+      const { clearWatch } = fakeLocation('granted', (ok) => ok({ coords: ME }));
+      mockApi(homeApi);
+      const { unmount } = renderRoute('/');
+
+      expect(await screen.findByRole('img', { name: '내 위치 (내 먹깨비)' })).toBeInTheDocument();
+      expect(screen.getByText('내 먹깨비')).toBeInTheDocument();
+      unmount();
+      expect(clearWatch).toHaveBeenCalled();
+    });
+
+    it('내 위치 버튼을 누르면 위치를 켜고 지도를 내 위치로 옮긴다', async () => {
+      fakeLocation('prompt', (ok) => ok({ coords: ME }));
+      const server = mockApi(homeApi);
+      renderRoute('/');
+      const button = await screen.findByRole('button', { name: '내 위치로 이동' });
+      expect(screen.queryByText('내 먹깨비')).not.toBeInTheDocument();
+
+      fireEvent.click(button);
+
+      expect(await screen.findByText('내 먹깨비')).toBeInTheDocument();
+      await waitFor(() => {
+        const last = server.calls('GET /map/restaurants').at(-1)!.query;
+        expect((Number(last.get('swLat')) + Number(last.get('neLat'))) / 2).toBeCloseTo(
+          ME.latitude,
+          6,
+        );
+      });
+    });
+
+    it('권한을 막았다가 허용하고 다시 누르면 위치를 새로 받는다', async () => {
+      let calls = 0;
+      fakeLocation('prompt', (ok, fail) => {
+        calls += 1;
+        if (calls === 1) fail({ code: 1, PERMISSION_DENIED: 1 });
+        else ok({ coords: ME });
+      });
+      mockApi(homeApi);
+      renderRoute('/');
+      const button = await screen.findByRole('button', { name: '내 위치로 이동' });
+
+      fireEvent.click(button);
+      expect(await screen.findByText(/위치 권한이 꺼져 있어요/)).toBeInTheDocument();
+      fireEvent.click(button);
+      expect(await screen.findByText('내 먹깨비')).toBeInTheDocument();
+      expect(calls).toBe(2);
+    });
+
+    it('위치 권한을 막았으면 켜는 방법을 알려 준다', async () => {
+      fakeLocation('prompt', (_ok, fail) => fail({ code: 1, PERMISSION_DENIED: 1 }));
+      mockApi(homeApi);
+      renderRoute('/');
+
+      fireEvent.click(await screen.findByRole('button', { name: '내 위치로 이동' }));
+      expect(
+        await screen.findByText(
+          '위치 권한이 꺼져 있어요. 주소창 왼쪽 자물쇠에서 위치를 허용해 주세요',
+        ),
+      ).toBeInTheDocument();
+    });
+  });
+
   it('지역 선택 시트에서 동네를 바꾸면 그 동네 지도를 다시 불러온다', async () => {
     const server = mockApi({
       ...regionApi,
