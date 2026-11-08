@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>지도 시안 · 우리 핀만</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+<style>
+  html, body { margin: 0; height: 100%; font-family: Pretendard, system-ui, sans-serif; background: #f1f4ee; }
+  #map { position: absolute; inset: 0; }
+  .bar { position: absolute; top: 12px; left: 12px; right: 12px; z-index: 2; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .chip { padding: 6px 12px; border-radius: 16px; background: #fff; box-shadow: 0 3px 8px rgba(33,61,41,.12); font-size: 13px; font-weight: 700; color: #2f5d3d; }
+  .note { padding: 4px 10px; border-radius: 12px; background: rgba(255,255,255,.9); font-size: 11px; color: #6b7468; }
+  .pin { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+  .pin img { width: 34px; height: 40px; filter: drop-shadow(0 4px 6px rgba(33,61,41,.12)); }
+  .pin span { margin-top: 2px; padding: 1px 6px; border-radius: 6px; background: #fff; font-size: 11px; color: #242824; white-space: nowrap; max-width: 96px; overflow: hidden; text-overflow: ellipsis; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); cursor: pointer; }
+  .me { display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+  .me img { width: 60px; }
+  .me .shadow { width: 44px; height: 11px; margin-top: -9px; border-radius: 50%; background: rgba(33,61,41,.18); }
+  .me .label { margin-top: 2px; padding: 3px 9px; border-radius: 10px; background: #2f5d3d; color: #fff; font-size: 11px; font-weight: 700; }
+  .sheet { position: absolute; left: 12px; right: 12px; bottom: 16px; z-index: 2; padding: 14px 16px; border-radius: 18px; background: #fff; box-shadow: 0 6px 18px rgba(33,61,41,.18); font-size: 14px; display: none; }
+  .sheet strong { display: block; font-size: 17px; margin-bottom: 4px; }
+  .maplibregl-ctrl-attrib { font-size: 10px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="bar">
+  <span class="chip">강서구 · 가양동</span>
+  <span class="note">시안: 지도 바탕의 가게 아이콘·이름을 끄고 우리 핀만 · 핀 위치는 OpenStreetMap 음식점 예시</span>
+</div>
+<div class="sheet" id="sheet"></div>
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+const MK = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTMzIiBoZWlnaHQ9IjE0Mi41IiB2aWV3Qm94PSIwIDAgMTMzIDE0Mi41IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Zz4KPGVsbGlwc2UgY3g9IjY2LjUiIGN5PSIxMzcuNzUiIHJ4PSIyOC41IiByeT0iMy44IiBmaWxsPSIjMjQyODI0IiBmaWxsLW9wYWNpdHk9IjAuMDgiLz4KPHBhdGggZD0iTTM3LjkyNCA2MC41MTVDMzcuOTI0IDUxLjAxNSAzOS40NDQgNDUuMzA1NSA0MS4wNCA0Mi42NDU1QzQxLjYxIDQxLjUwNTUgNDIuNzUgNDEuNTA1NSA0My4zMiA0Mi42NDU1QzQ3LjM0OCA0Ni44MjU1IDUzLjEyNCA1My4yOTUgNTMuMTI0IDYwLjUxNUgzNy45MjRaIiBmaWxsPSIjRjJDNzVDIi8+CjxwYXRoIGQ9Ik05NS4wNzYgNjAuNTE1Qzk1LjA3NiA1MS4wMTUgOTMuNTU2IDQ1LjMwNTUgOTEuOTYgNDIuNjQ1NUM5MS4zOSA0MS41MDU1IDkwLjI1IDQxLjUwNTUgODkuNjggNDIuNjQ1NUM4NS42NTIgNDYuODI1NSA3OS44NzYgNTMuMjk1IDc5Ljg3NiA2MC41MTVIOTUuMDc2WiIgZmlsbD0iI0YyQzc1QyIvPgo8ZWxsaXBzZSBjeD0iNDIuNzk3NSIgY3k9IjQ1LjkwOTIiIHJ4PSIyLjEzNzUiIHJ5PSIyLjg1IiBmaWxsPSIjRkZFN0EzIiBmaWxsLW9wYWNpdHk9IjAuOSIvPgo8ZWxsaXBzZSBjeD0iODkuNjEzNSIgY3k9IjQ1LjkwOTIiIHJ4PSIyLjEzNzUiIHJ5PSIyLjg1IiBmaWxsPSIjRkZFN0EzIiBmaWxsLW9wYWNpdHk9IjAuOSIvPgo8ZWxsaXBzZSBjeD0iMjUuNjUiIGN5PSI5Ny41ODQiIHJ4PSIxMS40IiByeT0iNy42IiBmaWxsPSIjRUE3QjY2Ii8+CjxlbGxpcHNlIGN4PSIxMDcuMzUiIGN5PSI5Ny41ODQiIHJ4PSIxMS40IiByeT0iNy42IiBmaWxsPSIjRUE3QjY2Ii8+CjxlbGxpcHNlIGN4PSI1My40MjgiIGN5PSIxMjkuNjc1IiByeD0iMTEuNCIgcnk9IjcuMTI1IiBmaWxsPSIjRDg2NDRGIi8+CjxlbGxpcHNlIGN4PSI3OS41NzIiIGN5PSIxMjkuNjc1IiByeD0iMTEuNCIgcnk9IjcuMTI1IiBmaWxsPSIjRDg2NDRGIi8+CjxlbGxpcHNlIGN4PSI2Ni41IiBjeT0iODguMzUiIHJ4PSI0My43IiByeT0iNDAuODUiIGZpbGw9IiNFQTdCNjYiLz4KPGVsbGlwc2UgY3g9IjQyLjc1ODIiIGN5PSI2Ni4wODQzIiByeD0iMTEuNCIgcnk9IjYuMTc1IiB0cmFuc2Zvcm09InJvdGF0ZSgyNSA0Mi43NTgyIDY2LjA4NDMpIiBmaWxsPSJ3aGl0ZSIgZmlsbC1vcGFjaXR5PSIwLjM1Ii8+CjxlbGxpcHNlIGN4PSI2Ni41IiBjeT0iMTA3Ljk1OCIgcng9IjIwLjk3NiIgcnk9IjEzLjA3MiIgZmlsbD0iI0ZGRjFEOSIvPgo8ZWxsaXBzZSBjeD0iNTQuMjY0IiBjeT0iODAuMjk0IiByeD0iNS4yMjUiIHJ5PSI2LjY1IiBmaWxsPSIjM0UyQTIyIi8+CjxjaXJjbGUgY3g9IjUzLjA3NjUiIGN5PSI3Ny42ODE1IiByPSIyLjEzNzUiIGZpbGw9IndoaXRlIi8+CjxjaXJjbGUgY3g9IjU2LjYzOSIgY3k9IjgzLjE0NCIgcj0iMC45NSIgZmlsbD0id2hpdGUiLz4KPGVsbGlwc2UgY3g9Ijc4LjczNiIgY3k9IjgwLjI5NCIgcng9IjUuMjI1IiByeT0iNi42NSIgZmlsbD0iIzNFMkEyMiIvPgo8Y2lyY2xlIGN4PSI3Ny41NDg1IiBjeT0iNzcuNjgxNSIgcj0iMi4xMzc1IiBmaWxsPSJ3aGl0ZSIvPgo8Y2lyY2xlIGN4PSI4MS4xMTEiIGN5PSI4My4xNDQiIHI9IjAuOTUiIGZpbGw9IndoaXRlIi8+CjxlbGxpcHNlIGN4PSI0MS43NjIiIGN5PSI5My4xMTkiIHJ4PSI3LjYiIHJ5PSI0LjI3NSIgZmlsbD0iI0Y3QTk5QiIgZmlsbC1vcGFjaXR5PSIwLjg1Ii8+CjxlbGxpcHNlIGN4PSI5MS4yMzgiIGN5PSI5My4xMTkiIHJ4PSI3LjYiIHJ5PSI0LjI3NSIgZmlsbD0iI0Y3QTk5QiIgZmlsbC1vcGFjaXR5PSIwLjg1Ii8+CjxwYXRoIGQ9Ik01OS44NSA4OS43OTRDNjQuMjgzMyA5Ni43NjA3IDY4LjcxNjcgOTYuNzYwNyA3My4xNSA4OS43OTRINTkuODVaIiBmaWxsPSIjN0EzRTMwIi8+CjxlbGxpcHNlIGN4PSI2Ni41IiBjeT0iOTUuNDk0IiByeD0iMy44IiByeT0iMS45IiBmaWxsPSIjRjI4QzhDIi8+CjwvZz4KPC9zdmc+Cg==', PIN_U = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDkiIGhlaWdodD0iNTciIHZpZXdCb3g9IjE0IDExIDQ5IDU3IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB4PSIxNiIgeT0iMTEiIHdpZHRoPSI0NCIgaGVpZ2h0PSI0NSIgcng9IjE1IiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMzIgNTFINDRMMzggNjNMMzIgNTFaIiBmaWxsPSJ3aGl0ZSIvPgo8cmVjdCB4PSIyNiIgeT0iMzAiIHdpZHRoPSIyNCIgaGVpZ2h0PSIxOCIgcng9IjQiIGZpbGw9IiNGRkYxRDkiLz4KPHJlY3QgeD0iMjMiIHk9IjIxIiB3aWR0aD0iMzAiIGhlaWdodD0iMTIiIHJ4PSI0IiBmaWxsPSIjRUE3QjY2Ii8+CjxyZWN0IHg9IjM1IiB5PSIzNyIgd2lkdGg9IjciIGhlaWdodD0iMTEiIHJ4PSIyIiBmaWxsPSIjRUE3QjY2Ii8+CjxjaXJjbGUgY3g9IjU0LjUiIGN5PSIxOS41IiByPSI4LjUiIGZpbGw9IiNFQTdCNjYiLz4KPHBhdGggZD0iTTUxLjc5MTcgMTQuNjI1VjE3Ljg3NU01My45NTg0IDE0LjYyNVYxNy44NzVNNTAuNzA4NCAxNC42MjVWMTcuODc1QzUwLjcwODQgMTkuMzE5NCA1MS40MzA2IDIwLjA0MTcgNTIuODc1IDIwLjA0MTdWMjQuMzc1TTU3Ljc1IDI0LjM3NVYxNC42MjVDNTUuOTQ0NSAxNi40MzA2IDU1Ljk0NDUgMTguMjM2MSA1Ny43NSAyMC4wNDE3IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjAuOTc1IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg==', PIN_C = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDkiIGhlaWdodD0iNTciIHZpZXdCb3g9IjE0IDExIDQ5IDU3IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB4PSIxNiIgeT0iMTEiIHdpZHRoPSI0NCIgaGVpZ2h0PSI0NSIgcng9IjE1IiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMzIgNTFINDRMMzggNjNMMzIgNTFaIiBmaWxsPSJ3aGl0ZSIvPgo8cmVjdCB4PSIyNiIgeT0iMzAiIHdpZHRoPSIyNCIgaGVpZ2h0PSIxOCIgcng9IjQiIGZpbGw9IiNGRkYxRDkiLz4KPHJlY3QgeD0iMjMiIHk9IjIxIiB3aWR0aD0iMzAiIGhlaWdodD0iMTIiIHJ4PSI0IiBmaWxsPSIjNTlBODY0Ii8+CjxyZWN0IHg9IjM1IiB5PSIzNyIgd2lkdGg9IjciIGhlaWdodD0iMTEiIHJ4PSIyIiBmaWxsPSIjNTlBODY0Ii8+CjxjaXJjbGUgY3g9IjU0LjUiIGN5PSIxOS41IiByPSI4LjUiIGZpbGw9IiM1OUE4NjQiLz4KPHBhdGggZD0iTTUwLjcwODQgMTkuNUw1Mi44NzUgMjEuNjY2N0w1OC4yOTE3IDE2LjI1IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjAuOTc1IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg==';
+const CENTER = [126.8545, 37.5617];
+const FOOD = ['restaurant', 'cafe', 'fast_food', 'bar', 'pub', 'ice_cream', 'bakery', 'food_court'];
+const map = new maplibregl.Map({
+  container: 'map',
+  style: 'https://tiles.openfreemap.org/styles/positron',
+  center: CENTER,
+  zoom: 16.2,
+  attributionControl: { compact: true },
+});
+map.on('load', () => {
+  for (const layer of map.getStyle().layers) {
+    const id = layer.id;
+    // 1) 바탕 지도의 가게·장소 아이콘과 이름 끄기 (우리 핀과 겹치지 않게)
+    if (/^poi/.test(id)) { map.setLayoutProperty(id, 'visibility', 'none'); continue; }
+    // 2) 이름은 한국어로
+    if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
+      map.setLayoutProperty(id, 'text-field', ['coalesce', ['get', 'name:ko'], ['get', 'name']]);
+    }
+    // 3) 피그마 홈 색에 가깝게
+    if (layer.type === 'background') map.setPaintProperty(id, 'background-color', '#f1f4ee');
+    if (/water/.test(id) && layer.type === 'fill') map.setPaintProperty(id, 'fill-color', '#cfe3ee');
+    if (/park|grass|wood|landcover|landuse/.test(id) && layer.type === 'fill') map.setPaintProperty(id, 'fill-color', '#dcebd7');
+    if (/building/.test(id) && layer.type === 'fill') { map.setPaintProperty(id, 'fill-color', '#e4e9df'); }
+  }
+  // 내 위치 먹깨비
+  const me = document.createElement('div');
+  me.className = 'me';
+  me.innerHTML = `<img src="${MK}" alt=""><span class="shadow"></span><span class="label">내 먹깨비</span>`;
+  new maplibregl.Marker({ element: me, anchor: 'bottom', offset: [0, 22] }).setLngLat([126.8531, 37.5609]).addTo(map);
+  draw();
+});
+
+let markers = [];
+function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); }
+function draw() {
+  markers.forEach((m) => m.remove());
+  markers = [];
+  const seen = new Set();
+  const feats = map.querySourceFeatures('openmaptiles', { sourceLayer: 'poi' })
+    .filter((f) => FOOD.includes(f.properties.class) || FOOD.includes(f.properties.subclass));
+  const zoom = map.getZoom();
+  for (const f of feats) {
+    const name = f.properties['name:ko'] || f.properties.name;
+    if (!name || f.geometry.type !== 'Point') continue;
+    const key = name + f.geometry.coordinates.map((v) => v.toFixed(5)).join(',');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const conquered = hash(name) % 6 === 0;
+    let el;
+    if (zoom >= 16.5) {
+      el = document.createElement('div');
+      el.className = 'pin';
+      el.innerHTML = `<img src="${conquered ? PIN_C : PIN_U}" alt=""><span></span>`;
+      el.querySelector('span').textContent = name;
+    } else {
+      el = document.createElement('div');
+      el.className = 'dot';
+      el.style.background = conquered ? '#2f5d3d' : '#ea7b66';
+    }
+    el.addEventListener('click', (e) => { e.stopPropagation(); show(name, conquered); });
+    markers.push(new maplibregl.Marker({ element: el, anchor: zoom >= 16.5 ? 'top' : 'center', offset: zoom >= 16.5 ? [0, -40] : [0, 0] })
+      .setLngLat(f.geometry.coordinates).addTo(map));
+    if (markers.length >= 250) break;
+  }
+}
+function show(name, conquered) {
+  const s = document.getElementById('sheet');
+  s.innerHTML = `<strong></strong>${conquered ? '정복 완료' : '미정복'} · 누른 핀의 가게만 열려요`;
+  s.querySelector('strong').textContent = name;
+  s.style.display = 'block';
+}
+map.on('click', () => { document.getElementById('sheet').style.display = 'none'; });
+map.on('idle', draw);
+</script>
+</body>
+</html>
