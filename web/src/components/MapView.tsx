@@ -247,7 +247,8 @@ function KakaoMapView(props: Props & { maps: KakaoMaps }) {
     const start = performance.now();
     setWalking(meBox, true);
     const step = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
+      // 첫 프레임 시각이 start보다 조금 앞설 수 있어 0~1로 자른다
+      const t = Math.min(1, Math.max(0, (now - start) / duration));
       overlay.setPosition(
         new maps.LatLng(from.lat + (me.lat - from.lat) * t, from.lng + (me.lng - from.lng) * t),
       );
@@ -255,6 +256,12 @@ function KakaoMapView(props: Props & { maps: KakaoMaps }) {
       else setWalking(meBox, false);
     };
     walk.current = requestAnimationFrame(step);
+    // 위치가 또 바뀌거나 없어지면 걷던 것을 멈춘다 (다음 걸음은 지금 서 있는 곳에서 출발)
+    return () => {
+      if (walk.current !== undefined) cancelAnimationFrame(walk.current);
+      walk.current = undefined;
+      setWalking(meBox, false);
+    };
   }, [maps, meBox, me]);
 
   // 내 위치를 못 쓰게 되거나 화면을 떠나면 치운다

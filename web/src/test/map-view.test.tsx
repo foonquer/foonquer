@@ -176,6 +176,31 @@ describe('MapView 내 위치 (홈)', () => {
   });
 });
 
+describe('MapView 내 위치 걷기 멈추기', () => {
+  it('걷는 중에 위치를 못 쓰게 되면 걷기를 멈춘다', async () => {
+    fakeKakao();
+    const props = {
+      center: { lat: 37.56, lng: 126.85 },
+      pins,
+      selectedId: null,
+      onPinClick: vi.fn(),
+      onBoundsChange: vi.fn(),
+    };
+    const marker = <span>내 먹깨비</span>;
+    const { rerender } = render(
+      <MapView {...props} me={{ coords: { lat: 37.56, lng: 126.85 }, marker }} />,
+    );
+    const box = (await screen.findByText('내 먹깨비')).parentElement as HTMLElement;
+    rerender(
+      <MapView {...props} me={{ coords: { lat: 37.56 + 50 / 111_320, lng: 126.85 }, marker }} />,
+    );
+    expect(box.dataset.walking).toBe('true');
+
+    rerender(<MapView {...props} me={null} />);
+    expect(box.dataset.walking).toBe('false');
+  });
+});
+
 describe('MapView 내 위치 (StrictMode)', () => {
   it('효과가 두 번 돌아도(개발 모드) 새 지도에 내 먹깨비를 다시 붙인다', async () => {
     fakeKakao();
