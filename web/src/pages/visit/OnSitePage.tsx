@@ -223,7 +223,7 @@ function PickNearby() {
 
 function OnSiteLoader({ restaurantId }: { restaurantId: number }) {
   const { data: r, error, reload } = useAsync(() => getRestaurant(restaurantId), [restaurantId]);
-  const passed = useLocation().state as PassedCoords | null;
+  const passed = toPassedCoords(useLocation().state);
 
   if (error) {
     return (
@@ -241,7 +241,16 @@ function OnSiteLoader({ restaurantId }: { restaurantId: number }) {
       </Screen>
     );
   }
-  return <OnSite r={r} passed={passed?.me && passed.at ? passed : null} />;
+  return <OnSite r={r} passed={passed} />;
+}
+
+/** 라우터 state는 타입이 보장되지 않으니 좌표·시각이 숫자일 때만 쓴다 */
+function toPassedCoords(state: unknown): PassedCoords | null {
+  const s = state as Partial<PassedCoords> | null;
+  const me = s?.me;
+  const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  if (!me || !num(me.lat) || !num(me.lng) || !num(me.accuracyM) || !num(s?.at)) return null;
+  return { me, at: s.at };
 }
 
 function OnSite({ r, passed }: { r: RestaurantDetail; passed: PassedCoords | null }) {
