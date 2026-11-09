@@ -157,15 +157,35 @@ describe('랭킹 확인용 가짜 데이터 (demo-data)', () => {
       await prisma.conquest.count({ where: { userId: me.id, restaurantId: gangseo[2].id } }),
     ).toBe(0);
 
-    // 확인하다가 가짜 정복이 있는 가게를 진짜로 인증하고 별점까지 남겼다 (정복은 새로 안 생김)
-    const fake = await prisma.conquest.findFirstOrThrow({
+    // 확인하다가 가짜 정복이 있는 가게 두 곳을 진짜로 인증하고 정복까지 마쳤다 (정복은 새로 안 생김).
+    // 한 곳은 별점 기록이 있고, 한 곳은 없다
+    const [fake, fakeNoReview] = await prisma.conquest.findMany({
       where: {
         userId: me.id,
         seasonId: current.id,
         visit: { receiptImageKey: 'demo/receipt.jpg' },
       },
+      take: 2,
     });
-    const realVisit = await createVisit(me.id, fake.restaurantId, { seasonId: current.id });
+    const verifiedAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const ratedAt = new Date(Date.now() - 60 * 60 * 1000);
+    const realVisit = await createVisit(me.id, fake.restaurantId, {
+      seasonId: current.id,
+      verifiedAt,
+    });
+    await prisma.review.create({
+      data: {
+        visitId: realVisit.id,
+        userId: me.id,
+        restaurantId: fake.restaurantId,
+        overallScore: 4.5,
+        regDate: ratedAt,
+      },
+    });
+    const realNoReview = await createVisit(me.id, fakeNoReview.restaurantId, {
+      seasonId: current.id,
+      verifiedAt,
+    });
 
     // 확인하다가 먹깨비에 받은 왕관을 써 보고 가짜 탐험가를 차단해 봤다
     const crown = await prisma.memberItem.findFirstOrThrow({
@@ -179,7 +199,7 @@ describe('랭킹 확인용 가짜 데이터 (demo-data)', () => {
     expect(cleared).toMatchObject({ members: 24, seasons: [1, 2] });
     expect(await prisma.member.count()).toBe(2);
 
-    // 내 계정은 처음 그대로: 진짜 정복 1곳 + 진짜로 별점을 남긴 곳(가짜 정복을 진짜 방문으로 옮김),
+    // 내 계정은 처음 그대로: 진짜 정복 1곳 + 진짜로 정복을 마친 두 곳(가짜 정복을 진짜 방문으로 옮김),
     // 먹포인트 100, 진짜 내역·알림·아이템(쓰고 있던 얼굴 포함)만 남는다
     const mine = await prisma.member.findUniqueOrThrow({
       where: { id: me.id },
@@ -189,9 +209,18 @@ describe('랭킹 확인용 가짜 데이터 (demo-data)', () => {
     expect(mine.mukkaebi?.hatItemId).toBeNull();
     expect(mine.mukkaebi?.faceItemId).toBe(face.id);
     const myConquests = await prisma.conquest.findMany({ where: { userId: me.id } });
-    expect(myConquests).toHaveLength(2);
-    expect(myConquests.find((c) => c.id === fake.id)?.visitId).toBe(realVisit.id);
-    expect(await prisma.visit.count({ where: { userId: me.id } })).toBe(3);
+    expect(myConquests).toHaveLength(3);
+    // 정복 시각 = 별점 등록 시각, 별점 기록이 없으면 인증 시각 (구 순위 동점 순서에 쓰인다)
+    const movedOf = (id: bigint) => myConquests.find((c) => c.id === id);
+    expect([movedOf(fake.id)?.visitId, movedOf(fake.id)?.conqueredAt]).toEqual([
+      realVisit.id,
+      ratedAt,
+    ]);
+    expect([movedOf(fakeNoReview.id)?.visitId, movedOf(fakeNoReview.id)?.conqueredAt]).toEqual([
+      realNoReview.id,
+      verifiedAt,
+    ]);
+    expect(await prisma.visit.count({ where: { userId: me.id } })).toBe(4);
     const where = { where: { userId: me.id } };
     const left = await Promise.all([
       prisma.memberItem.findMany(where),
@@ -211,8 +240,8 @@ describe('랭킹 확인용 가짜 데이터 (demo-data)', () => {
     // 이번 시즌 순위는 진짜 기록대로 다시 계산되고, 지난 시즌은 다시 비어 있다
     const stats = await prisma.seasonRegionStat.findMany({ orderBy: { rankNo: 'asc' } });
     expect(stats.map((s) => [s.userId, s.seasonId, s.conquestCount, s.rankNo, s.tier])).toEqual([
-      [real.id, current.id, 2, 1, 'M'],
-      [me.id, current.id, 2, 2, 'B'],
+      [me.id, current.id, 3, 1, 'M'],
+      [real.id, current.id, 2, 2, 'B'],
     ]);
     const restored = await prisma.season.findMany({ where: { id: { in: [first.id, second.id] } } });
     expect(restored.every((s) => s.status === 'F' && s.finalizedAt === null)).toBe(true);
