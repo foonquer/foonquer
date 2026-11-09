@@ -59,7 +59,24 @@ async function setup() {
   await prisma.memberLocalRegion.create({
     data: { userId: me.id, regionId: gayang.id, sigunguId: gayang.parentId ?? 0 },
   });
-  await prisma.mukkaebi.create({ data: { userId: me.id } });
+  // 내 계정의 진짜 기록: 먹포인트 내역·알림·산 얼굴 아이템(쓰고 있음) — clear가 남겨 둬야 한다
+  const face = await prisma.item.findFirstOrThrow({
+    where: { category: 'FACE', requiredAchievementId: null, seasonRewardRules: { none: {} } },
+  });
+  await prisma.memberItem.create({ data: { userId: me.id, itemId: face.id, acquiredType: 'P' } });
+  await prisma.mukkaebi.create({ data: { userId: me.id, faceItemId: face.id } });
+  await prisma.pointHistory.create({
+    data: { userId: me.id, amount: 100, balanceAfter: 100, reason: 'ADMIN', title: '진짜 적립' },
+  });
+  await prisma.notification.create({
+    data: {
+      userId: me.id,
+      category: 'NOTICE',
+      type: 'NOTICE',
+      title: '진짜 공지',
+      content: '공지',
+    },
+  });
   const real = await createMember({ nickname: '진짜회원' });
   await createConquest(me.id, gangseo[0], seasons.current.id);
   await createConquest(real.id, gangseo[0], seasons.current.id);
@@ -78,12 +95,12 @@ async function setup() {
       },
     });
   }
-  return { ...seasons, me, real, gangseoId: gayang.parentId ?? 0 };
+  return { ...seasons, me, real, face, gangseoId: gayang.parentId ?? 0 };
 }
 
 describe('랭킹 확인용 가짜 데이터 (demo-data)', () => {
   it('seed: 가짜 탐험가와 시즌별 정복을 넣고, 지난 시즌은 확정 결과·보상까지, clear는 모두 되돌린다', async () => {
-    const { current, second, first, me, real, gangseoId } = await setup();
+    const { current, second, first, me, real, face, gangseoId } = await setup();
 
     const seeded = await seedDemoData('안준형');
     expect(seeded.members).toBe(24);
@@ -141,25 +158,32 @@ describe('랭킹 확인용 가짜 데이터 (demo-data)', () => {
     expect(cleared).toMatchObject({ members: 24, seasons: [1, 2] });
     expect(await prisma.member.count()).toBe(2);
 
-    // 내 계정은 처음 그대로: 진짜 정복 1곳, 먹포인트 100, 받은 아이템·업적·알림·시즌 결과 없음
+    // 내 계정은 처음 그대로: 진짜 정복 1곳, 먹포인트 100, 진짜 내역·알림·아이템(쓰고 있던 얼굴 포함)만 남는다
     const mine = await prisma.member.findUniqueOrThrow({
       where: { id: me.id },
       include: { mukkaebi: true },
     });
     expect(mine.pointBalance).toBe(100);
     expect(mine.mukkaebi?.hatItemId).toBeNull();
+    expect(mine.mukkaebi?.faceItemId).toBe(face.id);
     expect(await prisma.conquest.count({ where: { userId: me.id } })).toBe(1);
     expect(await prisma.visit.count({ where: { userId: me.id } })).toBe(1);
     const where = { where: { userId: me.id } };
-    const leftovers = await Promise.all([
-      prisma.memberItem.count(where),
+    const left = await Promise.all([
+      prisma.memberItem.findMany(where),
+      prisma.notification.findMany(where),
+      prisma.pointHistory.findMany(where),
+    ]);
+    expect(left.map((rows) => rows.length)).toEqual([1, 1, 1]);
+    expect(left[0][0].itemId).toBe(face.id);
+    expect(left[1][0].title).toBe('진짜 공지');
+    expect(left[2][0].title).toBe('진짜 적립');
+    const gone = await Promise.all([
       prisma.memberAchievement.count(where),
-      prisma.notification.count(where),
-      prisma.pointHistory.count(where),
       prisma.seasonResult.count(where),
       prisma.memberBlock.count({ where: { blockerId: me.id } }),
     ]);
-    expect(leftovers).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(gone).toEqual([0, 0, 0]);
     // 이번 시즌 순위는 진짜 기록대로 다시 계산되고, 지난 시즌은 다시 비어 있다
     const stats = await prisma.seasonRegionStat.findMany({ orderBy: { rankNo: 'asc' } });
     expect(stats.map((s) => [s.userId, s.seasonId, s.conquestCount, s.rankNo, s.tier])).toEqual([
