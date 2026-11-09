@@ -171,8 +171,31 @@ describe('랭킹 확인용 가짜 데이터 (demo-data)', () => {
     expect(await prisma.conquest.count({ where: { userId: real.id } })).toBe(2);
   }, 120_000);
 
+  it('받은 먹포인트를 그사이 썼으면 0에서 멈추고, clear는 다시 돌려도 되며 가짜 탐험가 닉네임은 받지 않는다', async () => {
+    const { me } = await setup();
+    await seedDemoData('안준형');
+    await expect(clearDemoData('떡볶이요정')).rejects.toThrow('회원이 없어요');
+    expect(await prisma.member.count()).toBe(26);
+
+    // 받은 보상보다 적게 남을 만큼 상점에서 썼다
+    await prisma.member.update({ where: { id: me.id }, data: { pointBalance: 50 } });
+    await clearDemoData('안준형');
+    const after = await prisma.member.findUniqueOrThrow({ where: { id: me.id } });
+    expect(after.pointBalance).toBe(0);
+
+    expect(await clearDemoData('안준형')).toEqual({
+      members: 0,
+      myConquests: 0,
+      pointBack: 0,
+      seasons: [],
+    });
+    expect(await prisma.member.count()).toBe(2);
+    expect(await prisma.seasonResult.count()).toBe(0);
+    await expect(clearDemoData('없는사람')).rejects.toThrow('회원이 없어요');
+  }, 120_000);
+
   it('지난 시즌에 진짜 기록이 있거나 보상 아이템을 이미 가졌으면 아무것도 넣지 않는다', async () => {
-    const { second, me, real, gangseoId } = await setup();
+    const { current, second, me, real, gangseoId } = await setup();
     await prisma.seasonRegionStat.create({
       data: { seasonId: second.id, sigunguId: gangseoId, userId: real.id, conquestCount: 1 },
     });
@@ -183,7 +206,11 @@ describe('랭킹 확인용 가짜 데이터 (demo-data)', () => {
     await prisma.memberItem.create({ data: { userId: me.id, itemId: club.id, acquiredType: 'S' } });
     await expect(seedDemoData('안준형')).rejects.toThrow('보상 아이템을 이미 가지고 있어요');
     await expect(seedDemoData('없는사람')).rejects.toThrow('회원이 없어요');
+    await prisma.memberItem.deleteMany({ where: { userId: me.id } });
+    await prisma.season.update({ where: { id: current.id }, data: { status: 'E' } });
+    await expect(seedDemoData('안준형')).rejects.toThrow('진행 중인 시즌이 없어요');
     expect(await prisma.member.count()).toBe(2);
     expect(await prisma.conquest.count()).toBe(3);
+    expect(await prisma.seasonResult.count()).toBe(0);
   });
 });
