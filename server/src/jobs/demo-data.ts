@@ -145,13 +145,16 @@ export async function seedDemoData(nickname: string) {
     orderBy: { seasonNo: 'desc' },
     take: MY_MAIN_COUNTS.length - 1,
   });
-  // 지난 시즌은 확정 코드를 다시 돌리므로 진짜 기록이 있으면 건드리지 않는다
+  // 지난 시즌은 확정 코드를 다시 돌리므로 진짜 기록(별점 대기 방문 포함)이 있으면 건드리지 않는다
   for (const season of past) {
-    const [stats, results] = await Promise.all([
+    const [stats, results, visits] = await Promise.all([
       prisma.seasonRegionStat.count({ where: { seasonId: season.id } }),
       prisma.seasonResult.count({ where: { seasonId: season.id } }),
+      prisma.visit.count({ where: { seasonId: season.id } }),
     ]);
-    if (stats + results > 0) throw new Error(`시즌 ${season.seasonNo}에 이미 기록이 있어요`);
+    if (stats + results + visits > 0) {
+      throw new Error(`시즌 ${season.seasonNo}에 이미 기록이 있어요`);
+    }
   }
   // 시즌·업적 보상 아이템을 이미 가졌으면 clear가 받은 만큼만 되돌릴 수 없어 멈춘다
   const owned = await prisma.memberItem.findMany({
@@ -223,12 +226,13 @@ export async function seedDemoData(nickname: string) {
     demo.push(member.id);
   }
 
-  // 이번 시즌에 내가 이미 정복한 가게는 빼고 고른다 (사람·가게·시즌마다 정복은 1번)
-  const mine = await prisma.conquest.findMany({
-    where: { userId: me, seasonId: current.id },
+  // 내가 방문 인증을 한 적 있는 가게(진행 중·별점 대기 포함)는 빼고 고른다.
+  // 가짜 정복이 있으면 진짜 별점을 등록해도 정복이 새로 생기지 않는다 (사람·가게·시즌마다 정복은 1번)
+  const mine = await prisma.visit.findMany({
+    where: { userId: me, restaurantId: { not: null } },
     select: { restaurantId: true },
   });
-  const myCurrent = new Set(mine.map((c) => c.restaurantId.toString()));
+  const myVisited = new Set(mine.map((v) => String(v.restaurantId)));
   const now = new Date();
   const seasons = [current, ...past];
   let conquests = 0;
@@ -244,7 +248,7 @@ export async function seedDemoData(nickname: string) {
       if (myCount) people.push([me, myCount]);
       for (const [userId, count] of people) {
         const pool = shuffle(sigungu.pool, rand).filter(
-          (id) => !(userId === me && s === 0 && myCurrent.has(id.toString())),
+          (id) => !(userId === me && myVisited.has(id.toString())),
         );
         await prisma.$transaction(async (tx) => {
           for (const restaurantId of pool.slice(0, count)) {
@@ -359,13 +363,54 @@ export async function clearDemoData(nickname: string) {
     }
   });
 
-  // 2. 내 가짜 정복 → 정복 수 다시 세기
+  // 2. 내 가짜 정복 → 정복 수 다시 세기.
+  // 가짜 정복이 있는 가게를 그사이 진짜로 인증하고 별점까지 남겼으면(그때는 정복이 새로 안 생긴다)
+  // 그 정복은 지우지 않고 진짜 방문으로 옮긴다
   const myDemo = await prisma.conquest.findMany({
     where: { userId: me, visit: demoVisit },
-    select: { id: true, visitId: true },
+    select: { id: true, visitId: true, restaurantId: true, seasonId: true },
+  });
+  const realDone = await prisma.visit.findMany({
+    where: {
+      userId: me,
+      status: 'C',
+      conquest: null,
+      AND: [
+        { OR: [{ receiptImageKey: null }, { receiptImageKey: { not: DEMO_RECEIPT_KEY } }] },
+        { OR: myDemo.map((c) => ({ restaurantId: c.restaurantId, seasonId: c.seasonId })) },
+      ],
+    },
+    orderBy: { id: 'asc' },
+    select: {
+      id: true,
+      restaurantId: true,
+      seasonId: true,
+      verifiedAt: true,
+      review: { select: { regDate: true } },
+    },
+  });
+  const moved = myDemo.flatMap((c) => {
+    const real = realDone.find(
+      (v) => v.restaurantId === c.restaurantId && v.seasonId === c.seasonId,
+    );
+    return real ? [{ conquestId: c.id, real }] : [];
   });
   await prisma.$transaction([
-    prisma.conquest.deleteMany({ where: { id: { in: myDemo.map((c) => c.id) } } }),
+    ...moved.map(({ conquestId, real }) =>
+      prisma.conquest.update({
+        where: { id: conquestId },
+        data: {
+          visitId: real.id,
+          conqueredAt: real.review?.regDate ?? real.verifiedAt ?? new Date(),
+        },
+      }),
+    ),
+    prisma.conquest.deleteMany({
+      where: {
+        id: { in: myDemo.map((c) => c.id) },
+        NOT: { id: { in: moved.map((m) => m.conquestId) } },
+      },
+    }),
     prisma.visit.deleteMany({ where: { id: { in: myDemo.map((c) => c.visitId) } } }),
   ]);
   for (const pair of touched) {

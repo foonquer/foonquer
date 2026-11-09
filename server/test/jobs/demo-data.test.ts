@@ -5,7 +5,13 @@ import { addDays, kstTodayAsDbDate } from '../../src/common/time';
 import { clearDemoData, seedDemoData } from '../../src/jobs/demo-data';
 import { prisma } from '../../src/lib/prisma';
 import { resetDb } from '../helpers/db';
-import { bearer, createConquest, createMember, createRestaurant } from '../helpers/fixtures';
+import {
+  bearer,
+  createConquest,
+  createMember,
+  createRestaurant,
+  createVisit,
+} from '../helpers/fixtures';
 
 const app = createApp();
 const GAYANG = '1150010400'; // 강서구 가양동
@@ -81,6 +87,8 @@ async function setup() {
   await createConquest(me.id, gangseo[0], seasons.current.id);
   await createConquest(real.id, gangseo[0], seasons.current.id);
   await createConquest(real.id, gangseo[1], seasons.current.id);
+  // 별점을 아직 안 남긴 진짜 방문 — seed는 이 가게에 가짜 정복을 만들면 안 된다
+  await createVisit(me.id, gangseo[2].id, { seasonId: seasons.current.id, status: 'V' });
   for (const userId of [me.id, real.id]) {
     await prisma.seasonRegionStat.create({
       data: {
@@ -95,12 +103,12 @@ async function setup() {
       },
     });
   }
-  return { ...seasons, me, real, face, gangseoId: gayang.parentId ?? 0 };
+  return { ...seasons, me, real, face, gangseo, gangseoId: gayang.parentId ?? 0 };
 }
 
 describe('랭킹 확인용 가짜 데이터 (demo-data)', () => {
   it('seed: 가짜 탐험가와 시즌별 정복을 넣고, 지난 시즌은 확정 결과·보상까지, clear는 모두 되돌린다', async () => {
-    const { current, second, first, me, real, face, gangseoId } = await setup();
+    const { current, second, first, me, real, face, gangseo, gangseoId } = await setup();
 
     const seeded = await seedDemoData('안준형');
     expect(seeded.members).toBe(24);
@@ -145,6 +153,19 @@ describe('랭킹 확인용 가짜 데이터 (demo-data)', () => {
     expect(seasons.every((s) => s.status === 'F' && s.finalizedAt !== null)).toBe(true);
 
     await expect(seedDemoData('안준형')).rejects.toThrow('이미 있어요');
+    expect(
+      await prisma.conquest.count({ where: { userId: me.id, restaurantId: gangseo[2].id } }),
+    ).toBe(0);
+
+    // 확인하다가 가짜 정복이 있는 가게를 진짜로 인증하고 별점까지 남겼다 (정복은 새로 안 생김)
+    const fake = await prisma.conquest.findFirstOrThrow({
+      where: {
+        userId: me.id,
+        seasonId: current.id,
+        visit: { receiptImageKey: 'demo/receipt.jpg' },
+      },
+    });
+    const realVisit = await createVisit(me.id, fake.restaurantId, { seasonId: current.id });
 
     // 확인하다가 먹깨비에 받은 왕관을 써 보고 가짜 탐험가를 차단해 봤다
     const crown = await prisma.memberItem.findFirstOrThrow({
@@ -158,7 +179,8 @@ describe('랭킹 확인용 가짜 데이터 (demo-data)', () => {
     expect(cleared).toMatchObject({ members: 24, seasons: [1, 2] });
     expect(await prisma.member.count()).toBe(2);
 
-    // 내 계정은 처음 그대로: 진짜 정복 1곳, 먹포인트 100, 진짜 내역·알림·아이템(쓰고 있던 얼굴 포함)만 남는다
+    // 내 계정은 처음 그대로: 진짜 정복 1곳 + 진짜로 별점을 남긴 곳(가짜 정복을 진짜 방문으로 옮김),
+    // 먹포인트 100, 진짜 내역·알림·아이템(쓰고 있던 얼굴 포함)만 남는다
     const mine = await prisma.member.findUniqueOrThrow({
       where: { id: me.id },
       include: { mukkaebi: true },
@@ -166,8 +188,10 @@ describe('랭킹 확인용 가짜 데이터 (demo-data)', () => {
     expect(mine.pointBalance).toBe(100);
     expect(mine.mukkaebi?.hatItemId).toBeNull();
     expect(mine.mukkaebi?.faceItemId).toBe(face.id);
-    expect(await prisma.conquest.count({ where: { userId: me.id } })).toBe(1);
-    expect(await prisma.visit.count({ where: { userId: me.id } })).toBe(1);
+    const myConquests = await prisma.conquest.findMany({ where: { userId: me.id } });
+    expect(myConquests).toHaveLength(2);
+    expect(myConquests.find((c) => c.id === fake.id)?.visitId).toBe(realVisit.id);
+    expect(await prisma.visit.count({ where: { userId: me.id } })).toBe(3);
     const where = { where: { userId: me.id } };
     const left = await Promise.all([
       prisma.memberItem.findMany(where),
@@ -188,7 +212,7 @@ describe('랭킹 확인용 가짜 데이터 (demo-data)', () => {
     const stats = await prisma.seasonRegionStat.findMany({ orderBy: { rankNo: 'asc' } });
     expect(stats.map((s) => [s.userId, s.seasonId, s.conquestCount, s.rankNo, s.tier])).toEqual([
       [real.id, current.id, 2, 1, 'M'],
-      [me.id, current.id, 1, 2, 'B'],
+      [me.id, current.id, 2, 2, 'B'],
     ]);
     const restored = await prisma.season.findMany({ where: { id: { in: [first.id, second.id] } } });
     expect(restored.every((s) => s.status === 'F' && s.finalizedAt === null)).toBe(true);
@@ -225,6 +249,13 @@ describe('랭킹 확인용 가짜 데이터 (demo-data)', () => {
     });
     await expect(seedDemoData('안준형')).rejects.toThrow('시즌 2에 이미 기록이 있어요');
     await prisma.seasonRegionStat.deleteMany({ where: { seasonId: second.id } });
+    // 별점 대기 방문만 있어도 진짜 기록이다
+    const pending = await createVisit(real.id, (await createRestaurant()).id, {
+      seasonId: second.id,
+      status: 'V',
+    });
+    await expect(seedDemoData('안준형')).rejects.toThrow('시즌 2에 이미 기록이 있어요');
+    await prisma.visit.delete({ where: { id: pending.id } });
 
     const club = await prisma.item.findFirstOrThrow({ where: { category: 'CLUB' } });
     await prisma.memberItem.create({ data: { userId: me.id, itemId: club.id, acquiredType: 'S' } });
