@@ -92,15 +92,22 @@ export interface KakaoNearPlace {
 const FOOD_CATEGORY_CODES = ['FD6', 'CE7'];
 
 /**
- * 좌표 둘레 radiusM 안의 음식점·카페 중 가장 가까운 곳 (MAP-03). 없으면 null.
+ * 좌표 둘레 radiusM 안의 음식점·카페 중 가까운 순 limit곳 (MAP-03).
  * https://developers.kakao.com/docs/latest/ko/local/dev-guide#search-by-category
  */
-export async function nearestFoodPlace(lat: number, lng: number, radiusM: number) {
+export async function nearbyFoodPlaces(lat: number, lng: number, radiusM: number, limit: number) {
   const bodies = await Promise.all(
     FOOD_CATEGORY_CODES.map((code) =>
       kakaoGet<{ documents: KakaoNearPlace[] }>(
         '/v2/local/search/category.json',
-        { category_group_code: code, x: lng, y: lat, radius: radiusM, sort: 'distance', size: 1 },
+        {
+          category_group_code: code,
+          x: lng,
+          y: lat,
+          radius: radiusM,
+          sort: 'distance',
+          size: limit,
+        },
         PLACE_TIMEOUT_MS,
       ),
     ),
@@ -112,7 +119,7 @@ export async function nearestFoodPlace(lat: number, lng: number, radiusM: number
     .flatMap((b) => b.documents ?? [])
     .filter((p) => isNumber(p.x) && isNumber(p.y) && isNumber(p.distance));
   places.sort((a, b) => Number(a.distance) - Number(b.distance));
-  return places[0] ?? null;
+  return places.slice(0, limit);
 }
 
 interface RegionCodeResponse {

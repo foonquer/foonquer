@@ -35,10 +35,10 @@ export const mapRestaurantsQuery = z
 export type MapRestaurantsQuery = z.infer<typeof mapRestaurantsQuery>;
 
 /** MAP-03. radiusM은 누른 곳에서 찾을 반경(m), 지도 확대 수준에 맞춰 웹이 정한다 */
-export const nearestRestaurantQuery = z.object({
+export const nearbyPlacesQuery = z.object({
   lat: latQuery,
   lng: lngQuery,
   radiusM: z.coerce.number().int().min(10).max(100).default(30),
 });
 
-export type NearestRestaurantQuery = z.infer<typeof nearestRestaurantQuery>;
+export type NearbyPlacesQuery = z.infer<typeof nearbyPlacesQuery>;

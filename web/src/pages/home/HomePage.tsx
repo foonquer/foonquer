@@ -3,9 +3,10 @@ import { Link } from 'react-router';
 import { getHomeSummary } from '../../api/home';
 import {
   getMapRestaurants,
-  getNearestRestaurant,
+  getNearbyPlaces,
   type Bounds,
   type MapRestaurant,
+  type NearbyPlace,
 } from '../../api/restaurants';
 import { getMe } from '../../api/users';
 import flagIcon from '../../assets/icons/flag.svg';
@@ -29,15 +30,19 @@ import { useAsync } from '../../lib/useAsync';
 import { useMyCoords } from '../../lib/useMyCoords';
 import { geolocationGranted, useWatchedCoords } from '../../lib/useWatchedCoords';
 import { wearingOf } from '../../lib/wearing';
+import { NearbySheet } from './NearbySheet';
 import { PreviewSheet } from './PreviewSheet';
 import styles from './HomePage.module.css';
 
 /** 지도를 멈추고 이만큼 기다렸다가 가게를 다시 불러온다 (ms) */
 const FETCH_DELAY_MS = 300;
-/** 지도를 누른 자리에서 가게를 찾는 반경 = 보이는 지도 가로의 6% (390px 화면이면 손가락 한 개쯤) */
-const TAP_RADIUS_RATIO = 0.06;
+/**
+ * 지도를 누른 자리에서 가게를 찾는 반경 = 보이는 지도 가로의 8%.
+ * 카카오는 가게 이름 글자를 장소 좌표에서 조금 떨어진 곳에 그리고, 목록에서 고르므로 넉넉하게 잡는다
+ */
+const TAP_RADIUS_RATIO = 0.08;
 /** 반경 범위 (m). 서버 MAP-03은 10~100m를 받는다 */
-const TAP_RADIUS_MIN_M = 20;
+const TAP_RADIUS_MIN_M = 30;
 const TAP_RADIUS_MAX_M = 100;
 
 /** 지금 보이는 지도에 맞춘 누르기 반경 (m). 아직 영역을 모르면 30m */
@@ -72,6 +77,8 @@ export function HomePage() {
   const [pins, setPins] = useState<MapRestaurant[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  /** 지도를 누른 자리 근처 음식점 (고르는 시트). null이면 닫힘 */
+  const [nearby, setNearby] = useState<NearbyPlace[] | null>(null);
   const [regionOpen, setRegionOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const request = useRef<AbortController>(undefined);
@@ -161,7 +168,7 @@ export function HomePage() {
     [toast],
   );
 
-  // 핀이 아닌 곳을 누르면 그 자리에서 가장 가까운 음식점 1곳(찜·정복 여부와 상관없이)을 미리보기.
+  // 핀이 아닌 곳을 누르면 그 자리 근처 음식점(찜·정복 여부와 상관없이)을 띄워 고르게 한다. 1곳이면 바로 미리보기.
   // 카카오 지도에 그려진 가게 이름은 카카오 좌표에 있어서 서버가 카카오 음식점 기준으로 찾는다 (MAP-03)
   const findAt = useCallback(
     async (point: Coords) => {
@@ -169,15 +176,17 @@ export function HomePage() {
       const controller = new AbortController();
       tapRequest.current = controller;
       try {
-        const { restaurantId, placeName } = await getNearestRestaurant(
+        const { items } = await getNearbyPlaces(
           { ...point, radiusM: tapRadius(viewBounds.current) },
           controller.signal,
         );
         // 응답이 이미 와 있던 이전 요청은 abort로 못 막으니 결과를 버린다
         if (controller.signal.aborted) return;
-        if (restaurantId !== null) setSelectedId(restaurantId);
-        else if (placeName) toast(`${eunNeun(placeName)} 아직 먹장깨기에 없는 가게예요`);
-        else toast('이 자리에서 가게를 찾지 못했어요');
+        const [only] = items;
+        if (!only) toast('이 자리에서 가게를 찾지 못했어요');
+        else if (items.length > 1) setNearby(items);
+        else if (only.restaurantId !== null) setSelectedId(only.restaurantId);
+        else toast(`${eunNeun(only.name)} 아직 먹장깨기에 없는 가게예요`);
       } catch (err) {
         if (!controller.signal.aborted) toast(errorMessage(err));
       }
@@ -195,6 +204,11 @@ export function HomePage() {
   );
 
   const closePreview = useCallback(() => setSelectedId(null), []);
+  const closeNearby = useCallback(() => setNearby(null), []);
+  const pickNearby = useCallback((restaurantId: number) => {
+    setNearby(null);
+    setSelectedId(restaurantId);
+  }, []);
   // 핀을 고르거나 지역 시트를 열면, 아직 오는 중인 지도 누르기 결과는 버린다
   const pickRestaurant = useCallback((restaurantId: number) => {
     tapRequest.current?.abort();
@@ -299,6 +313,7 @@ export function HomePage() {
         </Link>
       </section>
 
+      <NearbySheet places={nearby} onPick={pickNearby} onClose={closeNearby} />
       <PreviewSheet restaurantId={selectedId} coords={live ?? coords} onClose={closePreview} />
       <RegionSelectSheet open={regionOpen} onClose={() => setRegionOpen(false)} />
     </div>

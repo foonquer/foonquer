@@ -1,13 +1,13 @@
 import { findCurrentSeason } from '../../common/season';
 import { Prisma } from '../../generated/prisma/client';
-import { KakaoApiError, type KakaoNearPlace, nearestFoodPlace } from '../../lib/kakao-local';
+import { KakaoApiError, type KakaoNearPlace, nearbyFoodPlaces } from '../../lib/kakao-local';
 import { prisma } from '../../lib/prisma';
 import { type BBox, SEOUL } from '../region/seoul-regions';
 import { requireCategory } from '../restaurant/category';
 import { saveKakaoPlaceId } from '../restaurant/kakao-link';
 import { loadMyStates, myStateOf } from '../restaurant/my-state';
 import { normalizeStoreName, storeNameMatches } from '../visit/visit.service';
-import type { MapRestaurantsQuery, NearestRestaurantQuery } from './map.schema';
+import type { MapRestaurantsQuery, NearbyPlacesQuery } from './map.schema';
 
 /** 한 번에 돌려주는 최대 가게 수. 넘으면 truncated = true ("지도를 확대해 보세요") */
 export const MAX_MAP_ITEMS = 300;
@@ -159,28 +159,51 @@ async function restaurantForPlace(place: KakaoNearPlace): Promise<bigint | null>
   return id;
 }
 
-/**
- * MAP-03 누른 자리에서 가장 가까운 음식점.
- * 카카오 지도에 그려진 가게 이름은 카카오 장소 좌표에 있어서, 누른 곳에서 가장 가까운 카카오 음식점·카페를
- * 실시간으로 찾아 우리 가게와 잇는다 (카카오 이용 정책상 장소 ID만 저장하고 이름·좌표는 응답에만 쓴다).
- * - 카카오 가게가 우리 가게가 아니면 restaurantId null, placeName에 카카오 이름
- * - 카카오가 실패하거나 근처에 아무것도 없으면 우리 가게 중 radiusM 안 가장 가까운 곳 (placeName null)
- */
-export async function findNearestRestaurant(q: NearestRestaurantQuery) {
-  const [swLat, swLng, neLat, neLng] = SEOUL.bbox;
-  if (q.lat < swLat || q.lat > neLat || q.lng < swLng || q.lng > neLng) {
-    return { restaurantId: null, placeName: null };
-  }
+/** MAP-03 후보 수 */
+export const MAX_NEARBY_PLACES = 5;
 
-  let place: KakaoNearPlace | null = null;
+/**
+ * MAP-03 누른 자리 근처 음식점 (가까운 순 5곳). 웹은 이 중에서 고르게 한다.
+ * 카카오 지도에 그려진 가게 이름은 카카오 장소 좌표에 있어서, 누른 곳 근처 카카오 음식점·카페를
+ * 실시간으로 찾아 우리 가게와 잇는다 (카카오 이용 정책상 장소 ID만 저장하고 이름·좌표는 응답에만 쓴다).
+ * - 카카오 가게가 우리 가게가 아니면 restaurantId null (이름은 카카오 이름)
+ * - 카카오가 실패하거나 근처에 아무것도 없으면 우리 가게 중 radiusM 안 가까운 곳
+ */
+export async function findNearbyPlaces(q: NearbyPlacesQuery) {
+  const [swLat, swLng, neLat, neLng] = SEOUL.bbox;
+  if (q.lat < swLat || q.lat > neLat || q.lng < swLng || q.lng > neLng) return { items: [] };
+
+  let places: KakaoNearPlace[] = [];
   try {
-    place = await nearestFoodPlace(q.lat, q.lng, q.radiusM);
+    places = await nearbyFoodPlaces(q.lat, q.lng, q.radiusM, MAX_NEARBY_PLACES);
   } catch (err) {
     if (!(err instanceof KakaoApiError)) throw err;
     console.error('카카오 근처 음식점 찾기 실패', err);
   }
-  if (place) return { restaurantId: await restaurantForPlace(place), placeName: place.place_name };
 
-  const [nearest] = await nearbyRestaurants(q.lat, q.lng, q.radiusM, Prisma.empty, 1);
-  return { restaurantId: nearest ? BigInt(nearest.id) : null, placeName: null };
+  const found: { name: string; restaurantId: bigint | null }[] = [];
+  if (places.length > 0) {
+    // 하나씩 차례로 잇는다: 앞 장소가 저장한 장소 ID 덕분에 같은 우리 가게를 두 장소에 잇지 않는다
+    for (const place of places) {
+      found.push({ name: place.place_name, restaurantId: await restaurantForPlace(place) });
+    }
+  } else {
+    const rows = await nearbyRestaurants(q.lat, q.lng, q.radiusM, Prisma.empty, MAX_NEARBY_PLACES);
+    for (const r of rows) found.push({ name: r.name, restaurantId: BigInt(r.id) });
+  }
+
+  const ids = found.flatMap((f) => (f.restaurantId === null ? [] : [f.restaurantId]));
+  const categories = await prisma.restaurant.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, category: { select: { name: true } } },
+  });
+  const categoryOf = new Map(categories.map((r) => [r.id.toString(), r.category?.name ?? null]));
+  return {
+    items: found.map((f) => ({
+      name: f.name,
+      restaurantId: f.restaurantId,
+      categoryName:
+        f.restaurantId === null ? null : (categoryOf.get(f.restaurantId.toString()) ?? null),
+    })),
+  };
 }
