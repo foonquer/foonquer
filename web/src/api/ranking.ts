@@ -77,7 +77,12 @@ export const getMySigunguDetail = (
       activeExplorerCount: number;
       tierProgress: { current: number; nextTierAt: number | null; nextTierName: string | null };
       mukjjangGap: number;
-      rankingPreview: RankingRow[];
+      /** 1위와 내 앞뒤 (RANK-05 줄과 같은 모양) */
+      rankingPreview: (RankingRow & {
+        profileImageUrl: string | null;
+        mukkaebi: { level: number; hatCode: string | null };
+        tierName: string;
+      })[];
       restaurants: Page<{
         restaurantId: number;
         name: string;

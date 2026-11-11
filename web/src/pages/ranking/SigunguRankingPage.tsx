@@ -1,33 +1,13 @@
 import { Link, useParams, useSearchParams } from 'react-router';
 import { getSigunguRanking, TIER_NAME } from '../../api/ranking';
 import { AppHeader } from '../../components/AppHeader';
-import { MukkaebiAvatar } from '../../components/Mukkaebi';
 import { Screen } from '../../components/Screen';
 import { SeasonSelect } from '../../components/SeasonSelect';
 import { EmptyState, Loading } from '../../components/StateViews';
 import { errorMessage } from '../../lib/api';
 import { useAsync } from '../../lib/useAsync';
+import { RankAvatar, RankList } from './RankParts';
 import styles from './Ranking.module.css';
-
-type Row = { profileImageUrl: string | null; mukkaebi: { hatCode: string | null } };
-
-/** 순위·PICK 줄의 얼굴: 프로필 사진이 있으면 사진, 없으면 쓴 모자까지 그린 먹깨비 (피그마 구 랭킹) */
-function RankAvatar({ row, size, ring }: { row: Row | undefined; size: number; ring?: number }) {
-  return (
-    <span className={styles.avatarBox} data-ring={ring} style={{ width: size, height: size }}>
-      {row?.profileImageUrl ? (
-        <img src={row.profileImageUrl} alt="" />
-      ) : (
-        <MukkaebiAvatar
-          size={size}
-          wearing={
-            row?.mukkaebi.hatCode ? { HAT: { code: row.mukkaebi.hatCode, name: '' } } : undefined
-          }
-        />
-      )}
-    </span>
-  );
-}
 
 /** 구 랭킹 TOP 50 /ranking/sigungus/:sigunguId?seasonId= (RANK-05) */
 export function SigunguRankingPage() {
@@ -183,35 +163,7 @@ export function SigunguRankingPage() {
               <h2 className={styles.sectionTitle}>전체 순위</h2>
               <span>1위 ~ {data.items.length}위</span>
             </div>
-            <ol className={styles.rankList} aria-label="전체 순위">
-              {data.items.map((r) => {
-                const body = (
-                  <>
-                    <span className={styles.rankNo} data-rank={r.rank}>
-                      {r.rank}
-                    </span>
-                    <RankAvatar row={r} size={34} />
-                    <span className={styles.rankName}>
-                      <strong>{r.nickname}</strong>
-                      {r.isMe && <span className={styles.meChip}>나</span>}
-                      <span className={styles.rowTier}>{r.tierName}</span>
-                    </span>
-                    <span className={styles.rankCount}>{r.conquestCount}곳</span>
-                  </>
-                );
-                return (
-                  <li key={r.rank} data-me={r.isMe}>
-                    {r.userId !== null ? (
-                      <Link to={`/users/${r.userId}`} className={styles.rankRow}>
-                        {body}
-                      </Link>
-                    ) : (
-                      <div className={styles.rankRow}>{body}</div>
-                    )}
-                  </li>
-                );
-              })}
-            </ol>
+            <RankList rows={data.items} label="전체 순위" />
           </>
         )}
       </div>
