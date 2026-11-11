@@ -7,9 +7,11 @@
   padding: 2px var(--mk-side) 16px;
 }
 
+/* 부모(.content)가 왼쪽 정렬이라 그대로 두면 글자 너비만큼만 차지해 왼쪽에 붙는다 → 가로를 다 쓴다 */
 .nearby {
   display: flex;
   flex-direction: column;
+  align-self: stretch;
   gap: 8px;
   margin-top: 8px;
 }
