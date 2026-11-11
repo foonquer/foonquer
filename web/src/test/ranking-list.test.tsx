@@ -27,6 +27,70 @@ const tier = (tierName: string, next: string | null, remaining = 0) => ({
   nextTier: next ? { tier: 'GOURMET', tierName: next, remaining } : null,
 });
 
+describe('구 랭킹 TOP 50', () => {
+  it('TOP 3의 PICK과 전체 순위를 먹깨비·티어와 보여 주고, 줄을 누르면 프로필로 간다', async () => {
+    const row = (rank: number, nickname: string, hatCode: string | null, isMe = false) => ({
+      rank,
+      userId: rank + 10,
+      nickname,
+      conquestCount: 40 - rank,
+      tier: 'GOURMET',
+      tierName: rank === 1 ? '먹짱' : '미식가',
+      isMe,
+      profileImageUrl: null,
+      mukkaebi: { level: 7, hatCode },
+    });
+    mockApi({
+      'GET /seasons': ok({ items: [season] }),
+      'GET /rankings/sigungus/:id': ok({
+        season,
+        sigunguId: 1,
+        sigunguName: '강서구',
+        activeExplorerCount: 4,
+        items: [
+          row(1, '마라탕러버', 'HAT_CROWN'),
+          row(2, '돈까스왕', null),
+          row(3, '디저트헌터', 'HAT_CHICK'),
+          row(4, '1234', null, true),
+        ],
+        myRank: { rank: 4, conquestCount: 36, topPercent: 50, tier: 'GOURMET', mukjjangGap: 3 },
+        topPicks: [
+          {
+            rank: 1,
+            userId: 11,
+            nickname: '마라탕러버',
+            pickCount: 3,
+            restaurants: [
+              { restaurantId: 1, name: '통나무집닭갈비' },
+              { restaurantId: 2, name: '루씨엘브런치' },
+            ],
+          },
+          { rank: 2, userId: 12, nickname: '돈까스왕', pickCount: 0, restaurants: [] },
+        ],
+      }),
+    });
+    renderRoute('/ranking/sigungus/1');
+
+    const picks = await screen.findByRole('region', { name: '강서구 TOP 3의 PICK' });
+    const pick = within(picks).getByRole('link', { name: /마라탕러버의 PICK/ });
+    expect(pick).toHaveAttribute('href', '/users/11?tab=pick');
+    expect(within(pick).getByText('통나무집닭갈비 · 루씨엘브런치 외 1곳')).toBeInTheDocument();
+    // PICK이 없는 사람은 줄을 만들지 않는다
+    expect(within(picks).queryByText(/돈까스왕/)).not.toBeInTheDocument();
+
+    const list = screen.getByRole('list', { name: '전체 순위' });
+    const mine = within(list).getByRole('link', { name: /1234/ });
+    expect(mine).toHaveAttribute('href', '/users/14');
+    expect(within(mine).getByText('나')).toBeInTheDocument();
+    expect(within(mine).getByText('미식가')).toBeInTheDocument();
+    expect(within(mine).getByText('36곳')).toBeInTheDocument();
+    expect(within(list).getByRole('link', { name: /마라탕러버/ })).toHaveAttribute(
+      'href',
+      '/users/11',
+    );
+  });
+});
+
 describe('랭킹/현황', () => {
   it('현황: 구별 정복과 다음 티어까지 남은 수, 랭킹: 구를 고르면 먹짱과 TOP 50 링크', async () => {
     mockApi({
