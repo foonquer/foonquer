@@ -1,4 +1,5 @@
 import type { Prisma } from '../../generated/prisma/client';
+import { publicImageUrl } from '../../lib/image-url';
 import {
   TASTE_KEYS,
   type TasteKey,
@@ -33,6 +34,11 @@ export function ratingOf(stat: Stat) {
     return { score: null, reviewCount: stat?.reviewCount ?? 0 };
   }
   return { score: stat.displayScore.toNumber(), reviewCount: stat.reviewCount };
+}
+
+/** 가게 대표 사진 URL (인증 리뷰 사진). 없으면 null → 화면은 음식 종류 그림 */
+export function coverImageUrlOf(stat: Stat) {
+  return publicImageUrl(stat?.coverImageKey);
 }
 
 /** 재방문 % = revisitor_count ÷ visitor_count */
