@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { getHomeSummary } from '../../api/home';
+import { getCurrentQuests } from '../../api/quests';
 import {
   getMapRestaurants,
   getNearbyPlaces,
@@ -32,6 +33,8 @@ import { geolocationGranted, useWatchedCoords } from '../../lib/useWatchedCoords
 import { wearingOf } from '../../lib/wearing';
 import { NearbySheet } from './NearbySheet';
 import { PreviewSheet } from './PreviewSheet';
+import { markQuestsSeen } from '../../lib/quest';
+import { QuestButton, QuestSheet } from './QuestSheet';
 import styles from './HomePage.module.css';
 
 /** 지도를 멈추고 이만큼 기다렸다가 가게를 다시 불러온다 (ms) */
@@ -64,13 +67,23 @@ export function HomePage() {
   const summary = useAsync(getHomeSummary, []);
   // 다른 앱에 갔다가 돌아오면 안 읽은 알림 수·레벨을 다시 받는다 (reload 중에는 이전 값을 그대로 보여 준다)
   const reloadSummary = summary.reload;
+  // 이번 주 맞춤 퀘스트 (피그마 Q1·Q2) — 못 받아도 홈은 그대로 쓴다
+  const quests = useAsync(getCurrentQuests, []);
+  const reloadQuests = quests.reload;
+  // 퀘스트 완료 화면의 "남은 퀘스트 보기"로 오면 시트를 열어 둔다
+  const location = useLocation();
+  const [questOpen, setQuestOpen] = useState(
+    () => (location.state as { openQuests?: boolean } | null)?.openQuests === true,
+  );
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === 'visible') reloadSummary();
+      if (document.visibilityState !== 'visible') return;
+      reloadSummary();
+      reloadQuests();
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [reloadSummary]);
+  }, [reloadSummary, reloadQuests]);
   const title = summary.data ? (summary.data.title ?? summary.data.rank.main?.tierTitle) : null;
   const { region, error: regionError, retry } = useViewRegion();
   const { coords } = useMyCoords();
@@ -295,6 +308,17 @@ export function HomePage() {
           </p>
         )}
 
+        {quests.data && (
+          <QuestButton
+            data={quests.data}
+            onClick={() => {
+              tapRequest.current?.abort();
+              if (quests.data) markQuestsSeen(quests.data);
+              setQuestOpen(true);
+            }}
+          />
+        )}
+
         {region && (
           <button
             type="button"
@@ -316,6 +340,9 @@ export function HomePage() {
       <NearbySheet places={nearby} onPick={pickNearby} onClose={closeNearby} />
       <PreviewSheet restaurantId={selectedId} coords={live ?? coords} onClose={closePreview} />
       <RegionSelectSheet open={regionOpen} onClose={() => setRegionOpen(false)} />
+      {quests.data && (
+        <QuestSheet data={quests.data} open={questOpen} onClose={() => setQuestOpen(false)} />
+      )}
     </div>
   );
 }

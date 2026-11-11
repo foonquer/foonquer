@@ -111,6 +111,8 @@ describe('SET-02 PATCH /users/me/notification-settings', () => {
       rankAlarm: false,
       marketingAlarm: false,
       marketingConsentChangedAt: null,
+      questEnabled: true,
+      personalizedReco: true,
     });
     expect(await marketingRows(me.id)).toHaveLength(0);
   });

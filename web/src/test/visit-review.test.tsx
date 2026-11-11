@@ -768,6 +768,54 @@ describe('방문 인증', () => {
 });
 
 describe('별점 → 정복 → 세부평가 → 적립', () => {
+  it('맞춤 퀘스트를 깼으면 퀘스트 완료 화면부터 보여 준다', async () => {
+    mockApi({
+      'GET /visit-verifications/:id': ok(verification()),
+      'POST /visits/:id/rating': ok({
+        reviewId: 50,
+        visitId: 31,
+        overallScore: 4,
+        restaurant: { restaurantId: 7, name: '새맛집' },
+        conquest: {
+          isNewConquest: true,
+          isFirstEver: true,
+          sigunguId: 3,
+          sigunguName: '강서구',
+          conquestCount: 1,
+          rank: 1,
+          previousRank: null,
+          topPercent: 100,
+          tier: 'MUKJJANG',
+          tierTitle: '강서구의 먹짱',
+          nextTier: null,
+        },
+        rewards: { point: 100, levelUp: null },
+        celebrations: { tierUp: null, backgroundUnlocked: null, achievements: [] },
+        nextReward: null,
+        quest: {
+          completed: [
+            {
+              questId: 21,
+              typeName: '첫 평가자',
+              levelName: '쉬움',
+              title: '새맛집 첫 평가자 되기',
+              rewardPoint: 50,
+              isBonus: false,
+            },
+          ],
+          week: { baseCount: 2, doneCount: 1, boxId: null, streak: 0 },
+          bonusQuest: null,
+          achievements: [],
+        },
+      }),
+    });
+    const { router } = renderRoute('/visits/31/rating');
+    fireEvent.click(await screen.findByRole('button', { name: '4점' }));
+    fireEvent.click(screen.getByRole('button', { name: '이 별점으로 정복하기' }));
+    expect(await screen.findByText('첫 평가자 성공!')).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/visits/31/quest');
+  });
+
   it('맛 별점을 고르면 정복하고, 세부평가를 남기면 포인트를 받는다', async () => {
     let rated = false;
     const server = mockApi({

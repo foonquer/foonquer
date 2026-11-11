@@ -216,6 +216,22 @@ const rewardPolicies = [
     dailyLimit: null,
     description: '아이템 상자 (줄 아이템이 없을 때)',
   },
+  // 맞춤 퀘스트 (피그마 12, 숫자는 나중에 조정). 보상은 별점 값과 상관없이 준다
+  { reason: 'QUEST_EASY', point: 50, exp: 0, dailyLimit: null, description: '퀘스트 완료 (쉬움)' },
+  {
+    reason: 'QUEST_EXPLORE',
+    point: 100,
+    exp: 0,
+    dailyLimit: null,
+    description: '퀘스트 완료 (탐험)',
+  },
+  {
+    reason: 'QUEST_CHALLENGE',
+    point: 150,
+    exp: 0,
+    dailyLimit: null,
+    description: '퀘스트 완료 (도전)',
+  },
 ];
 
 async function seedRewardPolicies(prisma: PrismaClient) {
@@ -592,6 +608,23 @@ const achievements = [
     conditionType: 'SEASON_RANK',
     conditionValue: 1,
     rewardPoint: 500,
+  },
+  // 맞춤 퀘스트 (2026-11-10). 이미 넣은 업적의 sort_order와 겹치지 않게 맨 뒤에 둔다
+  {
+    code: 'QUEST_STREAK_4',
+    name: '꾸준한 탐험가',
+    description: '4주 연속 이번 주 퀘스트를 모두 완료',
+    conditionType: 'QUEST_STREAK',
+    conditionValue: 4,
+    rewardPoint: 200,
+  },
+  {
+    code: 'QUEST_PLACES_10',
+    name: '새 맛 수집가',
+    description: '퀘스트로 서로 다른 가게 10곳 정복',
+    conditionType: 'QUEST_PLACES',
+    conditionValue: 10,
+    rewardPoint: 200,
   },
 ];
 

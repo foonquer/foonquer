@@ -62,7 +62,11 @@ export function RatingPage() {
     setSaving(true);
     try {
       const result = await rateVisit(visitId, score);
-      navigate(`/visits/${visitId}/conquered`, { replace: true, state: result });
+      // 퀘스트를 깼으면 퀘스트 완료(·주간 상자)를 먼저 보여 주고 정복 결과로 이어 간다
+      navigate(`/visits/${visitId}/${result.quest ? 'quest' : 'conquered'}`, {
+        replace: true,
+        state: result,
+      });
     } catch (err) {
       setSaving(false);
       if (err instanceof ApiError && err.code === 'ALREADY_RATED') {

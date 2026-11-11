@@ -15,6 +15,7 @@ import {
 } from './modules/mukkaebi/mukkaebi.router';
 import { notificationRouter } from './modules/notification/notification.router';
 import { profileRouter, reportRouter } from './modules/profile/profile.router';
+import { questRouter } from './modules/quest/quest.router';
 import { myRankingRouter, rankingRouter, seasonRouter } from './modules/ranking/ranking.router';
 import {
   restaurantReviewRouter,
@@ -63,6 +64,7 @@ router.use('/review-aspects', reviewAspectRouter);
 router.use('/reports', reportRouter);
 router.use('/seasons', seasonRouter);
 router.use('/rankings', rankingRouter);
+router.use('/quests', questRouter);
 router.use('/characters', characterRouter);
 router.use('/shop', shopRouter);
 router.use('/points', pointRouter);

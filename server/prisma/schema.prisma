@@ -51,6 +51,10 @@ model Member {
   weightPortion           Int                       @default(1) @map("weight_portion") @db.TinyInt
   weightService           Int                       @default(1) @map("weight_service") @db.TinyInt
   weightPrice             Int                       @default(1) @map("weight_price") @db.TinyInt
+  /// 맞춤 퀘스트 받기 (피그마 12. 설정 "맞춤 퀘스트") — 끄면 홈 퀘스트 아이콘이 사라지고 새 퀘스트를 받지 않는다
+  questEnabled            Boolean                   @default(true) @map("quest_enabled")
+  /// 방문 기록으로 맞춤 추천 — 끄면 퀘스트가 내 기록 대신 동네 인기순 일반 추천으로 바뀐다. 기록은 다른 사람에게 안 보인다
+  personalizedReco        Boolean                   @default(true) @map("personalized_reco")
   /// P 프로필 설정 전 / A 활성 / S 이용 정지 / D 탈퇴
   status                  String                    @default("P") @db.Char(1)
   /// U 일반 회원 / A 운영자 — /api/v1/admin을 쓸 수 있다 (v1.3). 운영자는 DB에서 직접 지정한다
@@ -92,6 +96,9 @@ model Member {
   activityLogs            MemberActivityLog[]
   picks                   MemberPick[]
   itemBoxes               MemberItemBox[]
+  questWeeks              QuestWeek[]
+  quests                  Quest[]
+  questDislikes           QuestDislike[]
 
   @@map("member")
 }
@@ -240,6 +247,7 @@ model Region {
   seasonResults             SeasonResult[]
   mukkaebis                 Mukkaebi[]
   memberRegionBackgrounds   MemberRegionBackground[]
+  quests                    Quest[]
 
   @@index([parentId, name], map: "region_parent_name_idx")
   @@index([level], map: "region_level_idx")
@@ -284,48 +292,50 @@ model Category {
 }
 
 model Restaurant {
-  id                BigInt                 @id @default(autoincrement())
+  id               BigInt                 @id @default(autoincrement())
   /// 공공데이터 소상공인시장진흥공단 상가(상권)정보의 상가업소번호 — 주기 작업 store-import가 이 번호로 가게를 갱신한다. 카카오에서 저장했던 옛 가게 중 공공데이터와 이어지지 않은 것만 null
-  bizesId           String?                @unique @map("bizes_id") @db.VarChar(30)
+  bizesId          String?                @unique @map("bizes_id") @db.VarChar(30)
   /// 카카오 장소 ID — 카카오 결과는 저장하면 안 되고 ID만 저장할 수 있다. 음식점 상세(REST-01)에서 카카오로 같은 가게를 처음 찾았을 때 저장. 못 찾았으면 null
-  kakaoPlaceId      String?                @unique @map("kakao_place_id") @db.VarChar(20)
+  kakaoPlaceId     String?                @unique @map("kakao_place_id") @db.VarChar(20)
   /// 상호명 + 지점명 (공공데이터)
-  name              String                 @db.VarChar(100)
+  name             String                 @db.VarChar(100)
   /// 공공데이터 업종 소분류를 우리 카테고리로 매핑
-  categoryId        Int?                   @map("category_id")
+  categoryId       Int?                   @map("category_id")
   /// 공공데이터 업종 소분류 이름. 예) 국수/칼국수 — 맛집 검색(SEARCH-02)에서 검색어와 비교한다
-  categoryDetail    String?                @map("category_detail") @db.VarChar(100)
-  roadAddress       String?                @map("road_address") @db.VarChar(255)
-  jibunAddress      String?                @map("jibun_address") @db.VarChar(255)
+  categoryDetail   String?                @map("category_detail") @db.VarChar(100)
+  roadAddress      String?                @map("road_address") @db.VarChar(255)
+  jibunAddress     String?                @map("jibun_address") @db.VarChar(255)
   /// 동 (level = 3)
-  regionId          Int                    @map("region_id")
+  regionId         Int                    @map("region_id")
   /// 구 (level = 2) — 랭킹·검색·로컬 판정에 자주 쓰여서 따로 둔다
-  sigunguId         Int                    @map("sigungu_id")
+  sigunguId        Int                    @map("sigungu_id")
   /// 현장 인증 거리 계산의 기준 좌표
-  lat               Decimal                @db.Decimal(10, 7)
-  lng               Decimal                @db.Decimal(10, 7)
+  lat              Decimal                @db.Decimal(10, 7)
+  lng              Decimal                @db.Decimal(10, 7)
   /// 사업자등록번호 — 처음 인증된 영수증에서 얻는다. 같은 이름 다른 지점 구분에 사용
-  businessNo        String?                @map("business_no") @db.VarChar(12)
+  businessNo       String?                @map("business_no") @db.VarChar(12)
   /// 영업시간 — 공공데이터·카카오 API가 주지 않으므로 직접 입력한 경우만 (없으면 화면에서 숨김). 형식: 요일(mon~sun)별 open/close 배열, 한국 시간 24시간제. 예) {"mon":[{"open":"11:00","close":"21:00"}],"sun":[]} · 쉬는 요일은 빈 배열, 점심·저녁 따로 영업하면 배열에 2개
-  businessHours     Json?                  @map("business_hours")
+  businessHours    Json?                  @map("business_hours")
   /// 마패가 붙어 있는지 — 표시 중인 restaurant_mapae(status = A)가 있으면 true. 검색 목록·음식점 상세에서 "리뷰 이벤트를 하는 가게입니다"를 보여 줄 때 바로 읽으려고 둔다
-  hasMapae          Boolean                @default(false) @map("has_mapae")
+  hasMapae         Boolean                @default(false) @map("has_mapae")
   /// A 영업 / C 폐업 / H 숨김
-  status            String                 @default("A") @db.Char(1)
-  regDate           DateTime               @default(now()) @map("reg_date")
-  updateDate        DateTime?              @updatedAt @map("update_date")
-  category          Category?              @relation(fields: [categoryId], references: [id])
-  region            Region                 @relation("restaurant_region_id", fields: [regionId], references: [id])
-  sigungu           Region                 @relation("restaurant_sigungu_id", fields: [sigunguId], references: [id])
-  restaurantStat    RestaurantStat?
-  savedRestaurants  SavedRestaurant[]
-  visits            Visit[]
-  conquests         Conquest[]
-  reviews           Review[]
-  mukkaebis         Mukkaebi[]
-  mapaes            RestaurantMapae[]
-  aspectStats       RestaurantAspectStat[]
-  picks             MemberPick[]
+  status           String                 @default("A") @db.Char(1)
+  regDate          DateTime               @default(now()) @map("reg_date")
+  updateDate       DateTime?              @updatedAt @map("update_date")
+  category         Category?              @relation(fields: [categoryId], references: [id])
+  region           Region                 @relation("restaurant_region_id", fields: [regionId], references: [id])
+  sigungu          Region                 @relation("restaurant_sigungu_id", fields: [sigunguId], references: [id])
+  restaurantStat   RestaurantStat?
+  savedRestaurants SavedRestaurant[]
+  visits           Visit[]
+  conquests        Conquest[]
+  reviews          Review[]
+  mukkaebis        Mukkaebi[]
+  mapaes           RestaurantMapae[]
+  aspectStats      RestaurantAspectStat[]
+  picks            MemberPick[]
+  quests           Quest[]                @relation("quest_restaurant_id")
+  doneQuests       Quest[]                @relation("quest_done_restaurant_id")
 
   @@index([sigunguId, categoryId], map: "restaurant_sigungu_category_idx")
   @@index([regionId, categoryId], map: "restaurant_region_category_idx")
@@ -1282,4 +1292,82 @@ model MemberPick {
   @@unique([userId, sortOrder], map: "member_pick_order_uk")
   @@index([restaurantId], map: "member_pick_restaurant_idx")
   @@map("member_pick")
+}
+
+/// 맞춤 퀘스트 한 주 (피그마 12. 맞춤 퀘스트, 2026-11-10). 회원마다 주(KST 월요일 시작)에 1행 — 그 주에 퀘스트를 처음 열 때 만든다
+model QuestWeek {
+  id          BigInt    @id @default(autoincrement())
+  userId      BigInt    @map("user_id")
+  /// 그 주 월요일 (KST)
+  weekStart   DateTime  @map("week_start") @db.Date
+  /// 받은 기본 퀘스트 수 — 지난 4주 평균 방문 (주 0~1회 2개 / 2~3회 3개 / 4회 이상 4개). 고를 가게가 모자라면 그보다 적다
+  baseCount   Int       @map("base_count") @db.TinyInt
+  /// L 활동 적음 / M 보통 / H 많음 (지난 4주 평균 방문)
+  activity    String    @db.Char(1)
+  /// 이번 주 "다른 퀘스트로 바꾸기"를 쓴 시각 (주 1번)
+  swappedAt   DateTime? @map("swapped_at")
+  /// 기본 퀘스트를 모두 깬 시각 — 주간 아이템 상자(member_item_box source QUEST_WEEK)를 준다
+  completedAt DateTime? @map("completed_at")
+  regDate     DateTime  @default(now()) @map("reg_date")
+  user        Member    @relation(fields: [userId], references: [id])
+  quests      Quest[]
+
+  @@unique([userId, weekStart], map: "quest_week_user_week_uk")
+  @@map("quest_week")
+}
+
+/// 퀘스트 한 개. 가게 선택과 순서는 우리 DB와 계산식이 정하고(같은 구 안), 이유 문장도 서버가 만든다
+model Quest {
+  id               BigInt      @id @default(autoincrement())
+  weekId           BigInt      @map("week_id")
+  userId           BigInt      @map("user_id")
+  /// NEW_TASTE 새 맛 탐험 / MY_STANDARD 내 기준 맛집 / WIDEN_MENU 메뉴 넓히기 / LOCAL_PICK 동네 새 가게(맞춤 추천을 껐거나 기록이 모자랄 때)
+  /// / NEXT_DONG 옆 동네 한 바퀴 / TIER_UP 티어 도전 / FIRST_REVIEWER 첫 평가자 / SAVED_VISIT 저장한 곳 가기
+  type             String      @db.VarChar(20)
+  /// E 쉬움 / X 탐험 / C 도전
+  level            String      @db.Char(1)
+  /// 가 볼 가게 — 옆 동네 한 바퀴·티어 도전은 null (그 동·구에서 아무 곳이나)
+  restaurantId     BigInt?     @map("restaurant_id")
+  /// 옆 동네 한 바퀴: 새로 정복할 동 (region.level = 3)
+  regionId         Int?        @map("region_id")
+  /// 깨려면 정복할 곳 수 (가게 퀘스트는 1)
+  target           Int         @default(1) @db.TinyInt
+  progress         Int         @default(0) @db.TinyInt
+  /// "단골 국밥집 말고 새 국밥집"
+  title            String      @db.VarChar(60)
+  /// 목록의 셋째 줄 (예: 최근 한 달 방문의 70%가 같은 국밥집이에요)
+  summary          String      @db.VarChar(100)
+  /// "왜 나에게 왔나요?" 문장 2~3개 (JSON 문자열 배열)
+  reasons          Json
+  /// 깨면 줄 먹포인트 (만들 때 reward_policy QUEST_EASY·EXPLORE·CHALLENGE 값)
+  rewardPoint      Int         @map("reward_point")
+  /// 이번 주 기본 퀘스트를 모두 깬 뒤 열리는 보너스 퀘스트 (주간 상자 조건에는 안 들어간다)
+  isBonus          Boolean     @default(false) @map("is_bonus")
+  /// A 진행 중 / C 완료 / S 다른 퀘스트로 바꿈 / D 관심 없어요
+  status           String      @default("A") @db.Char(1)
+  /// 퀘스트를 깬 가게 (퀘스트 기록 "퀘스트로 간 곳", 업적 "새 맛 수집가")
+  doneRestaurantId BigInt?     @map("done_restaurant_id")
+  completedAt      DateTime?   @map("completed_at")
+  regDate          DateTime    @default(now()) @map("reg_date")
+  week             QuestWeek   @relation(fields: [weekId], references: [id])
+  user             Member      @relation(fields: [userId], references: [id])
+  restaurant       Restaurant? @relation("quest_restaurant_id", fields: [restaurantId], references: [id])
+  doneRestaurant   Restaurant? @relation("quest_done_restaurant_id", fields: [doneRestaurantId], references: [id])
+  region           Region?     @relation(fields: [regionId], references: [id])
+
+  @@index([userId, status], map: "quest_user_status_idx")
+  @@index([userId, restaurantId, regDate], map: "quest_user_restaurant_idx")
+  @@map("quest")
+}
+
+/// "관심 없어요"를 누른 퀘스트 종류 — 많이 누른 종류일수록 덜 추천한다
+model QuestDislike {
+  userId     BigInt   @map("user_id")
+  type       String   @db.VarChar(20)
+  count      Int      @default(1)
+  updateDate DateTime @default(now()) @updatedAt @map("update_date")
+  user       Member   @relation(fields: [userId], references: [id])
+
+  @@id([userId, type])
+  @@map("quest_dislike")
 }

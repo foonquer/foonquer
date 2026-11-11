@@ -34,22 +34,29 @@ async function notificationOf(db: Db, userId: bigint) {
   };
 }
 
-/** SET-01 설정 조회: 알림 3종, 내 동네, 연결된 계정(카카오) */
+/** SET-01 설정 조회: 알림 3종, 맞춤 퀘스트·맞춤 추천, 내 동네, 연결된 계정(카카오) */
 export async function getSettings(userId: bigint) {
   const [notification, localRegions, member] = await Promise.all([
     notificationOf(prisma, userId),
     listLocalRegions(userId),
-    prisma.member.findUniqueOrThrow({ where: { id: userId }, select: { regDate: true } }),
+    prisma.member.findUniqueOrThrow({
+      where: { id: userId },
+      select: { regDate: true, questEnabled: true, personalizedReco: true },
+    }),
   ]);
   return {
     notification,
+    personalization: {
+      questEnabled: member.questEnabled,
+      personalizedReco: member.personalizedReco,
+    },
     localRegions,
     account: { provider: 'KAKAO' as const, joinedAt: toKstIso(member.regDate) },
   };
 }
 
 /**
- * SET-02 알림 설정 변경. 보낸 항목만 바꾼다.
+ * SET-02 알림·맞춤 설정 변경 (알림 3종, 맞춤 퀘스트, 방문 기록으로 맞춤 추천). 보낸 항목만 바꾼다.
  * 이벤트·혜택 알림은 광고성 정보 수신 동의라서 값이 실제로 바뀌면 member_consent(MARKETING)에 새 행을 남긴다.
  */
 export async function updateNotificationSettings(
@@ -60,7 +67,9 @@ export async function updateNotificationSettings(
   if (
     body.conquestAlarm === undefined &&
     body.rankAlarm === undefined &&
-    body.marketingAlarm === undefined
+    body.marketingAlarm === undefined &&
+    body.questEnabled === undefined &&
+    body.personalizedReco === undefined
   ) {
     throw new AppError(UserError.NO_FIELDS_TO_UPDATE);
   }
@@ -83,6 +92,8 @@ export async function updateNotificationSettings(
         conquestAlarm: body.conquestAlarm,
         rankAlarm: body.rankAlarm,
         marketingAlarm: body.marketingAlarm,
+        questEnabled: body.questEnabled,
+        personalizedReco: body.personalizedReco,
       },
     });
     if (marketingChanged) {
@@ -101,12 +112,19 @@ export async function updateNotificationSettings(
     }
 
     const data = await notificationOf(tx, userId);
-    let message = '알림 설정을 바꿨어요.';
+    const personalization = await tx.member.findUniqueOrThrow({
+      where: { id: userId },
+      select: { questEnabled: true, personalizedReco: true },
+    });
+    let message =
+      body.questEnabled === undefined && body.personalizedReco === undefined
+        ? '알림 설정을 바꿨어요.'
+        : '설정을 바꿨어요.';
     if (marketingChanged) {
       message = body.marketingAlarm
         ? '이벤트·혜택 알림 수신에 동의했어요.'
         : '이벤트·혜택 알림 수신을 거부했어요.';
     }
-    return { data, message };
+    return { data: { ...data, ...personalization }, message };
   });
 }

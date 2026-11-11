@@ -10,6 +10,7 @@ import {
   type UnlockedAchievement,
 } from '../achievement/achievement.service';
 import { applyConquest } from '../conquest/conquest.service';
+import { advanceQuests } from '../quest/quest-progress';
 import {
   refreshReviewWeight,
   refreshRestaurantStat,
@@ -93,14 +94,22 @@ export async function rateVisit(
         null,
         now,
       );
+      // 맞춤 퀘스트 진행 (방문 인증 + 맛 별점이 완료 조건)
+      const quest = await advanceQuests(tx, {
+        userId,
+        restaurantId: restaurant.id,
+        isNewConquest: conquest.isNewConquest,
+        isFirstEver: conquest.isFirstEver,
+        now,
+      });
       await refreshReviewWeight(tx, review.id);
       await refreshRestaurantStat(tx, restaurant.id, now);
-      return { review, restaurant, conquest };
+      return { review, restaurant, conquest, quest };
     },
     { timeout: 15_000 },
   );
 
-  const { review, restaurant, conquest } = result;
+  const { review, restaurant, conquest, quest } = result;
   // 정복·보상은 이미 커밋됐다. 보조 정보라 실패해도 null로 응답한다 (다시 보내면 ALREADY_RATED가 되므로)
   const nextReward = await nextConquestReward(prisma, userId, now).catch((err: unknown) => {
     console.error('다음 정복 보상 조회 실패', err);
@@ -133,6 +142,8 @@ export async function rateVisit(
       achievements: conquest.achievements,
     },
     nextReward,
+    /** 이번 정복으로 깬 맞춤 퀘스트 (없으면 null) — 퀘스트 완료·주간 상자 화면 */
+    quest,
   };
 }
 

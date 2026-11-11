@@ -139,7 +139,8 @@ describe('RANK-08·09·11 업적·칭호', () => {
       achieved: boolean;
       progress: { current: number };
     }[];
-    expect(items).toHaveLength(12);
+    // 업적 12개 + 맞춤 퀘스트 업적 2개(꾸준한 탐험가·새 맛 수집가)
+    expect(items).toHaveLength(14);
     expect(items.find((a) => a.code === 'FIRST_CONQUEST')?.achieved).toBe(true);
     expect(items.find((a) => a.code === 'DISTRICT_3')?.progress.current).toBe(1);
     expect(achievements.body.data.representativeTitle).toBe('강서구의 먹짱');

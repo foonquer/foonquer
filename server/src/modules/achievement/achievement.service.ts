@@ -1,5 +1,6 @@
 import type { Db, Tx } from '../../common/db';
 import { objectParticle, withObjectParticle } from '../../common/josa';
+import { kstWeekStartAsDbDate } from '../../common/time';
 import { notify } from '../notification/notify';
 import { addPoint } from '../reward/reward.service';
 
@@ -15,7 +16,9 @@ export type ConditionType =
   | 'REVIEW_TEXT_COUNT'
   | 'REVIEW_PHOTO_COUNT'
   | 'HELPFUL_RECEIVED'
-  | 'SEASON_RANK';
+  | 'SEASON_RANK'
+  | 'QUEST_STREAK'
+  | 'QUEST_PLACES';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -23,6 +26,25 @@ const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 function weekIndex(date: Date) {
   // 1970-01-01(목)에서 3일 당겨 월요일 시작으로 맞춘다
   return Math.floor((date.getTime() + KST_OFFSET_MS + 3 * 24 * 60 * 60 * 1000) / WEEK_MS);
+}
+
+/**
+ * 이번 주 퀘스트를 모두 깬 주가 몇 주 이어지는지 (맞춤 퀘스트). 이번 주를 아직 못 깼으면 지난주부터 센다
+ */
+export async function questStreak(db: Db, userId: bigint, now: Date) {
+  const rows = await db.questWeek.findMany({
+    where: { userId, completedAt: { not: null } },
+    select: { weekStart: true },
+  });
+  const done = new Set(rows.map((r) => r.weekStart.getTime()));
+  let week = kstWeekStartAsDbDate(now).getTime();
+  if (!done.has(week)) week -= WEEK_MS;
+  let streak = 0;
+  while (done.has(week)) {
+    streak += 1;
+    week -= WEEK_MS;
+  }
+  return streak;
 }
 
 /** 이번 주부터 거꾸로 매주 1곳 이상 정복한 주가 몇 주 이어지는지 (이번 주에 아직 없으면 지난주부터 센다) */
@@ -87,6 +109,16 @@ export async function progressOf(
         _sum: { helpfulCount: true },
       });
       return sum._sum.helpfulCount ?? 0;
+    }
+    case 'QUEST_STREAK':
+      return questStreak(db, userId, now);
+    case 'QUEST_PLACES': {
+      const rows = await db.quest.findMany({
+        where: { userId, status: 'C', doneRestaurantId: { not: null } },
+        distinct: ['doneRestaurantId'],
+        select: { doneRestaurantId: true },
+      });
+      return rows.length;
     }
     case 'SEASON_RANK': {
       // 확정된 시즌에서 가장 높았던 순위 (값이 작을수록 좋다) — 진행도는 "달성/미달성"만 본다

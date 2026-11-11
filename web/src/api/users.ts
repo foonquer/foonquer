@@ -232,18 +232,30 @@ export type NotificationSettings = {
   marketingConsentChangedAt: string | null;
 };
 
-/** SET-01 설정 (알림 3종·내 동네·연결된 계정) */
+/** 맞춤 퀘스트 받기, 방문 기록으로 맞춤 추천 (끄면 퀘스트가 동네 일반 추천으로) */
+export type PersonalizationSettings = { questEnabled: boolean; personalizedReco: boolean };
+
+/** SET-01 설정 (알림 3종·맞춤 퀘스트·내 동네·연결된 계정) */
 export const getSettings = () =>
   api.get<{
     notification: NotificationSettings;
+    personalization: PersonalizationSettings;
     localRegions: LocalRegion[];
     account: { provider: 'KAKAO'; joinedAt: string };
   }>('/users/me/settings');
 
-/** SET-02 알림 설정 (보낸 항목만) */
+/** SET-02 알림·맞춤 설정 (보낸 항목만) */
 export const updateNotificationSettings = (
-  body: Partial<Pick<NotificationSettings, 'conquestAlarm' | 'rankAlarm' | 'marketingAlarm'>>,
-) => api.call<NotificationSettings>('PATCH', '/users/me/notification-settings', { body });
+  body: Partial<
+    Pick<NotificationSettings, 'conquestAlarm' | 'rankAlarm' | 'marketingAlarm'> &
+      PersonalizationSettings
+  >,
+) =>
+  api.call<NotificationSettings & PersonalizationSettings>(
+    'PATCH',
+    '/users/me/notification-settings',
+    { body },
+  );
 
 /** SET-03 탈퇴 전 안내 */
 export const getWithdrawalSummary = () =>

@@ -1,6 +1,7 @@
 // 별점·리뷰 API (REVIEW-01~10)
 
 import { api, type Query } from '../lib/api';
+import type { QuestAdvance } from './quests';
 
 export type LevelUp = { from: number; to: number; itemBoxCount: number };
 export type Rewards = { point: number; levelUp: LevelUp | null };
@@ -89,6 +90,8 @@ export type RatingResult = {
   };
   /** 다음 정복 보상: 정복으로 채우는 업적 중 남은 수가 가장 적은 것 */
   nextReward: NextConquestReward | null;
+  /** 이번 정복으로 깬 맞춤 퀘스트 (없으면 null) */
+  quest: QuestAdvance | null;
 };
 
 export type NextConquestReward = {
