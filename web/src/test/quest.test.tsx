@@ -70,6 +70,7 @@ const quest = (over: Partial<Quest> = {}): Quest => ({
     restaurantId: 7,
     name: '옛날순대국',
     categoryName: '한식',
+    imageUrl: null,
     regionName: '등촌동',
     distanceM: 650,
     tasteScore: 4.5,

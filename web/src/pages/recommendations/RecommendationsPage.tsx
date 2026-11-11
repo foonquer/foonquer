@@ -1,13 +1,13 @@
 import { useRef, useState, type PointerEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { getRecommendations, type RecommendationItem } from '../../api/restaurants';
-import mealReco from '../../assets/illust/meal-reco.svg';
 import { AppHeader } from '../../components/AppHeader';
 import { ButtonLink } from '../../components/Button';
 import { FilterChips } from '../../components/Chips';
 import { RegionChip } from '../../components/RegionChip';
 import { RegionSelectSheet } from '../../components/RegionSelectSheet';
 import { Screen } from '../../components/Screen';
+import { FoodImage } from '../../components/FoodImage';
 import { EmptyState, Loading } from '../../components/StateViews';
 import { errorMessage } from '../../lib/api';
 import { formatDistance, formatScore, joinDot } from '../../lib/format';
@@ -130,7 +130,11 @@ function Carousel({ items, reason }: { items: RecommendationItem[]; reason: stri
               aria-label={`${i + 1} / ${items.length}`}
               aria-hidden={i !== index}
             >
-              <img src={mealReco} alt="" className={styles.illust} draggable={false} />
+              <FoodImage
+                imageUrl={item.imageUrl}
+                categoryName={item.categoryName}
+                className={styles.illust}
+              />
               <RecoCard item={item} reason={reason} focusable={i === index} />
             </div>
           ))}

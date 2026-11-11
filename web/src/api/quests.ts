@@ -26,6 +26,8 @@ export type Quest = {
     restaurantId: number;
     name: string;
     categoryName: string | null;
+    /** 대표 사진 (인증 리뷰 사진, 없으면 null) */
+    imageUrl: string | null;
     regionName: string | null;
     /** 내 동네 동 중심에서 거리 (m) */
     distanceM: number | null;

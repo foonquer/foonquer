@@ -64,6 +64,8 @@ export type RestaurantPreview = {
   name: string;
   categoryId: number | null;
   categoryName: string | null;
+  /** 대표 사진 (인증 리뷰 사진, 없으면 null → 음식 종류 그림) */
+  imageUrl: string | null;
   sigunguName: string | null;
   dongName: string | null;
   distanceM: number | null;
@@ -99,6 +101,8 @@ export type RestaurantDetail = {
   status: 'A' | 'C';
   categoryId: number | null;
   categoryName: string | null;
+  /** 대표 사진 (인증 리뷰 사진, 없으면 null → 음식 종류 그림) */
+  imageUrl: string | null;
   /** 공공데이터 업종 소분류. 예) 국수/칼국수 */
   categoryDetail: string | null;
   /** 카카오에서 실시간으로 찾은 전화번호 (저장하지 않는다) */
@@ -161,6 +165,8 @@ export type RestaurantCardItem = {
   name: string;
   categoryId: number | null;
   categoryName: string | null;
+  /** 대표 사진 (인증 리뷰 사진, 없으면 null → 음식 종류 그림) */
+  imageUrl: string | null;
   /** 업종 소분류 (예: 해장국·냉면). 옛 서버 응답에는 없을 수 있다 */
   categoryDetail?: string | null;
   distanceM: number | null;

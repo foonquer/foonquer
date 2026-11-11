@@ -8,9 +8,9 @@ import {
 } from '../../api/restaurants';
 import { IMAGE_ACCEPT, uploadImage } from '../../api/uploads';
 import { checkLocation, completeOnSite, getVerification } from '../../api/visits';
-import mealThumb from '../../assets/illust/meal-thumb.svg';
 import { AppHeader } from '../../components/AppHeader';
 import { Button, ButtonLink } from '../../components/Button';
+import { FoodImage } from '../../components/FoodImage';
 import { Screen } from '../../components/Screen';
 import { EmptyState, Loading } from '../../components/StateViews';
 import { useToast } from '../../components/Toast';
@@ -409,8 +409,8 @@ function OnSite({ r, passed }: { r: RestaurantDetail; passed: PassedCoords | nul
     ]);
   const shop = (distanceM?: number) => (
     <div className={styles.shop}>
-      <span className={styles.shopIcon} aria-hidden="true">
-        <img src={mealThumb} alt="" width={40} height={40} />
+      <span className={styles.shopIcon}>
+        <FoodImage imageUrl={r.imageUrl} categoryName={r.categoryName} />
       </span>
       <div>
         <p className={styles.shopName}>{r.name}</p>

@@ -1,8 +1,8 @@
 import { Link } from 'react-router';
 import type { RestaurantCardItem } from '../api/restaurants';
-import mealThumb from '../assets/illust/meal-thumb.svg';
 import { formatDistance, formatScore, joinDot } from '../lib/format';
 import { ConquestBadge } from './ConquestBadge';
+import { FoodImage } from './FoodImage';
 import styles from './RestaurantCard.module.css';
 
 type Props = {
@@ -24,8 +24,8 @@ export function RestaurantCard({ item, note }: Props) {
 
   return (
     <Link to={`/restaurants/${item.restaurantId}`} className={styles.card}>
-      <span className={styles.thumb} aria-hidden="true">
-        <img src={mealThumb} alt="" />
+      <span className={styles.thumb}>
+        <FoodImage imageUrl={item.imageUrl} categoryName={item.categoryName} />
       </span>
       <span className={styles.text}>
         <span className={styles.name}>{item.name}</span>
