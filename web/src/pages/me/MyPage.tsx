@@ -108,6 +108,7 @@ export function MyPage() {
             },
             { label: '내 리뷰', to: '/me/reviews' },
             { label: '퀘스트 기록', to: '/me/quests' },
+            { label: '내 모임', to: '/me/crews' },
             {
               label: '시즌 기록 · 칭호',
               value: summary ? `칭호 ${summary.titleCount}개` : undefined,

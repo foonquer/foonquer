@@ -58,6 +58,10 @@ export function deepLinkOf(refType: string | null, refId: bigint | null) {
       return `/support?inquiryId=${id}`;
     case 'NOTICE':
       return `/notices?noticeId=${id}`;
+    case 'CREW':
+      return `/crews/${id}`;
+    case 'CREW_INVITE':
+      return `/crews/${id}/invitation`;
     default:
       return null;
   }

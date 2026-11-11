@@ -1,0 +1,911 @@
+/* 피그마 12. 모임 (G1~G6, M1). 종류 색: 친구 파랑 / 가족 주황 / 연인 분홍 */
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px var(--mk-side) 24px;
+}
+
+.step {
+  font-size: 14px;
+  color: var(--mk-muted);
+}
+
+.bigTitle {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.lead {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--mk-muted);
+}
+
+.hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+  text-align: center;
+}
+
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--mk-green-info);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+  text-align: left;
+}
+
+.note > svg {
+  flex-shrink: 0;
+}
+
+.note[data-tone='blue'] {
+  background: #e2ecf8;
+  color: #3d6fb5;
+}
+
+/* 모임원 동그라미 */
+.avatars {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: -6px;
+  border: 2px solid var(--mk-white);
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--mk-white);
+}
+
+.avatar:first-child {
+  margin-left: 0;
+}
+
+.avatars[data-size='md'] .avatar {
+  width: 28px;
+  height: 28px;
+  margin-left: 0;
+  border: 0;
+  font-size: 13px;
+}
+
+.avatars[data-size='lg'] .avatar {
+  width: 36px;
+  height: 36px;
+  margin-left: -10px;
+  border-width: 3px;
+  font-size: 15px;
+}
+
+.avatars[data-size='lg'] .avatar:first-child {
+  margin-left: 0;
+}
+
+/* 모임 종류 (G2, M1) */
+.typeList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.typeCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 16px;
+  border: 1.5px solid var(--mk-line);
+  border-radius: 18px;
+  background: var(--mk-white);
+  text-align: left;
+}
+
+.typeCard[data-on='true'] {
+  border-color: var(--mk-green);
+  background: var(--mk-green-50);
+}
+
+.typeIcon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #e2ecf8;
+  color: #3d6fb5;
+}
+
+.typeIcon[data-type='FAMILY'] {
+  background: #fbebd4;
+  color: #c27a1c;
+}
+
+.typeIcon[data-type='COUPLE'] {
+  background: #fbe3ea;
+  color: #c0587a;
+}
+
+.typeBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.typeName {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.typeName small {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.typeText {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.typeChip {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #e2ecf8;
+  font-size: 11px;
+  font-weight: 700;
+  color: #3d6fb5;
+}
+
+.typeChip[data-type='FAMILY'] {
+  background: #fbebd4;
+  color: #b06d12;
+}
+
+.typeChip[data-type='COUPLE'] {
+  background: #fbe3ea;
+  color: #c0587a;
+}
+
+/* 이름·동네 (G3) */
+.count {
+  font-size: 13px;
+  color: var(--mk-muted);
+}
+
+.fieldLabel {
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.fieldLabel small {
+  margin-left: 6px;
+  font-weight: 400;
+  color: var(--mk-muted);
+}
+
+.sigungus {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldBox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
+  border: 1.5px solid var(--mk-line);
+  border-radius: 14px;
+  background: var(--mk-white);
+  font-size: 16px;
+  color: var(--mk-ink);
+  text-align: left;
+}
+
+.fieldBox[data-on='true'] {
+  border-color: var(--mk-green);
+}
+
+.fieldBox small {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+/* 초대 (G3) */
+.inviteTiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.inviteTiles button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 4px;
+  border: 1px solid var(--mk-line);
+  border-radius: 16px;
+  background: var(--mk-white);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.inviteTiles button:disabled {
+  color: var(--mk-disabled-text);
+}
+
+.inviteTiles button > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--mk-green-100);
+  color: var(--mk-forest);
+}
+
+.inviteTiles small {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--mk-muted);
+}
+
+.inviteForm {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.inviteForm > :first-child {
+  flex: 1;
+}
+
+.memberList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 16px;
+  border-radius: 18px;
+  background: var(--mk-white);
+}
+
+.memberList li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.memberName {
+  flex: 1;
+  font-size: 15px;
+  color: var(--mk-ink);
+}
+
+.memberState {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.memberState[data-state='JOINED'] {
+  color: var(--mk-forest);
+}
+
+/* 모임 퀘스트 카드 (G1) */
+.questCard {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 16px 14px;
+  border: 1px solid var(--mk-line);
+  border-radius: 16px;
+  background: var(--mk-white);
+  text-align: left;
+}
+
+.questCard[data-done='true'] {
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.questCircle {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #e2ecf8;
+  color: #3d6fb5;
+}
+
+.questCircle[data-done='true'] {
+  background: var(--mk-green);
+  color: var(--mk-white);
+}
+
+.questBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.questKind {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.togetherChip {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #e2ecf8;
+  font-size: 11px;
+  font-weight: 700;
+  color: #3d6fb5;
+}
+
+.questTitle {
+  margin-top: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--mk-ink);
+  word-break: keep-all;
+}
+
+.questSummary {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mk-forest);
+}
+
+.questStatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.questSide {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.questSide strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-star);
+}
+
+.questSide span {
+  font-size: 12px;
+  color: var(--mk-subtle);
+}
+
+.questSide [data-done='true'] {
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+/* 퀘스트 시트 탭 (G1) */
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--mk-gray-button);
+}
+
+.tabs button {
+  height: 36px;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.tabs button[aria-selected='true'] {
+  background: var(--mk-white);
+  font-weight: 700;
+  color: var(--mk-ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.crewChips {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.crewChips button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--mk-line);
+  border-radius: 17px;
+  background: var(--mk-white);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.crewChips button[aria-pressed='true'] {
+  border-color: var(--mk-forest);
+  background: var(--mk-forest);
+  color: var(--mk-white);
+}
+
+.questList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.sheetActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* 받은 초대 (G4) */
+.inviteWrap {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  padding: 24px var(--mk-side);
+}
+
+.inviteCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 24px 18px 18px;
+  border-radius: 24px;
+  background: var(--mk-white);
+  text-align: center;
+}
+
+.inviteTitle {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--mk-ink);
+  word-break: keep-all;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.chips span,
+.chip {
+  padding: 3px 9px;
+  border-radius: 10px;
+  background: var(--mk-green-100);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.chips span[data-tone='blue'],
+.chip[data-tone='blue'] {
+  background: #e2ecf8;
+  color: #3d6fb5;
+}
+
+.privacy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--mk-green-50);
+  font-size: 13px;
+  color: var(--mk-ink);
+  text-align: left;
+}
+
+.privacy li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.privacy svg {
+  flex-shrink: 0;
+  color: var(--mk-green);
+}
+
+.privacy li[data-off='true'] svg {
+  color: var(--mk-coral);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.actions > * {
+  flex: 1;
+}
+
+/* 모임 공간 (G5) */
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--mk-ink);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 14px;
+  border-radius: 18px;
+  background: var(--mk-white);
+}
+
+.headBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.headTitle {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.headSub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.headLink {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+.panel {
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--mk-white);
+}
+
+.panelHead {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.panelEmpty {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--mk-muted);
+}
+
+.panelEmpty a {
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+.questRows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.questRows li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.questRows li[data-done='true'] strong {
+  color: var(--mk-muted);
+}
+
+.rowIcon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #e2ecf8;
+  color: #3d6fb5;
+}
+
+.rowBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+
+.rowBody strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.rowBody small {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.sectionHead small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--mk-muted);
+}
+
+.map {
+  position: relative;
+  height: 180px;
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.conquests {
+  display: flex;
+  flex-direction: column;
+}
+
+.conquests a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+}
+
+.score {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.more {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+.badgeCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--mk-cream);
+}
+
+.badgeIcon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--mk-white);
+  color: #b06d12;
+}
+
+.badgeTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #b06d12;
+}
+
+.badgeText {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+/* 함께 정복 완료 (G6) */
+.togetherHero {
+  position: relative;
+}
+
+.heroAvatars {
+  position: absolute;
+  bottom: -14px;
+  left: 50%;
+  display: flex;
+  transform: translateX(-50%);
+}
+
+.heroAvatars span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-left: -6px;
+  border: 3px solid var(--mk-bg);
+  border-radius: 50%;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--mk-white);
+}
+
+.heroAvatars span:first-child {
+  margin-left: 0;
+}
+
+.badgeIconSmall {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e2ecf8;
+  color: #3d6fb5;
+}
+
+/* 내 모임 (M1) */
+.crewCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--mk-white);
+}
+
+.crewBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.crewBody > small {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.crewName {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.crewFoot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.questChip {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--mk-cream);
+  font-size: 11px;
+  font-weight: 700;
+  color: #b06d12;
+}
+
+.chevron {
+  font-size: 22px;
+  color: var(--mk-muted);
+}
+
+.invitations {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 16px;
+  border-radius: 18px;
+  background: var(--mk-green-50);
+}
+
+.invitations a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.inviteAvatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mk-white);
+}

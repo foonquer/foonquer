@@ -226,6 +226,20 @@ const rewardPolicies = [
     description: '퀘스트 완료 (탐험)',
   },
   {
+    reason: 'CREW_TOGETHER',
+    point: 100,
+    exp: 0,
+    dailyLimit: null,
+    description: '모임 퀘스트 함께 정복 (각자)',
+  },
+  {
+    reason: 'CREW_SPLIT',
+    point: 80,
+    exp: 0,
+    dailyLimit: null,
+    description: '모임 퀘스트 맛집 나눠 찾기 (각자)',
+  },
+  {
     reason: 'QUEST_CHALLENGE',
     point: 150,
     exp: 0,

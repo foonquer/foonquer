@@ -491,6 +491,10 @@
   gap: 12px;
 }
 
+.panelRow + .panelRow {
+  margin-top: 12px;
+}
+
 .panelTitle {
   font-size: 15px;
   font-weight: 700;

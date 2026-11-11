@@ -229,13 +229,15 @@ export type NotificationSettings = {
   conquestAlarm: boolean;
   rankAlarm: boolean;
   marketingAlarm: boolean;
+  /** 모임 퀘스트 · 초대 알림 */
+  crewAlarm: boolean;
   marketingConsentChangedAt: string | null;
 };
 
 /** 맞춤 퀘스트 받기, 방문 기록으로 맞춤 추천 (끄면 퀘스트가 동네 일반 추천으로) */
 export type PersonalizationSettings = { questEnabled: boolean; personalizedReco: boolean };
 
-/** SET-01 설정 (알림 3종·맞춤 퀘스트·내 동네·연결된 계정) */
+/** SET-01 설정 (알림 4종·맞춤 퀘스트·내 동네·연결된 계정) */
 export const getSettings = () =>
   api.get<{
     notification: NotificationSettings;
@@ -247,7 +249,7 @@ export const getSettings = () =>
 /** SET-02 알림·맞춤 설정 (보낸 항목만) */
 export const updateNotificationSettings = (
   body: Partial<
-    Pick<NotificationSettings, 'conquestAlarm' | 'rankAlarm' | 'marketingAlarm'> &
+    Pick<NotificationSettings, 'conquestAlarm' | 'rankAlarm' | 'marketingAlarm' | 'crewAlarm'> &
       PersonalizationSettings
   >,
 ) =>

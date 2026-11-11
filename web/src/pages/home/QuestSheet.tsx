@@ -1,7 +1,14 @@
+import { useState } from 'react';
 import { Link } from 'react-router';
+import { getCrewQuests } from '../../api/crews';
 import type { CurrentQuests } from '../../api/quests';
 import { BottomSheet } from '../../components/BottomSheet';
+import { ButtonLink } from '../../components/Button';
+import { errorMessage } from '../../lib/api';
 import { dDay, hasNewQuests } from '../../lib/quest';
+import { useAsync } from '../../lib/useAsync';
+import { CrewQuestCard, CrewTypeIcon } from '../crew/CrewParts';
+import crew from '../crew/Crew.module.css';
 import { QuestCard } from '../quest/QuestCard';
 import { FlagIcon, GiftIcon } from '../quest/QuestIcons';
 import quest from '../quest/Quest.module.css';
@@ -45,7 +52,68 @@ export function QuestButton({ data, onClick }: { data: CurrentQuests; onClick: (
   );
 }
 
-/** 이번 주 퀘스트 시트 (피그마 Q2) */
+/** 퀘스트 시트의 모임 퀘스트 탭 (피그마 G1): 모임 고르기 · 모임 퀘스트 · 모임 공간 열기 / 새 모임 만들기 */
+function CrewQuestTab({ data }: { data: Awaited<ReturnType<typeof getCrewQuests>> }) {
+  const [crewId, setCrewId] = useState<number | null>(null);
+  const picked = data.items.find((c) => c.crewId === crewId) ?? data.items[0];
+  if (!picked) {
+    return (
+      <>
+        <p className={quest.empty}>친구·가족·연인과 모임을 만들면 같이 정복하는 퀘스트를 받아요.</p>
+        <div className={crew.sheetActions}>
+          <ButtonLink to="/crews/join" variant="white" size="md">
+            초대 코드로 참여
+          </ButtonLink>
+          <ButtonLink to="/crews/new" size="md">
+            새 모임 만들기
+          </ButtonLink>
+        </div>
+      </>
+    );
+  }
+  return (
+    <>
+      {data.items.length > 1 && (
+        <div className={crew.crewChips} aria-label="모임 고르기">
+          {data.items.map((c) => (
+            <button
+              key={c.crewId}
+              type="button"
+              aria-pressed={c.crewId === picked.crewId}
+              onClick={() => setCrewId(c.crewId)}
+            >
+              <CrewTypeIcon type={c.type} size={16} />
+              {c.name} {c.memberCount}
+            </button>
+          ))}
+        </div>
+      )}
+      {picked.quests.length === 0 ? (
+        <p className={quest.empty}>
+          모임원이 2명 이상이면 모임 퀘스트를 받아요.
+          <br />
+          <Link to={`/crews/${picked.crewId}/invite`}>모임원 초대하기</Link>
+        </p>
+      ) : (
+        <div className={crew.questList}>
+          {picked.quests.map((q) => (
+            <CrewQuestCard key={q.crewQuestId} quest={q} members={picked.members} />
+          ))}
+        </div>
+      )}
+      <div className={crew.sheetActions}>
+        <ButtonLink to={`/crews/${picked.crewId}`} variant="white" size="md">
+          모임 공간 열기
+        </ButtonLink>
+        <ButtonLink to="/crews/new" size="md">
+          새 모임 만들기
+        </ButtonLink>
+      </div>
+    </>
+  );
+}
+
+/** 이번 주 퀘스트 시트 (피그마 Q2, 모임 퀘스트 탭은 G1) */
 export function QuestSheet({
   data,
   open,
@@ -56,6 +124,13 @@ export function QuestSheet({
   onClose: () => void;
 }) {
   const week = data.week;
+  const [tab, setTab] = useState<'mine' | 'crew'>('mine');
+  // 시트를 열 때마다 모임 퀘스트를 새로 받는다 (탭 이름의 수에도 쓴다)
+  const crews = useAsync(() => (open ? getCrewQuests() : Promise.resolve(null)), [open]);
+  const crewActive = (crews.data?.items ?? []).reduce(
+    (sum, c) => sum + c.quests.filter((q) => q.status === 'ACTIVE').length,
+    0,
+  );
   return (
     <BottomSheet open={open} onClose={onClose} label="이번 주 퀘스트" dim="light">
       <div className={quest.sheetHead}>
@@ -72,7 +147,34 @@ export function QuestSheet({
         )}
       </div>
 
-      {!week ? (
+      <div className={crew.tabs} role="tablist" aria-label="퀘스트 종류">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'mine'}
+          onClick={() => setTab('mine')}
+        >
+          내 퀘스트{week && week.baseCount > 0 ? ` ${week.doneCount}/${week.baseCount}` : ''}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'crew'}
+          onClick={() => setTab('crew')}
+        >
+          모임 퀘스트{crewActive > 0 ? ` · ${crewActive}` : ''}
+        </button>
+      </div>
+
+      {tab === 'crew' ? (
+        crews.error ? (
+          <p className={quest.empty}>{errorMessage(crews.error)}</p>
+        ) : crews.data ? (
+          <CrewQuestTab data={crews.data} />
+        ) : (
+          <p className={quest.empty}>불러오는 중…</p>
+        )
+      ) : !week ? (
         <p className={quest.empty}>
           내 동네를 정하면 그 구 안에서 퀘스트를 받아요.
           <br />

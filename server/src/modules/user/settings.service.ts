@@ -24,17 +24,18 @@ async function marketingConsentChangedAt(db: Db, userId: bigint) {
 async function notificationOf(db: Db, userId: bigint) {
   const member = await db.member.findUniqueOrThrow({
     where: { id: userId },
-    select: { conquestAlarm: true, rankAlarm: true, marketingAlarm: true },
+    select: { conquestAlarm: true, rankAlarm: true, marketingAlarm: true, crewAlarm: true },
   });
   return {
     conquestAlarm: member.conquestAlarm,
     rankAlarm: member.rankAlarm,
     marketingAlarm: member.marketingAlarm,
+    crewAlarm: member.crewAlarm,
     marketingConsentChangedAt: toKstIsoOrNull(await marketingConsentChangedAt(db, userId)),
   };
 }
 
-/** SET-01 설정 조회: 알림 3종, 맞춤 퀘스트·맞춤 추천, 내 동네, 연결된 계정(카카오) */
+/** SET-01 설정 조회: 알림 4종(정복·순위·마케팅·모임), 맞춤 퀘스트·맞춤 추천, 내 동네, 연결된 계정(카카오) */
 export async function getSettings(userId: bigint) {
   const [notification, localRegions, member] = await Promise.all([
     notificationOf(prisma, userId),
@@ -56,7 +57,7 @@ export async function getSettings(userId: bigint) {
 }
 
 /**
- * SET-02 알림·맞춤 설정 변경 (알림 3종, 맞춤 퀘스트, 방문 기록으로 맞춤 추천). 보낸 항목만 바꾼다.
+ * SET-02 알림·맞춤 설정 변경 (알림 4종, 맞춤 퀘스트, 방문 기록으로 맞춤 추천). 보낸 항목만 바꾼다.
  * 이벤트·혜택 알림은 광고성 정보 수신 동의라서 값이 실제로 바뀌면 member_consent(MARKETING)에 새 행을 남긴다.
  */
 export async function updateNotificationSettings(
@@ -68,6 +69,7 @@ export async function updateNotificationSettings(
     body.conquestAlarm === undefined &&
     body.rankAlarm === undefined &&
     body.marketingAlarm === undefined &&
+    body.crewAlarm === undefined &&
     body.questEnabled === undefined &&
     body.personalizedReco === undefined
   ) {
@@ -92,6 +94,7 @@ export async function updateNotificationSettings(
         conquestAlarm: body.conquestAlarm,
         rankAlarm: body.rankAlarm,
         marketingAlarm: body.marketingAlarm,
+        crewAlarm: body.crewAlarm,
         questEnabled: body.questEnabled,
         personalizedReco: body.personalizedReco,
       },

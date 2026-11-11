@@ -23,6 +23,11 @@ export function eulReul(word: string) {
   return `${word}${finalConsonant(word) === 0 ? '를' : '을'}`;
 }
 
+/** 과/와 (수영과, 지현이와 → 지현과, 민지와) */
+export function gwaWa(word: string) {
+  return `${word}${finalConsonant(word) === 0 ? '와' : '과'}`;
+}
+
 /** 은/는 (새맛집은, 마포숯불갈비는) */
 export function eunNeun(word: string) {
   return `${word}${finalConsonant(word) === 0 ? '는' : '은'}`;

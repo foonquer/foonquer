@@ -19,14 +19,16 @@ export type NotificationType =
   | 'ACHIEVEMENT'
   | 'NOTICE'
   | 'EVENT'
-  | 'INQUIRY_ANSWER';
+  | 'INQUIRY_ANSWER'
+  | 'CREW_INVITE'
+  | 'CREW_TOGETHER';
 
 export interface NotificationInput {
   category: NotificationCategory;
   type: NotificationType;
   title: string;
   content: string;
-  /** 눌렀을 때 갈 곳 (NOTI-01 deepLink를 이것으로 만든다) — RESTAURANT / REVIEW / SIGUNGU / SEASON / INQUIRY / NOTICE / ITEM */
+  /** 눌렀을 때 갈 곳 (NOTI-01 deepLink를 이것으로 만든다) — RESTAURANT / REVIEW / SIGUNGU / SEASON / INQUIRY / NOTICE / ITEM / CREW / CREW_INVITE */
   refType?: string;
   refId?: bigint | number;
 }

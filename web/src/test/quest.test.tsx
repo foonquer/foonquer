@@ -385,6 +385,7 @@ describe('퀘스트 기록 · 설정 (M2·M3)', () => {
           conquestAlarm: true,
           rankAlarm: true,
           marketingAlarm: false,
+          crewAlarm: true,
           marketingConsentChangedAt: null,
         },
         personalization: { questEnabled: true, personalizedReco: true },
@@ -404,7 +405,7 @@ describe('퀘스트 기록 · 설정 (M2·M3)', () => {
       ),
     });
     renderRoute('/me/settings');
-    const section = await screen.findByRole('region', { name: '맞춤 퀘스트' });
+    const section = await screen.findByRole('region', { name: '맞춤 퀘스트 · 모임' });
     fireEvent.click(await within(section).findByRole('switch', { name: '맞춤 퀘스트' }));
     expect(await screen.findByText('설정을 바꿨어요.')).toBeInTheDocument();
     expect(server.calls('PATCH /users/me/notification-settings')[0].body).toEqual({
