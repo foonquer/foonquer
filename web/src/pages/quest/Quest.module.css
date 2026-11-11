@@ -1,0 +1,725 @@
+/* 피그마 12. 맞춤 퀘스트 (Q1~Q5, M2). 난이도 색: 쉬움 초록 / 탐험 파랑 / 도전 주황 */
+.card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 16px 14px;
+  border: 1px solid var(--mk-line);
+  border-radius: 16px;
+  background: var(--mk-white);
+  text-align: left;
+}
+
+.card[data-done='true'] {
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.levelCircle {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--mk-green-100);
+  color: var(--mk-forest);
+}
+
+.levelCircle[data-level='EXPLORE'] {
+  background: #e2ecf8;
+  color: #3d6fb5;
+}
+
+.levelCircle[data-level='CHALLENGE'] {
+  background: #fbebd4;
+  color: #c27a1c;
+}
+
+.levelCircle[data-done='true'] {
+  background: var(--mk-green);
+  color: var(--mk-white);
+}
+
+.cardBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardKind {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.levelChip {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--mk-green-100);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.levelChip[data-level='EXPLORE'] {
+  background: #e2ecf8;
+  color: #3d6fb5;
+}
+
+.levelChip[data-level='CHALLENGE'] {
+  background: #fbebd4;
+  color: #b06d12;
+}
+
+.cardTitle {
+  margin-top: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--mk-ink);
+  word-break: keep-all;
+}
+
+.card[data-done='true'] .cardTitle {
+  color: var(--mk-muted);
+}
+
+.cardPlace {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mk-forest);
+}
+
+.cardSummary {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.cardProgress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.cardProgress > span {
+  flex: 1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--mk-divider);
+}
+
+.cardProgress > span > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--mk-green);
+}
+
+.cardSide {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.cardSide strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-star);
+}
+
+.cardSide strong[data-done='true'] {
+  color: var(--mk-muted);
+}
+
+.cardSide span {
+  font-size: 12px;
+  color: var(--mk-subtle);
+}
+
+.cardSide span[data-done='true'] {
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+/* 이번 주 퀘스트 시트 (Q2) */
+.sheetHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sheetTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.sheetSub {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--mk-muted);
+}
+
+.activity {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: var(--mk-green-100);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--mk-cream);
+}
+
+.boxIcon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--mk-white);
+  color: #b06d12;
+}
+
+.boxBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.boxTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #b06d12;
+}
+
+.boxBar {
+  display: block;
+  height: 8px;
+  margin: 8px 0 6px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: rgba(222, 152, 57, 0.18);
+}
+
+.boxBar > span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--mk-star);
+}
+
+.boxText {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.empty {
+  margin-top: 24px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--mk-muted);
+  text-align: center;
+}
+
+/* 퀘스트 상세 (Q3) */
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px var(--mk-side) 24px;
+}
+
+.detailKind {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--mk-muted);
+}
+
+.detailTitle {
+  margin-top: -6px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--mk-ink);
+  word-break: keep-all;
+}
+
+.place {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--mk-white);
+}
+
+.placeThumb {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  background: var(--mk-photo);
+  object-fit: cover;
+}
+
+.placeName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--mk-coral-50);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mk-coral-text);
+}
+
+.badge[data-on='true'] {
+  background: var(--mk-green-100);
+  color: var(--mk-forest);
+}
+
+.placeScore {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.placeScore em {
+  font-style: normal;
+  color: var(--mk-star);
+}
+
+.placeMeta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.why {
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--mk-white);
+}
+
+.whyTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.why ul {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.why li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--mk-ink);
+}
+
+.whyIcon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--mk-green-100);
+  color: var(--mk-forest);
+}
+
+.reward {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--mk-cream);
+  font-size: 14px;
+  font-weight: 700;
+  color: #b06d12;
+}
+
+.condition {
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.actions > * {
+  flex: 1;
+}
+
+.links {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 10px;
+}
+
+.links button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--mk-muted);
+}
+
+.links button:disabled {
+  color: var(--mk-disabled-text);
+}
+
+/* 퀘스트 완료·주간 상자 (Q4·Q5) */
+.done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px var(--mk-side);
+  text-align: center;
+}
+
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: var(--mk-green-100);
+}
+
+.hero img {
+  width: 140px;
+}
+
+.hero[data-tone='box'] {
+  background: #fbebd4;
+  color: #de9839;
+}
+
+.pill {
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: #e2ecf8;
+  font-size: 12px;
+  font-weight: 700;
+  color: #3d6fb5;
+}
+
+.pill[data-tone='box'] {
+  background: var(--mk-cream);
+  color: #b06d12;
+}
+
+.doneTitle {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--mk-ink);
+  word-break: keep-all;
+}
+
+.doneSub {
+  margin-top: -8px;
+  font-size: 14px;
+  color: var(--mk-muted);
+}
+
+.panel {
+  width: 100%;
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--mk-white);
+  text-align: left;
+}
+
+.panelRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.panelTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.panelTitle[data-tone='point'] {
+  color: #b06d12;
+}
+
+.panelText {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+.panelHead {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.panelHead strong {
+  color: var(--mk-forest);
+}
+
+.panelHead em {
+  font-style: normal;
+  font-size: 12px;
+  color: #b06d12;
+}
+
+.segments {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 8px;
+}
+
+.segments span {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--mk-divider);
+}
+
+.segments span[data-on='true'] {
+  background: var(--mk-green);
+}
+
+.weeks {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 12px 0 10px;
+}
+
+.weeks span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 0;
+  border-radius: 12px;
+  background: var(--mk-bg);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-subtle);
+}
+
+.weeks span[data-on='true'] {
+  background: var(--mk-green-50);
+  color: var(--mk-forest);
+}
+
+.weeks span[data-goal='true'] {
+  color: #b06d12;
+}
+
+.bonus {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #e2ecf8;
+  text-align: left;
+}
+
+.bonusIcon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--mk-white);
+  color: #3d6fb5;
+}
+
+.bonusTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #3d6fb5;
+}
+
+.bonusText {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--mk-muted);
+}
+
+/* 퀘스트 기록 (M2) */
+.streakCard {
+  padding: 18px 16px;
+  border-radius: 20px;
+  background: var(--mk-white);
+}
+
+.streakTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.streakTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.streakSub {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #b06d12;
+}
+
+.medal {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--mk-cream);
+  color: #c27a1c;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.stats div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 4px;
+  border-radius: 12px;
+  background: var(--mk-bg);
+}
+
+.stats strong {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.stats span {
+  font-size: 11px;
+  color: var(--mk-muted);
+}
+
+.goal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #3d6fb5;
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.weekIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--mk-green-100);
+  color: var(--mk-forest);
+}
+
+.weekIcon[data-state='current'] {
+  background: #e2ecf8;
+  color: #3d6fb5;
+}
+
+.weekIcon[data-state='missed'] {
+  background: var(--mk-gray-button);
+  color: var(--mk-subtle);
+}
+
+.weekLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.weekLabel small {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--mk-muted);
+}

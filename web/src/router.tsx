@@ -36,6 +36,9 @@ import { RecommendationListPage } from './pages/recommendations/RecommendationLi
 import { RecommendationsPage } from './pages/recommendations/RecommendationsPage';
 import { RestaurantDetailPage } from './pages/restaurant/RestaurantDetailPage';
 import { ConqueredPage } from './pages/review/ConqueredPage';
+import { QuestCompletePage } from './pages/quest/QuestCompletePage';
+import { QuestDetailPage } from './pages/quest/QuestDetailPage';
+import { QuestRecordsPage, QuestWeekPage } from './pages/quest/QuestRecordsPage';
 import { RatingPage } from './pages/review/RatingPage';
 import { RestaurantReviewsPage } from './pages/review/RestaurantReviewsPage';
 import { ReviewDetailPage } from './pages/review/ReviewDetailPage';
@@ -109,6 +112,9 @@ export const routes: RouteObject[] = [
           { path: '/me/regions', element: <LocalRegionsPage /> },
           { path: '/me/regions/add', element: <AddLocalRegionPage /> },
           { path: '/me/taste', element: <TasteWeightsPage /> },
+          { path: '/me/quests', element: <QuestRecordsPage /> },
+          { path: '/me/quests/:weekId', element: <QuestWeekPage /> },
+          { path: '/quests/:questId', element: <QuestDetailPage /> },
           { path: '/me/reviews', element: <MyReviewsPage /> },
           { path: '/me/conquests', element: <ConquestsPage /> }, // ?seasonId=
           { path: '/me/seasons', element: <SeasonsPage /> },
@@ -140,6 +146,7 @@ export const routes: RouteObject[] = [
           { path: '/visits/:visitId/follow', element: <FollowPage /> },
           { path: '/visits/:visitId/rating', element: <RatingPage /> },
           { path: '/visits/:visitId/conquered', element: <ConqueredPage /> },
+          { path: '/visits/:visitId/quest', element: <QuestCompletePage /> },
           { path: '/visits/:visitId/review', element: <ReviewWritePage /> },
           { path: '/visits/:visitId/reward', element: <RewardPage /> },
           { path: '/restaurants/:restaurantId/reviews', element: <RestaurantReviewsPage /> },

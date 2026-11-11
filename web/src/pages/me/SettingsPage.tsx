@@ -5,6 +5,7 @@ import {
   getSettings,
   getTasteWeights,
   type NotificationSettings,
+  type PersonalizationSettings,
   type TasteWeights,
   updateNotificationSettings,
 } from '../../api/users';
@@ -66,12 +67,17 @@ export function SettingsPage() {
   const notification = settings.data?.notification;
 
   type AlarmKey = 'conquestAlarm' | 'rankAlarm' | 'marketingAlarm';
+  type PersonalKey = keyof PersonalizationSettings;
   // 저장 중인 스위치는 잠근다 (연달아 누르면 요청 순서가 엇갈려 화면과 서버 값이 달라질 수 있다)
-  const [saving, setSaving] = useState<Set<AlarmKey>>(new Set());
-  const toggle = async (key: AlarmKey, value: boolean) => {
+  const [saving, setSaving] = useState<Set<AlarmKey | PersonalKey>>(new Set());
+  const toggle = async (key: AlarmKey | PersonalKey, value: boolean) => {
     // 먼저 바꿔 보여 주고, 실패하면 되돌린다
     const set = (v: boolean) =>
-      settings.mutate((prev) => ({ ...prev, notification: { ...prev.notification, [key]: v } }));
+      settings.mutate((prev) =>
+        key === 'questEnabled' || key === 'personalizedReco'
+          ? { ...prev, personalization: { ...prev.personalization, [key]: v } }
+          : { ...prev, notification: { ...prev.notification, [key]: v } },
+      );
     set(value);
     setSaving((s) => new Set(s).add(key));
     try {
@@ -90,6 +96,18 @@ export function SettingsPage() {
       <Switch
         label={label}
         checked={(notification as NotificationSettings)[key]}
+        onChange={(v) => toggle(key, v)}
+        disabled={saving.has(key)}
+      />
+    ) : undefined,
+  });
+  const personalization = settings.data?.personalization;
+  const personal = (key: PersonalKey, label: string) => ({
+    label,
+    value: personalization ? (
+      <Switch
+        label={label}
+        checked={personalization[key]}
         onChange={(v) => toggle(key, v)}
         disabled={saving.has(key)}
       />
@@ -160,6 +178,29 @@ export function SettingsPage() {
               },
             ]}
           />
+        </MenuSection>
+
+        <MenuSection title="맞춤 퀘스트">
+          <MenuList
+            items={
+              settings.error
+                ? [
+                    {
+                      label: '설정을 불러오지 못했어요',
+                      value: '다시 시도',
+                      onClick: settings.reload,
+                    },
+                  ]
+                : [
+                    personal('questEnabled', '맞춤 퀘스트'),
+                    personal('personalizedReco', '방문 기록으로 맞춤 추천'),
+                  ]
+            }
+          />
+          <p className={styles.note}>
+            방문 기록으로 맞춤 추천을 끄면 퀘스트가 동네 일반 추천으로 바뀌어요. 기록은 다른
+            사람에게 보이지 않아요.
+          </p>
         </MenuSection>
 
         <MenuSection title="알림">

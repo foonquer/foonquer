@@ -182,3 +182,69 @@
 .fab:active {
   background: var(--mk-forest);
 }
+
+/* 퀘스트 아이콘 (피그마 Q1): 내 위치 버튼 위, 흰 동그라미 + 진행 링 + 아래 "1/3" */
+.quest {
+  position: absolute;
+  right: calc(var(--mk-side) - 6px);
+  bottom: 76px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.questRing {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--mk-white);
+  box-shadow: 0 4px 10px rgba(33, 61, 41, 0.16);
+  color: var(--mk-forest);
+}
+
+.questRingSvg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+
+.questTrack,
+.questBar {
+  fill: none;
+  stroke-width: 4;
+}
+
+.questTrack {
+  stroke: var(--mk-green-100);
+}
+
+.questBar {
+  stroke: var(--mk-green);
+  stroke-linecap: round;
+}
+
+.questDot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--mk-white);
+  border-radius: 50%;
+  background: var(--mk-coral);
+}
+
+.questCount {
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: var(--mk-forest);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mk-white);
+}

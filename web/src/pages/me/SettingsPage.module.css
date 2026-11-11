@@ -14,3 +14,11 @@
   font-weight: 400;
   color: var(--mk-muted);
 }
+
+/* 메뉴 카드 아래 회색 안내 (피그마 12. M3 "방문 기록으로 맞춤 추천을 끄면…") */
+.note {
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mk-subtle);
+}
