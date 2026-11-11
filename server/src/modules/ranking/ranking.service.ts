@@ -14,12 +14,18 @@ import type {
 } from './ranking.schema';
 import { RankingError } from './ranking.errors';
 import { findSigungu, resolveSeason, toSeasonView } from './season-view';
-import { nextTierOf, TIER_API, TIER_NAME, type TierCode, tierTitle } from './tier';
+import { nextTierIn, TIER_API, TIER_NAME, type TierCode, tierTitle } from './tier';
 import { loadTitles, titleOf } from './title';
 
-const tierView = (sigunguName: string, tier: string, count: number) => {
+/** 티어 이름·칭호와 다음 티어까지 남은 정복 수 (정복자·먹짱은 그 구 순위로 센다) */
+const tierView = async (
+  at: { seasonId: number; sigunguId: number },
+  sigunguName: string,
+  tier: string,
+  count: number,
+) => {
   const code = tier as TierCode;
-  const next = nextTierOf(code, count);
+  const next = await nextTierIn(prisma, at, code, count);
   return {
     tier: TIER_API[code],
     tierName: TIER_NAME[code],
@@ -29,6 +35,14 @@ const tierView = (sigunguName: string, tier: string, count: number) => {
       : null,
   };
 };
+
+/** 랭킹 줄의 회원 (RANK-05와 같은 값) */
+const PREVIEW_USER = {
+  nickname: true,
+  profileImageKey: true,
+  status: true,
+  mukkaebi: { select: { level: true, hatItem: { select: { code: true } } } },
+} as const;
 
 /** 시즌·구별 활동 탐험가 수 (정복 1곳 이상) */
 async function activeCounts(seasonId: number, sigunguIds: number[]) {
@@ -112,16 +126,23 @@ export async function getMySigunguConquests(userId: bigint, query: SeasonQuery) 
     season: toSeasonView(season),
     totalConquestCount: stats.reduce((sum, s) => sum + s.conquestCount, 0),
     sigunguCount: stats.length,
-    items: rows.map(({ sigungu, stat, isLocal }) => ({
-      sigunguId: sigungu.id,
-      sigunguName: sigungu.name,
-      isLocal,
-      conquestCount: stat?.conquestCount ?? 0,
-      rank: stat?.rankNo ?? null,
-      topPercent: stat?.topPercent?.toNumber() ?? null,
-      activeExplorerCount: actives.get(sigungu.id) ?? 0,
-      ...tierView(sigungu.name, stat?.tier ?? 'B', stat?.conquestCount ?? 0),
-    })),
+    items: await Promise.all(
+      rows.map(async ({ sigungu, stat, isLocal }) => ({
+        sigunguId: sigungu.id,
+        sigunguName: sigungu.name,
+        isLocal,
+        conquestCount: stat?.conquestCount ?? 0,
+        rank: stat?.rankNo ?? null,
+        topPercent: stat?.topPercent?.toNumber() ?? null,
+        activeExplorerCount: actives.get(sigungu.id) ?? 0,
+        ...(await tierView(
+          { seasonId: season.id, sigunguId: sigungu.id },
+          sigungu.name,
+          stat?.tier ?? 'B',
+          stat?.conquestCount ?? 0,
+        )),
+      })),
+    ),
   };
 }
 
@@ -163,21 +184,37 @@ export async function getMySigunguDetail(
           rankNo: { gte: Math.max(1, myRank - 1), lte: myRank + 1 },
         },
         orderBy: { rankNo: 'asc' },
-        include: { user: { select: { nickname: true } } },
+        include: { user: { select: PREVIEW_USER } },
       })
     : [];
-  const preview = [
-    ...(leader && !around.some((s) => s.rankNo === 1) ? [leader] : []),
-    ...around,
-  ].map((s) => ({
+  const first =
+    leader && !around.some((s) => s.rankNo === 1)
+      ? await prisma.seasonRegionStat.findUnique({
+          where: { id: leader.id },
+          include: { user: { select: PREVIEW_USER } },
+        })
+      : null;
+  // RANK-05 줄과 같은 모양 (먹깨비 모자·티어 이름까지)
+  const preview = [...(first ? [first] : []), ...around].map((s) => ({
     rank: s.rankNo,
-    userId: s.userId,
-    nickname: s.user.nickname,
+    userId: s.user.status === 'D' ? null : s.userId,
+    nickname: s.user.status === 'D' ? '탈퇴한 탐험가' : s.user.nickname,
+    profileImageUrl: publicImageUrl(s.user.profileImageKey),
+    mukkaebi: {
+      level: s.user.mukkaebi?.level ?? 1,
+      hatCode: s.user.mukkaebi?.hatItem?.code ?? null,
+    },
     conquestCount: s.conquestCount,
     tier: TIER_API[s.tier as TierCode],
+    tierName: TIER_NAME[s.tier as TierCode],
     isMe: s.userId === userId,
   }));
-  const tier = tierView(sigungu.name, mine?.tier ?? 'B', count);
+  const tier = await tierView(
+    { seasonId: season.id, sigunguId },
+    sigungu.name,
+    mine?.tier ?? 'B',
+    count,
+  );
   return {
     season: toSeasonView(season),
     sigunguId: sigungu.id,
@@ -574,7 +611,12 @@ export async function getSeasonRecords(userId: bigint) {
                 sigunguId: best.sigungu.id,
                 sigunguName: best.sigungu.name,
                 rank: best.rankNo,
-                ...tierView(best.sigungu.name, best.tier, best.conquestCount),
+                ...(await tierView(
+                  { seasonId: season.id, sigunguId: best.sigungu.id },
+                  best.sigungu.name,
+                  best.tier,
+                  best.conquestCount,
+                )),
               }
             : null,
         }
