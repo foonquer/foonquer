@@ -293,7 +293,8 @@ async function replaceQuest(userId: bigint, questId: bigint, mode: 'SWAP' | 'DIS
           update: { count: { increment: 1 } },
           create: { userId, type: quest.type },
         });
-      } else {
+      } else if (quest.type !== 'TIER_UP') {
+        // 바꾸기는 같은 종류의 다른 가게·동도 된다. 티어 도전은 가게·동이 없어 다시 고르면 같은 퀘스트라 뺀다
         skip.delete(quest.type as QuestType);
       }
       const picked = await draftQuest(

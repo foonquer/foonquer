@@ -364,6 +364,70 @@ describe('QUEST-02~04 상세·바꾸기·관심 없어요', () => {
   });
 });
 
+describe('QUEST-03·04·06 바꿀 수 없는 경우', () => {
+  it('진행 중·완료·지난 주 퀘스트는 못 바꾸고, 남의 주는 404, 티어 도전은 바꾸면 다른 종류로', async () => {
+    const season = await createActiveSeason(3);
+    const { me, gayang } = await member();
+    // 다음 티어(단골)까지 2곳 → 티어 도전을 다시 만들 수 있는 상태
+    await prisma.seasonRegionStat.create({
+      data: {
+        seasonId: season.id,
+        sigunguId: gayang.parentId ?? 0,
+        userId: me.id,
+        conquestCount: 3,
+      },
+    });
+    const other = await prisma.region.findFirstOrThrow({
+      where: { level: 3, parent: { name: '강서구' }, code: { not: GAYANG } },
+    });
+    for (let i = 0; i < 2; i += 1) await createRestaurant({ dongCode: other.code });
+    const thisWeek = kstWeekStartAsDbDate();
+    const week = await prisma.questWeek.create({
+      data: { userId: me.id, weekStart: thisWeek, baseCount: 3, activity: 'M' },
+    });
+    const base = { weekId: week.id, userId: me.id, summary: '요약', reasons: [], rewardPoint: 100 };
+    const tier = await prisma.quest.create({
+      data: { ...base, type: 'TIER_UP', level: 'C', target: 2, title: '2곳 더 정복하고 단골 되기' },
+    });
+    const started = await prisma.quest.create({
+      data: { ...base, type: 'NEW_TASTE', level: 'X', target: 2, progress: 1, title: '진행 중' },
+    });
+    const done = await prisma.quest.create({
+      data: { ...base, type: 'FIRST_REVIEWER', level: 'E', status: 'C', title: '완료' },
+    });
+    const lastWeek = await prisma.questWeek.create({
+      data: { userId: me.id, weekStart: addDays(thisWeek, -7), baseCount: 1, activity: 'L' },
+    });
+    const old = await prisma.quest.create({
+      data: { ...base, weekId: lastWeek.id, type: 'LOCAL_PICK', level: 'X', title: '지난 주' },
+    });
+
+    const inProgress = await api(me.id).post(`/quests/${started.id}/swap`);
+    expect([inProgress.status, inProgress.body.code]).toEqual([409, 'QUEST_IN_PROGRESS']);
+    for (const q of [done, old]) {
+      const res = await api(me.id).post(`/quests/${q.id}/dismiss`);
+      expect([res.status, res.body.code]).toEqual([409, 'QUEST_NOT_ACTIVE']);
+    }
+    // 못 바꿨으면 바꾸기 횟수·관심 없어요 기록이 남지 않는다
+    expect(
+      (await prisma.questWeek.findUniqueOrThrow({ where: { id: week.id } })).swappedAt,
+    ).toBeNull();
+    expect(await prisma.questDislike.count()).toBe(0);
+
+    const stranger = await createMember();
+    const otherWeek = await api(stranger.id).get(`/quests/weeks/${week.id}`);
+    expect([otherWeek.status, otherWeek.body.code]).toEqual([404, 'QUEST_WEEK_NOT_FOUND']);
+
+    const swapped = await api(me.id).post(`/quests/${tier.id}/swap`);
+    expect(swapped.status).toBe(200);
+    expect(swapped.body.data).toMatchObject({ type: 'NEXT_DONG', level: 'CHALLENGE' });
+    expect((await prisma.quest.findUniqueOrThrow({ where: { id: tier.id } })).status).toBe('S');
+    expect(
+      (await prisma.questWeek.findUniqueOrThrow({ where: { id: week.id } })).swappedAt,
+    ).not.toBeNull();
+  });
+});
+
 describe('SET-01·02 맞춤 퀘스트 설정', () => {
   it('맞춤 퀘스트·맞춤 추천을 조회하고 바꾼다', async () => {
     const { me } = await member();

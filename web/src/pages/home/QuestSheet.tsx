@@ -31,13 +31,16 @@ export function QuestButton({ data, onClick }: { data: CurrentQuests; onClick: (
       <span className={styles.questRing}>
         <svg viewBox="0 0 56 56" className={styles.questRingSvg} aria-hidden="true">
           <circle cx="28" cy="28" r={r} className={styles.questTrack} />
-          <circle
-            cx="28"
-            cy="28"
-            r={r}
-            className={styles.questBar}
-            strokeDasharray={`${length * ratio} ${length}`}
-          />
+          {/* 0%면 그리지 않는다 (둥근 선 끝 때문에 길이 0이어도 점이 보인다) */}
+          {ratio > 0 && (
+            <circle
+              cx="28"
+              cy="28"
+              r={r}
+              className={styles.questBar}
+              strokeDasharray={`${length * ratio} ${length}`}
+            />
+          )}
         </svg>
         <FlagIcon size={22} />
         {hasNewQuests(data) && <span className={styles.questDot} aria-hidden="true" />}

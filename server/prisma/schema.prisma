@@ -1332,7 +1332,7 @@ model Quest {
   id               BigInt      @id @default(autoincrement())
   weekId           BigInt      @map("week_id")
   userId           BigInt      @map("user_id")
-  /// NEW_TASTE 새 맛 탐험 / MY_STANDARD 내 기준 맛집 / WIDEN_MENU 메뉴 넓히기 / LOCAL_POPULAR 동네 인기(맞춤 추천을 껐을 때)
+  /// NEW_TASTE 새 맛 탐험 / MY_STANDARD 내 기준 맛집 / WIDEN_MENU 메뉴 넓히기 / LOCAL_PICK 동네 새 가게(맞춤 추천을 껐거나 기록이 모자랄 때)
   /// / NEXT_DONG 옆 동네 한 바퀴 / TIER_UP 티어 도전 / FIRST_REVIEWER 첫 평가자 / SAVED_VISIT 저장한 곳 가기
   type             String      @db.VarChar(20)
   /// E 쉬움 / X 탐험 / C 도전
