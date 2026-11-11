@@ -437,7 +437,9 @@ export async function craftItem(userId: bigint, itemId: number, now = new Date()
 
 /** 아이템 상자 제목 (피그마 "LV.10 성장 보상") */
 function itemBoxTitle(box: { source: string; sourceRef: number }) {
-  return box.source === 'LEVEL_UP' ? `LV.${box.sourceRef} 성장 보상` : '아이템 상자';
+  if (box.source === 'LEVEL_UP') return `LV.${box.sourceRef} 성장 보상`;
+  if (box.source === 'QUEST_WEEK') return '주간 퀘스트 상자';
+  return '아이템 상자';
 }
 
 /** CHAR-05 내 아이템 상자 (안 연 것 먼저, 최신순) */
@@ -473,10 +475,12 @@ export async function listItemBoxes(userId: bigint) {
 
 /** 아이템 상자에서 레어(R 이상)가 나올 확률 (피그마 "레어 등장 20%") */
 export const ITEM_BOX_RARE_RATE = 0.2;
+/** 주간 퀘스트 상자는 레어가 나올 확률이 평소보다 높다 (피그마 12. Q5, 숫자는 나중에 조정) */
+export const QUEST_BOX_RARE_RATE = 0.4;
 const BOX_CATEGORIES = ['HAT', 'FACE', 'PROP'];
 
 /**
- * CHAR-06 아이템 상자 열기 — 아직 없는 모자·얼굴·소품(상점 아이템) 중 하나. 레어는 20%.
+ * CHAR-06 아이템 상자 열기 — 아직 없는 모자·얼굴·소품(상점 아이템) 중 하나. 레어는 20%(주간 퀘스트 상자는 40%).
  * 다 가졌으면 reward_policy ITEM_BOX만큼 먹포인트. random은 테스트에서 바꿔 끼운다
  */
 export async function openItemBox(
@@ -486,8 +490,8 @@ export async function openItemBox(
   random: () => number = Math.random,
 ) {
   const result = await prisma.$transaction(async (tx) => {
-    const [box] = await tx.$queryRaw<{ user_id: bigint; status: string }[]>`
-      SELECT user_id, status FROM member_item_box WHERE id = ${boxId} FOR UPDATE`;
+    const [box] = await tx.$queryRaw<{ user_id: bigint; status: string; source: string }[]>`
+      SELECT user_id, status, source FROM member_item_box WHERE id = ${boxId} FOR UPDATE`;
     if (!box || box.user_id !== userId) throw new AppError(MukkaebiError.ITEM_BOX_NOT_FOUND);
     if (box.status !== 'U') throw new AppError(MukkaebiError.ITEM_BOX_ALREADY_OPENED);
     // 상점 구매와 동시에 같은 아이템을 받지 않게 회원 행도 잠근다 (구매도 같은 순서로 잠근다)
@@ -508,7 +512,11 @@ export async function openItemBox(
     const rare = candidates.filter((i) => i.rarity !== 'N');
     const normal = candidates.filter((i) => i.rarity === 'N');
     const pool =
-      rare.length > 0 && (normal.length === 0 || random() < ITEM_BOX_RARE_RATE) ? rare : normal;
+      rare.length > 0 &&
+      (normal.length === 0 ||
+        random() < (box.source === 'QUEST_WEEK' ? QUEST_BOX_RARE_RATE : ITEM_BOX_RARE_RATE))
+        ? rare
+        : normal;
     const item = pool.length > 0 ? pool[Math.floor(random() * pool.length)] : null;
 
     let point: number | null = null;

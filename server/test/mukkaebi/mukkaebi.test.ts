@@ -308,7 +308,7 @@ describe('v1.3 아이템 상자 · 세트 · 업적 보상 아이템', () => {
         opening = Promise.all(
           [1, 2].map(async () => api(me.id).post(`/characters/me/item-boxes/${box.id}/open`)),
         );
-        await waitForRunningQueries('SELECT user_id, status FROM member_item_box', 2);
+        await waitForRunningQueries('SELECT user_id, status, source FROM member_item_box', 2);
       },
       { timeout: 10_000 },
     );

@@ -23,3 +23,13 @@ export function withObjectParticle(word: string) {
 export function withSubjectParticle(word: string) {
   return `${word}${hasFinalConsonant(word) ? '이' : '가'}`;
 }
+
+/** 이에요/예요 붙이기. 예) 국밥집 → 국밥집이에요, 카페 → 카페예요 */
+export function withCopula(word: string) {
+  return `${word}${hasFinalConsonant(word) ? '이에요' : '예요'}`;
+}
+
+/** 이었어요/였어요 붙이기. 예) 국밥집 → 국밥집이었어요, 카페 → 카페였어요 */
+export function withPastCopula(word: string) {
+  return `${word}${hasFinalConsonant(word) ? '이었어요' : '였어요'}`;
+}

@@ -120,6 +120,10 @@ export const notificationSettingsBody = z.object({
   conquestAlarm: z.boolean().optional(),
   rankAlarm: z.boolean().optional(),
   marketingAlarm: z.boolean().optional(),
+  /** 맞춤 퀘스트 받기 */
+  questEnabled: z.boolean().optional(),
+  /** 방문 기록으로 맞춤 추천 (끄면 퀘스트가 동네 일반 추천으로) */
+  personalizedReco: z.boolean().optional(),
 });
 export type NotificationSettingsBody = z.infer<typeof notificationSettingsBody>;
 
