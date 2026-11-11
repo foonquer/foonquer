@@ -136,6 +136,7 @@ describe('홈 퀘스트 아이콘 · 이번 주 퀘스트 시트 (Q1·Q2)', () =
 
     const button = await screen.findByRole('button', { name: '이번 주 퀘스트 1/3' });
     expect(button.querySelector('[class*="questDot"]')).not.toBeNull();
+    expect(button.querySelector('[class*="questBar"]')).not.toBeNull();
     fireEvent.click(button);
 
     const sheet = await screen.findByRole('dialog', { name: '이번 주 퀘스트' });
@@ -157,6 +158,17 @@ describe('홈 퀘스트 아이콘 · 이번 주 퀘스트 시트 (Q1·Q2)', () =
     // 한 번 열어 본 퀘스트는 점이 사라진다
     fireEvent.keyDown(window, { key: 'Escape' });
     await waitFor(() => expect(button.querySelector('[class*="questDot"]')).toBeNull());
+  });
+
+  it('아직 하나도 못 깼으면 진행 링을 그리지 않는다', async () => {
+    mockApi({
+      ...homeApi,
+      'GET /quests/current': ok(current({ week: week({ doneCount: 0 }), quests: [quest()] })),
+    });
+    renderRoute('/');
+    const button = await screen.findByRole('button', { name: '이번 주 퀘스트 0/3' });
+    expect(button.querySelector('[class*="questTrack"]')).not.toBeNull();
+    expect(button.querySelector('[class*="questBar"]')).toBeNull();
   });
 
   it('맞춤 퀘스트를 껐으면 아이콘이 없다', async () => {

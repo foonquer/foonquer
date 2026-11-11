@@ -151,19 +151,24 @@ export async function advanceQuests(
   // 이번 주 퀘스트(보너스 포함)를 모두 깼으면 보너스 퀘스트 1개 더 (첫 평가자 같은 쉬운 것)
   let bonusQuest: QuestAdvance['bonusQuest'] = null;
   if (all.every((q) => q.status === 'C')) {
-    const profile = await loadProfile(tx, userId, weekStart, now);
-    const picked = profile
-      ? await draftQuest(tx, profile, 'E', all.length + 1, new Set<QuestType>(['SAVED_VISIT']))
-      : null;
-    if (profile && picked) {
-      const q = await insertQuest(tx, profile, week.id, picked, true);
-      bonusQuest = {
-        questId: q.id,
-        typeName: TYPE_NAME[q.type as QuestType] ?? q.type,
-        title: q.title,
-        summary: q.summary,
-        rewardPoint: q.rewardPoint,
-      };
+    // 보너스는 덤이라 고르다 실패해도 별점·정복은 그대로 남긴다 (MySQL은 실패한 문장만 되돌린다)
+    try {
+      const profile = await loadProfile(tx, userId, weekStart, now);
+      const picked = profile
+        ? await draftQuest(tx, profile, 'E', all.length + 1, new Set<QuestType>(['SAVED_VISIT']))
+        : null;
+      if (profile && picked) {
+        const q = await insertQuest(tx, profile, week.id, picked, true);
+        bonusQuest = {
+          questId: q.id,
+          typeName: TYPE_NAME[q.type as QuestType] ?? q.type,
+          title: q.title,
+          summary: q.summary,
+          rewardPoint: q.rewardPoint,
+        };
+      }
+    } catch (err) {
+      console.error('보너스 퀘스트 만들기 실패', err);
     }
   }
   return {
