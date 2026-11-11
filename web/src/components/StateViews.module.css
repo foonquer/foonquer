@@ -1,6 +1,8 @@
+/* 부모가 왼쪽 정렬 flex(추천맛집 등)여도 가로를 다 써서 가운데에 놓이게 */
 .center {
   display: flex;
   flex: 1;
+  align-self: stretch;
   flex-direction: column;
   align-items: center;
   justify-content: center;

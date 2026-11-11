@@ -127,6 +127,82 @@ describe('RANK-03~07 현황·랭킹', () => {
   });
 });
 
+describe('다음 티어까지 남은 수 (정복자·먹짱은 순위로 센다)', () => {
+  /** 순위대로 정복 수를 넣은 구 (rank는 1부터, 티어는 순위·상위 %로) */
+  async function standings(seasonId: number, sigunguId: number, counts: number[]) {
+    const members = [];
+    for (const [i, count] of counts.entries()) {
+      const m = await createMember({ nickname: `탐험가${i + 1}` });
+      const rank = i + 1;
+      const topPercent = Math.round((rank / counts.length) * 10000) / 100;
+      const tier =
+        rank === 1
+          ? 'M'
+          : count >= 20 && topPercent <= 10
+            ? 'C'
+            : count >= 20
+              ? 'G'
+              : count >= 5
+                ? 'R'
+                : 'B';
+      await prisma.seasonRegionStat.create({
+        data: {
+          seasonId,
+          sigunguId,
+          userId: m.id,
+          conquestCount: count,
+          rankNo: rank,
+          topPercent,
+          tier,
+        },
+      });
+      members.push(m);
+    }
+    return members;
+  }
+
+  it('미식가는 상위 10% 마지막 순위보다 한 곳 더, 정복자는 1위보다 한 곳 더', async () => {
+    const season = await createActiveSeason(3);
+    const gu = await gangseo();
+    // 22명: 상위 10% 안은 2위까지 (3위는 13.64%)
+    const counts = [38, 31, 26, 24, ...Array.from({ length: 18 }, (_, i) => 19 - i)];
+    const members = await standings(season.id, gu.id, counts);
+
+    const gourmet = await get(members[3].id, `/users/me/conquests/sigungus/${gu.id}`);
+    expect(gourmet.body.data).toMatchObject({
+      tier: 'GOURMET',
+      nextTier: { tierName: '정복자', remaining: 31 - 24 + 1 },
+      tierProgress: { current: 24, nextTierAt: 32, nextTierName: '정복자' },
+    });
+    const conqueror = await get(members[1].id, `/users/me/conquests/sigungus/${gu.id}`);
+    expect(conqueror.body.data.nextTier).toEqual({
+      tier: 'MUKJJANG',
+      tierName: '먹짱',
+      remaining: 38 - 31 + 1,
+    });
+    // 랭킹 미리보기도 TOP 50 줄처럼 먹깨비 모자·티어 이름을 준다
+    expect(gourmet.body.data.rankingPreview[0]).toMatchObject({
+      rank: 1,
+      nickname: '탐험가1',
+      tierName: '먹짱',
+      mukkaebi: { hatCode: null },
+      profileImageUrl: null,
+    });
+  });
+
+  it('활동 탐험가가 적어 상위 10% 안이 1위뿐이면 먹짱까지 센다', async () => {
+    const season = await createActiveSeason(3);
+    const gu = await gangseo();
+    const members = await standings(season.id, gu.id, [30, 25, 22, 3, 2, 1]);
+    const res = await get(members[2].id, '/users/me/conquests/sigungus');
+    expect(res.body.data.items[0].nextTier).toEqual({
+      tier: 'MUKJJANG',
+      tierName: '먹짱',
+      remaining: 30 - 22 + 1,
+    });
+  });
+});
+
 describe('RANK-08·09·11 업적·칭호', () => {
   it('업적 진행도, 보유 칭호, 대표 칭호 바꾸기·해제', async () => {
     const season = await createActiveSeason(3);

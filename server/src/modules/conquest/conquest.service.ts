@@ -2,7 +2,7 @@ import type { Tx } from '../../common/db';
 import { checkAchievements, type UnlockedAchievement } from '../achievement/achievement.service';
 import { notify } from '../notification/notify';
 import {
-  nextTierOf,
+  nextTierIn,
   recomputeSigunguRanking,
   TIER_API,
   TIER_NAME,
@@ -169,7 +169,12 @@ export async function applyConquest(
     });
     if (mine) {
       const tier = mine.tier as TierCode;
-      const next = nextTierOf(tier, mine.conquestCount);
+      const next = await nextTierIn(
+        tx,
+        { seasonId, sigunguId: restaurant.sigunguId },
+        tier,
+        mine.conquestCount,
+      );
       stat = {
         conquestCount: mine.conquestCount,
         rank: mine.rankNo,

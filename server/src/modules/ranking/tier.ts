@@ -1,4 +1,4 @@
-import type { Tx } from '../../common/db';
+import type { Db, Tx } from '../../common/db';
 import { Prisma } from '../../generated/prisma/client';
 
 // 티어 (디자인 결정사항 "시즌 · 티어", ERD season_region_stat.tier):
@@ -44,13 +44,55 @@ export function tierOf(count: number, rank: number | null, topPercent: number | 
   return 'B';
 }
 
-/** 다음 티어와 거기까지 남은 정복 수 (정복자·먹짱은 순위로 정해져서 남은 수 대신 null) */
+/** 다음 티어와 거기까지 남은 정복 수 (정복자·먹짱은 순위로 정해져서 null → 순위로 셀 때는 nextTierIn) */
 export function nextTierOf(tier: TierCode, count: number) {
   if (tier === 'B') return { tier: 'R' as TierCode, remaining: Math.max(REGULAR_AT - count, 1) };
   if (tier === 'R') return { tier: 'G' as TierCode, remaining: Math.max(GOURMET_AT - count, 1) };
   if (tier === 'G') return { tier: 'C' as TierCode, remaining: null };
   if (tier === 'C') return { tier: 'M' as TierCode, remaining: null };
   return null;
+}
+
+/** 정복자 자리 중 가장 낮은 순위: 상위 % (순위 ÷ 활동 탐험가 × 100, 소수 둘째 자리 반올림)가 10% 안인 마지막 순위 */
+export function lastConquerorRank(active: number) {
+  let rank = 0;
+  while (
+    rank < active &&
+    Math.round(((rank + 1) / active) * 10000) / 100 <= CONQUEROR_TOP_PERCENT
+  ) {
+    rank += 1;
+  }
+  return rank;
+}
+
+/**
+ * 다음 티어와 남은 정복 수. 정복자·먹짱은 순위로 정해져서 그 자리 사람보다 한 곳 더 정복해야 한다
+ * (동점이면 먼저 도달한 사람이 위). 정복자 = 상위 10% 안의 마지막 순위, 먹짱 = 1위.
+ * 활동 탐험가가 적어 상위 10% 안이 1위뿐이면 정복자를 건너뛰고 먹짱까지 센다
+ */
+export async function nextTierIn(
+  db: Db,
+  at: { seasonId: number; sigunguId: number },
+  tier: TierCode,
+  count: number,
+) {
+  const next = nextTierOf(tier, count);
+  if (!next || next.remaining !== null) return next;
+  let target: { tier: TierCode; rank: number } = { tier: 'M', rank: 1 };
+  if (next.tier === 'C') {
+    const active = await db.seasonRegionStat.count({ where: { ...at, conquestCount: { gt: 0 } } });
+    const last = lastConquerorRank(active);
+    // 1위는 먹짱이라 정복자 자리는 2위부터
+    if (last >= 2) target = { tier: 'C', rank: last };
+  }
+  const row = await db.seasonRegionStat.findFirst({
+    where: { ...at, rankNo: target.rank },
+    select: { conquestCount: true },
+  });
+  return {
+    tier: target.tier,
+    remaining: Math.max((row?.conquestCount ?? count) - count + 1, 1),
+  };
 }
 
 export interface RankChange {

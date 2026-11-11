@@ -7,6 +7,7 @@ import { EmptyState, Loading } from '../../components/StateViews';
 import { errorMessage } from '../../lib/api';
 import { formatRecentDay, joinDot } from '../../lib/format';
 import { usePaged } from '../../lib/usePaged';
+import { RankList } from './RankParts';
 import styles from './Ranking.module.css';
 
 /** "오늘 정복" / "어제" / "9월 21일" */
@@ -104,18 +105,7 @@ export function SigunguStatusPage() {
               <h2 className={styles.sectionTitle}>{data.sigunguName} 랭킹</h2>
               <Link to={`/ranking/sigungus/${data.sigunguId}${query}`}>TOP 50 보기 ›</Link>
             </div>
-            <ol className={styles.rows}>
-              {data.rankingPreview.map((r) => (
-                <li key={r.rank} data-me={r.isMe}>
-                  <span className={styles.rowRank}>{r.rank}</span>
-                  <span className={styles.rowName}>
-                    {r.nickname}
-                    {r.isMe && ' (나)'}
-                  </span>
-                  <span className={styles.rowValue}>{r.conquestCount}곳</span>
-                </li>
-              ))}
-            </ol>
+            <RankList rows={data.rankingPreview} label={`${data.sigunguName} 랭킹`} />
           </>
         )}
 

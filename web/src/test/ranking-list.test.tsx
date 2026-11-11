@@ -91,6 +91,61 @@ describe('구 랭킹 TOP 50', () => {
   });
 });
 
+describe('구 현황', () => {
+  it('정복자까지 남은 수와 랭킹 미리보기(먹깨비·티어·나)를 보여 준다', async () => {
+    const row = (
+      rank: number,
+      nickname: string,
+      count: number,
+      tierName: string,
+      isMe = false,
+    ) => ({
+      rank,
+      userId: rank + 10,
+      nickname,
+      conquestCount: count,
+      tier: 'GOURMET',
+      tierName,
+      isMe,
+      profileImageUrl: null,
+      mukkaebi: { level: 7, hatCode: rank === 1 ? 'HAT_CROWN' : null },
+    });
+    mockApi({
+      'GET /users/me/conquests/sigungus/:id': ok({
+        season,
+        sigunguId: 1,
+        sigunguName: '강서구',
+        conquestCount: 27,
+        rank: 3,
+        topPercent: 13.64,
+        activeExplorerCount: 22,
+        tier: 'GOURMET',
+        tierName: '미식가',
+        tierTitle: '강서구 미식가',
+        nextTier: { tier: 'CONQUEROR', tierName: '정복자', remaining: 5 },
+        tierProgress: { current: 27, nextTierAt: 32, nextTierName: '정복자' },
+        mukjjangGap: 12,
+        rankingPreview: [
+          row(1, '라멘탐험가', 38, '먹짱'),
+          row(2, '디저트헌터', 31, '정복자'),
+          row(3, '1234', 27, '미식가', true),
+          row(4, '마라탕러버', 26, '미식가'),
+        ],
+        restaurants: page([]),
+      }),
+    });
+    renderRoute('/ranking/sigungus/1/status');
+
+    expect(await screen.findByText('정복자까지 5곳 남았어요')).toBeInTheDocument();
+    const list = screen.getByRole('list', { name: '강서구 랭킹' });
+    const mine = within(list).getByRole('link', { name: /1234/ });
+    expect(mine).toHaveAttribute('href', '/users/13');
+    expect(within(mine).getByText('나')).toBeInTheDocument();
+    expect(within(mine).getByText('27곳')).toBeInTheDocument();
+    expect(within(list).getByText('정복자')).toBeInTheDocument();
+  });
+});
+
 describe('랭킹/현황', () => {
   it('현황: 구별 정복과 다음 티어까지 남은 수, 랭킹: 구를 고르면 먹짱과 TOP 50 링크', async () => {
     mockApi({

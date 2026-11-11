@@ -6,6 +6,7 @@ import { listCelebrations } from '../mukkaebi/mukkaebi.service';
 import { KEEP_DAYS } from '../notification/notification.service';
 import { toSeasonView } from '../ranking/season-view';
 import {
+  nextTierIn,
   nextTierOf,
   TIER_API,
   TIER_NAME,
@@ -53,7 +54,10 @@ async function rankSummary(userId: bigint, seasonId: number | null) {
       : null;
   const count = stat?.conquestCount ?? 0;
   const tier = (stat?.tier ?? 'B') as TierCode;
-  const next = nextTierOf(tier, count);
+  const next =
+    seasonId !== null
+      ? await nextTierIn(prisma, { seasonId, sigunguId: sigungu.id }, tier, count)
+      : nextTierOf(tier, count);
   return {
     conquestCount: total,
     main: {
