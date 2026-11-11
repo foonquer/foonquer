@@ -2,7 +2,7 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app';
 import { addDays, kstTodayAsDbDate } from '../../src/common/time';
-import { clearDemoData, seedDemoData } from '../../src/jobs/demo-data';
+import { clearDemoData, seedDemoData, seedDemoReviews } from '../../src/jobs/demo-data';
 import { prisma } from '../../src/lib/prisma';
 import { resetDb } from '../helpers/db';
 import {
@@ -247,6 +247,47 @@ describe('랭킹 확인용 가짜 데이터 (demo-data)', () => {
     expect(restored.every((s) => s.status === 'F' && s.finalizedAt === null)).toBe(true);
     expect(await prisma.conquest.count({ where: { userId: real.id } })).toBe(2);
   }, 120_000);
+
+  it('reviews: 가짜 방문마다 리뷰, 내 동네(동)에 가짜 방문을 넣어 추천이 차고, clear가 가게 별점까지 되돌린다', async () => {
+    const { me } = await setup();
+    await expect(seedDemoReviews('안준형')).rejects.toThrow('seed를 먼저');
+    await seedDemoData('안준형');
+    const demo = await prisma.member.findMany({
+      where: { kakaoId: { startsWith: 'demo-' } },
+      select: { id: true },
+    });
+    const userId = { in: demo.map((d) => d.id) };
+
+    const result = await seedDemoReviews('안준형');
+    expect(result.localVisits).toBeGreaterThan(12 * 5 - 1);
+    // 가짜 탐험가의 별점 남긴 방문마다 리뷰 하나, 내 계정의 가짜 방문에는 리뷰를 만들지 않는다
+    expect(result.reviews).toBe(await prisma.visit.count({ where: { userId, status: 'C' } }));
+    expect(await prisma.review.count({ where: { userId: me.id } })).toBe(0);
+    const reviews = await prisma.review.findMany({ where: { userId } });
+    expect(reviews.every((r) => r.aiCheckedAt !== null)).toBe(true);
+    expect(reviews.some((r) => r.content !== null && r.cleanliness !== null)).toBe(true);
+    expect(reviews.some((r) => r.isRevisit)).toBe(true);
+    for (const r of reviews) {
+      expect(r.overallScore.toNumber()).toBeGreaterThanOrEqual(1);
+      expect(r.overallScore.toNumber()).toBeLessThanOrEqual(5);
+    }
+    // 내 동네(가양동) 추천: 현지인 방문이 있는 가게가 보인다
+    const reco = await request(app)
+      .get('/api/v1/recommendations')
+      .query({ type: 'LOCAL_POPULAR' })
+      .set('Authorization', bearer(me.id));
+    expect(reco.status).toBe(200);
+    expect(reco.body.data.items.length).toBeGreaterThan(0);
+    await expect(seedDemoReviews('안준형')).rejects.toThrow('이미 있어요');
+
+    await clearDemoData('안준형');
+    expect(await prisma.review.count()).toBe(0);
+    expect(await prisma.reviewAspectMark.count()).toBe(0);
+    // 가게 별점·방문 수는 진짜 기록만 남는다 (진짜 정복 3건 + 별점 대기 방문 1건 = 방문자 4)
+    const stats = await prisma.restaurantStat.findMany();
+    expect(stats.every((st) => st.reviewCount === 0 && st.localVisitCount === 0)).toBe(true);
+    expect(stats.reduce((sum, st) => sum + st.visitorCount, 0)).toBe(4);
+  }, 180_000);
 
   it('받은 먹포인트를 그사이 썼으면 0에서 멈추고, clear는 다시 돌려도 되며 가짜 탐험가 닉네임은 받지 않는다', async () => {
     const { me } = await setup();

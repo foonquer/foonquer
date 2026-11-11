@@ -1,12 +1,19 @@
 import { prisma } from '../lib/prisma';
 import { finalizeSeason } from '../modules/ranking/season-job';
+import {
+  loadRatingParams,
+  refreshRestaurantStat,
+  refreshReviewWeight,
+} from '../modules/restaurant/restaurant-stat-calc';
 import { recomputeSigunguRanking } from '../modules/ranking/tier';
 
 // 랭킹 화면 확인용 가짜 데이터 (손으로만 돌린다. 주기 작업 all에는 없다)
 // seed: 가짜 탐험가 24명 + 내 동네 구와 다른 구 3곳에 지난 시즌 2개·이번 시즌 정복 기록.
 //   지난 시즌은 시즌 확정 코드(finalizeSeason)로 순위·결과·보상을 만들고, 이번 시즌은 구 순위만 계산한다.
 //   내 계정도 시즌마다 정복 기록을 받고, 지난 시즌 결과·보상·알림도 실제로 받는다.
-// clear: 가짜 탐험가와 그 기록 전부, 내 계정의 가짜 정복·지난 시즌 결과·보상을 지우고 순위를 다시 계산한다.
+// reviews: 가짜 탐험가의 방문마다 리뷰(맛 별점·세부 별점·좋았던 점·글)를 붙이고, 내 동네(동)에도 가짜 방문·리뷰를 넣어
+//   가게 별점·추천 맛집이 차 보이게 한다 (seed 다음에 돌린다).
+// clear: 가짜 탐험가와 그 기록(리뷰 포함) 전부, 내 계정의 가짜 정복·지난 시즌 결과·보상을 지우고 순위·가게 별점을 다시 계산한다.
 
 /** 가짜 탐험가의 kakao_id 앞부분 (실제 카카오 회원번호는 숫자뿐이라 겹치지 않는다) */
 const DEMO_KAKAO_PREFIX = 'demo-';
@@ -50,6 +57,44 @@ const MY_MAIN_COUNTS = [27, 24, 40];
 const MY_SECOND_COUNT = 3;
 const RESTAURANT_POOL = 150;
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** reviews: 내 동네(동)마다 가짜 방문·리뷰를 넣을 가게 수 */
+const LOCAL_SHOPS = 12;
+
+// reviews: 리뷰 글 (맛 별점 4 이상은 좋았던 글, 아래는 아쉬운 점이 섞인 글)
+const MEAL_TEXT = {
+  good: [
+    '양이 넉넉하고 간이 딱 맞아요. 점심에 또 올 것 같아요.',
+    '사장님이 친절하시고 음식이 빨리 나와요.',
+    '재료가 신선한 게 느껴져요. 동네에 이런 집이 있어서 다행이에요.',
+    '가격 대비 만족스러워요. 반찬도 계속 채워 주세요.',
+    '웨이팅이 조금 있었지만 기다린 보람이 있었어요.',
+    '혼밥하기 편하고 맛도 꾸준해요.',
+    '친구랑 갔는데 둘 다 만족했어요. 다음엔 다른 메뉴도 먹어 볼래요.',
+    '국물이 진하고 깔끔해요. 해장으로 딱이에요.',
+  ],
+  mixed: [
+    '맛은 괜찮은데 점심시간엔 좀 붐벼요.',
+    '무난하게 먹기 좋아요. 다만 간이 조금 센 편이에요.',
+    '양은 많은데 가격이 살짝 올랐어요.',
+    '자리가 좁아서 여럿이 가기엔 불편했어요. 맛은 평범해요.',
+  ],
+};
+const CAFE_TEXT = {
+  good: [
+    '커피가 진하고 디저트가 달지 않아서 좋아요.',
+    '자리가 넓어서 공부하기 편해요. 콘센트도 많아요.',
+    '케이크가 촉촉하고 직원분들이 친절해요.',
+    '창가 자리 분위기가 좋아요. 조용히 쉬다 가기 좋아요.',
+  ],
+  mixed: [
+    '분위기는 좋은데 음료 가격이 조금 있어요.',
+    '주말엔 자리가 없어요. 평일에 가는 걸 추천해요.',
+  ],
+};
+
+/** 맛 별점은 0.5 단위, 세부 별점은 1 단위 (1~5) */
+const half = (n: number) => Math.min(5, Math.max(1, Math.round(n * 2) / 2));
+const whole = (n: number) => Math.min(5, Math.max(1, Math.round(n)));
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 /** 같은 결과가 나오는 난수 (mulberry32) */
@@ -309,6 +354,178 @@ export async function seedDemoData(nickname: string) {
   };
 }
 
+/** reviews: 가짜 리뷰·내 동네 가짜 방문. 가짜 탐험가가 없거나 가짜 리뷰가 이미 있으면 멈춘다 */
+export async function seedDemoReviews(nickname: string) {
+  const me = await findMe(nickname);
+  const demo = await demoMemberIds();
+  if (demo.length === 0) throw new Error('가짜 탐험가가 없어요. seed를 먼저 돌려 주세요');
+  if ((await prisma.review.count({ where: { userId: { in: demo } } })) > 0) {
+    throw new Error('가짜 리뷰가 이미 있어요. clear를 먼저 돌려 주세요');
+  }
+  const current = await prisma.season.findFirst({ where: { status: 'A' } });
+  if (!current) throw new Error('진행 중인 시즌이 없어요');
+  const rand = random(20261111);
+  const now = new Date();
+  const start = current.startDate.getTime() - KST_OFFSET_MS;
+
+  // 1. 내 동네(동)마다 가게 12곳에 가짜 탐험가 5~9명이 방문 (셋 중 하나는 한 번 더 — 재방문 수에 쓰인다).
+  //    추천 맛집은 동 안의 현지인 방문·재방문·별점으로 고르므로 동 단위로 넣는다
+  const locals = await prisma.memberLocalRegion.findMany({
+    where: { userId: me },
+    select: { regionId: true },
+  });
+  const touched = new Set<string>();
+  let localVisits = 0;
+  for (const { regionId } of locals) {
+    const shops = await prisma.$queryRaw<{ id: bigint; sigungu_id: number }[]>`
+      SELECT id, sigungu_id FROM restaurant WHERE status = 'A' AND region_id = ${regionId}
+      ORDER BY RAND(${regionId}) LIMIT ${LOCAL_SHOPS}`;
+    for (const shop of shops) {
+      const restaurantId = BigInt(shop.id);
+      const sigunguId = Number(shop.sigungu_id);
+      const visitors = shuffle(demo, rand).slice(0, 5 + Math.floor(rand() * 5));
+      await prisma.$transaction(async (tx) => {
+        for (const userId of visitors) {
+          let at = start + rand() * (now.getTime() - start) * 0.6;
+          const times = rand() < 0.35 ? 2 : 1;
+          for (let t = 0; t < times; t += 1) {
+            if (t > 0) at += rand() * (now.getTime() - at);
+            const visit = await tx.visit.create({
+              data: {
+                userId,
+                restaurantId,
+                seasonId: current.id,
+                method: 'R',
+                status: 'C',
+                receiptImageKey: DEMO_RECEIPT_KEY,
+                isLocal: rand() < 0.7,
+                verifiedAt: new Date(at),
+                regDate: new Date(at),
+              },
+            });
+            localVisits += 1;
+            // 정복은 사람·가게·시즌마다 한 번 (다시 간 방문은 정복 없이 별점만)
+            const conquered = await tx.conquest.count({
+              where: { userId, restaurantId, seasonId: current.id },
+            });
+            if (conquered === 0) {
+              await tx.conquest.create({
+                data: {
+                  userId,
+                  restaurantId,
+                  seasonId: current.id,
+                  sigunguId,
+                  visitId: visit.id,
+                  conqueredAt: new Date(at),
+                },
+              });
+              touched.add(`${current.id}:${sigunguId}:${userId}`);
+            }
+          }
+        }
+      });
+    }
+  }
+  for (const key of touched) {
+    const [seasonId, sigunguId, userId] = key.split(':');
+    await recountStat(Number(seasonId), Number(sigunguId), BigInt(userId));
+  }
+  await recompute(new Set([...touched].map((k) => k.split(':').slice(0, 2).join(':'))));
+
+  // 2. 가짜 탐험가의 방문마다 리뷰. 가게마다 맛 수준(3.2~4.8)을 정해 두고 그 근처로 준다
+  const visits = await prisma.visit.findMany({
+    where: { userId: { in: demo }, status: 'C', review: null, restaurantId: { not: null } },
+    orderBy: [{ verifiedAt: 'asc' }, { id: 'asc' }],
+    select: {
+      id: true,
+      userId: true,
+      restaurantId: true,
+      verifiedAt: true,
+      restaurant: { select: { category: { select: { name: true } } } },
+    },
+  });
+  const aspects = await prisma.reviewAspect.findMany({ select: { id: true, code: true } });
+  const aspectOf = (code: string) => aspects.find((a) => a.code === code)?.id;
+  const levelOf = new Map<string, number>();
+  const been = new Set<string>();
+  const reviewIds: bigint[] = [];
+  const shops = new Set<bigint>();
+  for (let i = 0; i < visits.length; i += 200) {
+    await prisma.$transaction(
+      async (tx) => {
+        for (const v of visits.slice(i, i + 200)) {
+          const restaurantId = v.restaurantId as bigint;
+          const key = restaurantId.toString();
+          const level = levelOf.get(key) ?? 3.2 + rand() * 1.6;
+          levelOf.set(key, level);
+          const score = half(level + (rand() - 0.5));
+          const isRevisit = been.has(`${v.userId}:${key}`);
+          been.add(`${v.userId}:${key}`);
+          const at = new Date(
+            Math.min((v.verifiedAt ?? now).getTime() + (10 + rand() * 80) * 60_000, now.getTime()),
+          );
+          const detail = rand() < 0.6;
+          const texts = v.restaurant?.category?.name === '카페·디저트' ? CAFE_TEXT : MEAL_TEXT;
+          const pool = score >= 4 ? texts.good : texts.mixed;
+          const content = rand() < 0.7 ? pool[Math.floor(rand() * pool.length)] : null;
+          const review = await tx.review.create({
+            data: {
+              visitId: v.id,
+              userId: v.userId,
+              restaurantId,
+              overallScore: score,
+              isRevisit,
+              regDate: at,
+              ...(detail && {
+                cleanliness: whole(level + (rand() - 0.5) * 2),
+                portion: whole(level + (rand() - 0.5) * 2),
+                service: whole(level + (rand() - 0.5) * 2),
+                price: whole(level + (rand() - 0.5) * 2),
+                detailRegDate: at,
+              }),
+              ...(content && { content, contentRegDate: at }),
+              // 가짜 글은 Gemini 리뷰 분석(review-ai)에 보내지 않는다
+              aiCheckedAt: at,
+            },
+          });
+          if (detail) {
+            const good = shuffle(['TASTE', 'PORTION', 'PRICE', 'SERVICE', 'CLEAN', 'MOOD'], rand)
+              .slice(0, 1 + Math.floor(rand() * 2))
+              .map((code) => ({ code, polarity: 'G' }));
+            const bad =
+              score <= 3.5 ? [{ code: rand() < 0.5 ? 'WAIT' : 'PRICE', polarity: 'B' }] : [];
+            const marks = [...good, ...bad.filter((b) => !good.some((g) => g.code === b.code))];
+            await tx.reviewAspectMark.createMany({
+              data: marks.flatMap((m) => {
+                const aspectId = aspectOf(m.code);
+                return aspectId
+                  ? [{ reviewId: review.id, aspectId, polarity: m.polarity, regDate: at }]
+                  : [];
+              }),
+            });
+          }
+          reviewIds.push(review.id);
+          shops.add(restaurantId);
+        }
+      },
+      { timeout: 60_000 },
+    );
+  }
+
+  // 3. 리뷰 가중치(같은 사람 재방문·신뢰도)와 가게 별점·방문 수를 다시 계산한다
+  const params = await loadRatingParams(prisma);
+  for (let i = 0; i < reviewIds.length; i += 200) {
+    await prisma.$transaction(
+      async (tx) => {
+        for (const id of reviewIds.slice(i, i + 200)) await refreshReviewWeight(tx, id, params);
+      },
+      { timeout: 60_000 },
+    );
+  }
+  for (const id of shops) await refreshRestaurantStat(prisma, id, now, params);
+  return { localVisits, reviews: reviewIds.length, restaurants: shops.size };
+}
+
 export async function clearDemoData(nickname: string) {
   const me = await findMe(nickname);
   const demo = await demoMemberIds();
@@ -418,9 +635,21 @@ export async function clearDemoData(nickname: string) {
     await recountStat(seasonId, sigunguId, me);
   }
 
-  // 3. 가짜 탐험가와 그 기록 전부
+  // 3. 가짜 탐험가와 그 기록 전부 (리뷰를 지운 가게는 별점·방문 수를 다시 센다)
   const userId = { in: demo };
+  const demoShops = await prisma.visit.findMany({
+    where: { userId, restaurantId: { not: null } },
+    distinct: ['restaurantId'],
+    select: { restaurantId: true },
+  });
+  const demoReviews = { review: { userId } };
   await prisma.$transaction([
+    prisma.reviewAspectMark.deleteMany({ where: demoReviews }),
+    prisma.reviewImage.deleteMany({ where: demoReviews }),
+    // 확인하다가 가짜 리뷰에 도움돼요를 눌렀을 수 있다
+    prisma.reviewReaction.deleteMany({ where: { OR: [demoReviews, { userId }] } }),
+    prisma.restaurantMapae.updateMany({ where: demoReviews, data: { reviewId: null } }),
+    prisma.review.deleteMany({ where: { userId } }),
     prisma.notification.deleteMany({ where: { userId } }),
     prisma.pointHistory.deleteMany({ where: { userId } }),
     prisma.expHistory.deleteMany({ where: { userId } }),
@@ -441,6 +670,9 @@ export async function clearDemoData(nickname: string) {
 
   // 4. 남은 사람들의 순위를 다시 계산하고, 지난 시즌 확정 시각을 처음처럼 비운다
   await recompute(touched);
+  for (const { restaurantId } of demoShops) {
+    if (restaurantId !== null) await refreshRestaurantStat(prisma, restaurantId);
+  }
   await prisma.season.updateMany({
     where: { id: { in: seasons.map((s) => s.id) } },
     data: { finalizedAt: null },
