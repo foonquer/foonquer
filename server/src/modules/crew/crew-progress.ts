@@ -1,4 +1,5 @@
 import type { Tx } from '../../common/db';
+import { withObjectParticle } from '../../common/josa';
 import { kstTodayAsDbDate, kstWeekStartAsDbDate } from '../../common/time';
 import { notify } from '../notification/notify';
 import { refreshReviewWeight } from '../restaurant/restaurant-stat-calc';
@@ -166,7 +167,7 @@ export async function advanceCrews(
           {
             category: 'RANK',
             type: 'CREW_TOGETHER',
-            title: `${me}님과 ${restaurant.name}을(를) 함께 정복했어요`,
+            title: `${me}님과 ${withObjectParticle(restaurant.name)} 함께 정복했어요`,
             content: `${crew.name} · 함께 정복 ${conquestCount}곳째`,
             refType: 'CREW',
             refId: crew.id,

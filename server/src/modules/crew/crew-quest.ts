@@ -146,6 +146,10 @@ export async function crewQuestViews(
   quests: Awaited<ReturnType<typeof ensureCrewQuests>>,
   weekStart: Date,
 ) {
+  const places = await db.restaurant.findMany({
+    where: { id: { in: quests.flatMap((q) => (q.restaurantId ? [q.restaurantId] : [])) } },
+    select: { id: true, name: true },
+  });
   return Promise.all(
     [...quests]
       .sort((a, b) => (a.type === 'TOGETHER' ? 0 : 1) - (b.type === 'TOGETHER' ? 0 : 1))
@@ -184,6 +188,7 @@ export async function crewQuestViews(
           target: q.target,
           progress: participants.length,
           restaurantId: q.restaurantId,
+          restaurantName: places.find((p) => p.id === q.restaurantId)?.name ?? null,
           participants: participants.map((u) => ({ userId: u.id, nickname: u.nickname })),
         };
       }),

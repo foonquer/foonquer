@@ -203,6 +203,7 @@ describe('CREW-08 모임 퀘스트', () => {
         typeName: '함께 정복',
         title: '모두 안 가 본 한식집',
         restaurantId: Number(best.id),
+        restaurantName: '모두맛집',
         target: 2,
         progress: 0,
         rewardPoint: 100,
@@ -258,7 +259,7 @@ describe('CREW-08 모임 퀘스트', () => {
     ]);
     const notis = await api(junho.id).get('/notifications');
     expect(notis.body.data.items[0]).toMatchObject({
-      title: '민지님과 모두맛집을(를) 함께 정복했어요',
+      title: '민지님과 모두맛집을 함께 정복했어요',
       deepLink: `/crews/${crewId}`,
     });
 
