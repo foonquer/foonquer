@@ -17,7 +17,8 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "job": "tsx src/jobs/run.ts",
-    "job:prod": "node dist/src/jobs/run.js"
+    "job:prod": "node dist/src/jobs/run.js",
+    "demo": "tsx src/jobs/demo-run.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "8.4.0",
