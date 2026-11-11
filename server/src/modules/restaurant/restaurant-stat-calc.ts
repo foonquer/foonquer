@@ -77,24 +77,37 @@ export function decayOf(p: RatingParams, regDate: Date, now: Date) {
   return Math.max(p.DECAY_MIN, p.DECAY_RATE ** Math.floor(months / p.DECAY_MONTHS));
 }
 
-/** 리뷰 한 개의 score_weight를 지금 작성자 온도·공감 수로 다시 정한다 */
+/**
+ * 리뷰 한 개의 score_weight를 지금 작성자 온도·공감 수로 다시 정한다.
+ * 모임원과 함께 정복한 방문(crew_conquest)의 리뷰는 묶인 인원만큼 나눠 한 묶음으로 반영한다
+ * (친구 5명이 같이 가서 준 5점이 남남 5명이 준 5점보다 덜 반영되게 — 나누는 정도는 팀이 정할 값, 지금은 1/인원)
+ */
 export async function refreshReviewWeight(tx: Tx, reviewId: bigint, params?: RatingParams) {
   const p = params ?? (await loadRatingParams(tx));
   const review = await tx.review.findUniqueOrThrow({
     where: { id: reviewId },
     select: {
+      visitId: true,
       visitorHelpfulCount: true,
       unhelpfulCount: true,
       isRevisit: true,
       user: { select: { trustTemp: true } },
     },
   });
-  const scoreWeight = scoreWeightOf(p, {
-    trustTemp: review.user.trustTemp.toNumber(),
-    visitorHelpful: review.visitorHelpfulCount,
-    unhelpful: review.unhelpfulCount,
-    isRevisit: review.isRevisit,
+  const groups = await tx.crewConquestMember.findMany({
+    where: { visitId: review.visitId },
+    select: { crewConquest: { select: { _count: { select: { members: true } } } } },
   });
+  const together = Math.max(1, ...groups.map((g) => g.crewConquest._count.members));
+  const scoreWeight = round(
+    scoreWeightOf(p, {
+      trustTemp: review.user.trustTemp.toNumber(),
+      visitorHelpful: review.visitorHelpfulCount,
+      unhelpful: review.unhelpfulCount,
+      isRevisit: review.isRevisit,
+    }) / together,
+    3,
+  );
   await tx.review.update({ where: { id: reviewId }, data: { scoreWeight } });
   return scoreWeight;
 }

@@ -10,6 +10,7 @@ import {
   type UnlockedAchievement,
 } from '../achievement/achievement.service';
 import { applyConquest } from '../conquest/conquest.service';
+import { advanceCrews } from '../crew/crew-progress';
 import { advanceQuests } from '../quest/quest-progress';
 import {
   refreshReviewWeight,
@@ -94,6 +95,14 @@ export async function rateVisit(
         null,
         now,
       );
+      // 모임: 같은 날 2시간 안에 같은 가게를 인증한 모임원과 함께 정복 (리뷰 가중치를 나누므로 가중치 계산 전에)
+      const crew = await advanceCrews(tx, {
+        userId,
+        visitId: visit.id,
+        restaurantId: restaurant.id,
+        isFirstEver: conquest.isFirstEver,
+        now,
+      });
       // 맞춤 퀘스트 진행 (방문 인증 + 맛 별점이 완료 조건)
       const quest = await advanceQuests(tx, {
         userId,
@@ -104,12 +113,12 @@ export async function rateVisit(
       });
       await refreshReviewWeight(tx, review.id);
       await refreshRestaurantStat(tx, restaurant.id, now);
-      return { review, restaurant, conquest, quest };
+      return { review, restaurant, conquest, quest, crew };
     },
     { timeout: 15_000 },
   );
 
-  const { review, restaurant, conquest, quest } = result;
+  const { review, restaurant, conquest, quest, crew } = result;
   // 정복·보상은 이미 커밋됐다. 보조 정보라 실패해도 null로 응답한다 (다시 보내면 ALREADY_RATED가 되므로)
   const nextReward = await nextConquestReward(prisma, userId, now).catch((err: unknown) => {
     console.error('다음 정복 보상 조회 실패', err);
@@ -144,6 +153,8 @@ export async function rateVisit(
     nextReward,
     /** 이번 정복으로 깬 맞춤 퀘스트 (없으면 null) — 퀘스트 완료·주간 상자 화면 */
     quest,
+    /** 모임원과 함께 정복했으면 그 모임들 (없으면 null) — 함께 정복 완료 화면 */
+    crew,
   };
 }
 

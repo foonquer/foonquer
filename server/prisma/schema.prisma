@@ -55,6 +55,8 @@ model Member {
   questEnabled            Boolean                   @default(true) @map("quest_enabled")
   /// 방문 기록으로 맞춤 추천 — 끄면 퀘스트가 내 기록 대신 동네 인기순 일반 추천으로 바뀐다. 기록은 다른 사람에게 안 보인다
   personalizedReco        Boolean                   @default(true) @map("personalized_reco")
+  /// 모임 퀘스트 · 초대 알림 (끄면 알림함에는 쌓고 푸시만 보내지 않는다)
+  crewAlarm               Boolean                   @default(true) @map("crew_alarm")
   /// P 프로필 설정 전 / A 활성 / S 이용 정지 / D 탈퇴
   status                  String                    @default("P") @db.Char(1)
   /// U 일반 회원 / A 운영자 — /api/v1/admin을 쓸 수 있다 (v1.3). 운영자는 DB에서 직접 지정한다
@@ -99,6 +101,11 @@ model Member {
   questWeeks              QuestWeek[]
   quests                  Quest[]
   questDislikes           QuestDislike[]
+  ownedCrews              Crew[]
+  crewMembers             CrewMember[]              @relation("crew_member_user_id")
+  crewInvites             CrewMember[]              @relation("crew_member_invited_by")
+  crewConquestMembers     CrewConquestMember[]
+  crewQuestEntries        CrewQuestEntry[]
 
   @@map("member")
 }
@@ -248,6 +255,7 @@ model Region {
   mukkaebis                 Mukkaebi[]
   memberRegionBackgrounds   MemberRegionBackground[]
   quests                    Quest[]
+  crews                     Crew[]
 
   @@index([parentId, name], map: "region_parent_name_idx")
   @@index([level], map: "region_level_idx")
@@ -336,6 +344,9 @@ model Restaurant {
   picks            MemberPick[]
   quests           Quest[]                @relation("quest_restaurant_id")
   doneQuests       Quest[]                @relation("quest_done_restaurant_id")
+  crewConquests    CrewConquest[]
+  crewQuests       CrewQuest[]
+  crewQuestEntries CrewQuestEntry[]
 
   @@index([sigunguId, categoryId], map: "restaurant_sigungu_category_idx")
   @@index([regionId, categoryId], map: "restaurant_region_category_idx")
@@ -1370,4 +1381,130 @@ model QuestDislike {
 
   @@id([userId, type])
   @@map("quest_dislike")
+}
+
+/// 모임 (피그마 12. 모임, 2026-11-10). 친구·가족 2~8명, 연인 2명. 한 사람이 여러 모임에 들어갈 수 있고, 모임마다 퀘스트와 함께 정복 기록이 따로 쌓인다.
+/// 겨루기 없이 같이 정복하기만 있다. 모임원에게는 정복한 가게·맛 별점·모임 퀘스트 진행만 보인다 (방문 시간·지금 위치·다른 모임 활동은 안 보인다)
+model Crew {
+  id         BigInt         @id @default(autoincrement())
+  /// F 친구 / A 가족 / C 연인
+  type       String         @db.Char(1)
+  /// 2~12자
+  name       String         @db.VarChar(12)
+  /// 주로 정복할 구 (region.level = 2) — 모임 퀘스트는 이 구 안에서 추천
+  sigunguId  Int            @map("sigungu_id")
+  /// 초대 코드 (예: MJK-4821) — 링크 /crews/join?code=로도 쓴다
+  inviteCode String         @unique @map("invite_code") @db.VarChar(10)
+  ownerId    BigInt         @map("owner_id")
+  regDate    DateTime       @default(now()) @map("reg_date")
+  sigungu    Region         @relation(fields: [sigunguId], references: [id])
+  owner      Member         @relation(fields: [ownerId], references: [id])
+  members    CrewMember[]
+  conquests  CrewConquest[]
+  quests     CrewQuest[]
+  badges     CrewBadge[]
+
+  @@map("crew")
+}
+
+model CrewMember {
+  crewId    BigInt    @map("crew_id")
+  userId    BigInt    @map("user_id")
+  /// I 초대 받음(수락 대기) / A 참여 중 / R 거절 / L 나감
+  status    String    @db.Char(1)
+  /// 닉네임으로 초대한 사람 (코드로 들어오면 null)
+  invitedBy BigInt?   @map("invited_by")
+  invitedAt DateTime? @map("invited_at")
+  joinedAt  DateTime? @map("joined_at")
+  crew      Crew      @relation(fields: [crewId], references: [id])
+  user      Member    @relation("crew_member_user_id", fields: [userId], references: [id])
+  inviter   Member?   @relation("crew_member_invited_by", fields: [invitedBy], references: [id])
+
+  @@id([crewId, userId])
+  @@index([userId, status], map: "crew_member_user_idx")
+  @@map("crew_member")
+}
+
+/// 함께 정복: 같은 가게에서 같은 날(KST) 2시간 안에 인증하고 별점까지 남긴 모임원끼리 자동으로 묶는다.
+/// 같이 간 모임원 리뷰는 가게 별점에 한 묶음으로 반영한다 (리뷰 가중치를 묶인 인원만큼 나눈다)
+model CrewConquest {
+  id           BigInt               @id @default(autoincrement())
+  crewId       BigInt               @map("crew_id")
+  restaurantId BigInt               @map("restaurant_id")
+  /// 함께 정복한 날 (KST)
+  conqueredOn  DateTime             @map("conquered_on") @db.Date
+  regDate      DateTime             @default(now()) @map("reg_date")
+  crew         Crew                 @relation(fields: [crewId], references: [id])
+  restaurant   Restaurant           @relation(fields: [restaurantId], references: [id])
+  members      CrewConquestMember[]
+
+  @@unique([crewId, restaurantId, conqueredOn], map: "crew_conquest_uk")
+  @@map("crew_conquest")
+}
+
+model CrewConquestMember {
+  crewConquestId BigInt       @map("crew_conquest_id")
+  userId         BigInt       @map("user_id")
+  /// 묶인 방문 인증 — 리뷰 가중치를 나눌 때 이 방문의 리뷰를 찾는다
+  visitId        BigInt       @map("visit_id")
+  regDate        DateTime     @default(now()) @map("reg_date")
+  crewConquest   CrewConquest @relation(fields: [crewConquestId], references: [id])
+  user           Member       @relation(fields: [userId], references: [id])
+
+  @@id([crewConquestId, userId])
+  @@index([visitId], map: "crew_conquest_member_visit_idx")
+  @@map("crew_conquest_member")
+}
+
+/// 모임 퀘스트 (주마다, 그 주에 모임 퀘스트를 처음 열 때 만든다). 보상은 모임원 각자 먹포인트
+model CrewQuest {
+  id           BigInt           @id @default(autoincrement())
+  crewId       BigInt           @map("crew_id")
+  /// 그 주 월요일 (KST)
+  weekStart    DateTime         @map("week_start") @db.Date
+  /// TOGETHER 함께 정복(모임원 2명 이상이 추천 가게를 같이 정복) / SPLIT 맛집 나눠 찾기(같은 구에서 모임원마다 다른 곳 1곳씩)
+  type         String           @db.VarChar(20)
+  /// 함께 정복할 가게
+  restaurantId BigInt?          @map("restaurant_id")
+  /// 맛집 나눠 찾기: 정복할 사람 수 (만들 때 모임원 수)
+  target       Int              @default(1) @db.TinyInt
+  title        String           @db.VarChar(60)
+  summary      String           @db.VarChar(100)
+  rewardPoint  Int              @map("reward_point")
+  /// A 진행 중 / C 완료
+  status       String           @default("A") @db.Char(1)
+  completedAt  DateTime?        @map("completed_at")
+  regDate      DateTime         @default(now()) @map("reg_date")
+  crew         Crew             @relation(fields: [crewId], references: [id])
+  restaurant   Restaurant?      @relation(fields: [restaurantId], references: [id])
+  entries      CrewQuestEntry[]
+
+  @@unique([crewId, weekStart, type], map: "crew_quest_week_uk")
+  @@map("crew_quest")
+}
+
+/// 맛집 나눠 찾기: 모임원이 각자 새로 정복한 곳 (한 사람 한 곳, 같은 가게는 한 번만)
+model CrewQuestEntry {
+  crewQuestId  BigInt     @map("crew_quest_id")
+  userId       BigInt     @map("user_id")
+  restaurantId BigInt     @map("restaurant_id")
+  regDate      DateTime   @default(now()) @map("reg_date")
+  crewQuest    CrewQuest  @relation(fields: [crewQuestId], references: [id])
+  user         Member     @relation(fields: [userId], references: [id])
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@id([crewQuestId, userId])
+  @@unique([crewQuestId, restaurantId], map: "crew_quest_entry_restaurant_uk")
+  @@map("crew_quest_entry")
+}
+
+/// 모임 배지 — 함께 정복 수로 받는다: FIRST_FEAST 첫 만찬(1곳) / EXPLORERS ○○ 탐험대(5곳) / REGULARS 단골 모임(10곳)
+model CrewBadge {
+  crewId  BigInt   @map("crew_id")
+  code    String   @db.VarChar(20)
+  regDate DateTime @default(now()) @map("reg_date")
+  crew    Crew     @relation(fields: [crewId], references: [id])
+
+  @@id([crewId, code])
+  @@map("crew_badge")
 }

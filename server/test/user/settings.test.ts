@@ -52,7 +52,7 @@ afterEach(() => {
 });
 
 describe('SET-01 GET /users/me/settings', () => {
-  it('알림 3종, 내 동네, 카카오 계정 가입 시각을 준다', async () => {
+  it('알림 4종, 내 동네, 카카오 계정 가입 시각을 준다', async () => {
     const joinedAt = new Date('2026-09-10T11:01:00Z');
     const me = await createMember({ kakaoId: 'k-1', marketingAlarm: false, regDate: joinedAt });
     await agreeConsents(me.id);
@@ -69,6 +69,7 @@ describe('SET-01 GET /users/me/settings', () => {
       conquestAlarm: true,
       rankAlarm: true,
       marketingAlarm: false,
+      crewAlarm: true,
       marketingConsentChangedAt: toKstIso(lastMarketing!.regDate),
     });
     expect(
@@ -110,6 +111,7 @@ describe('SET-02 PATCH /users/me/notification-settings', () => {
       conquestAlarm: true,
       rankAlarm: false,
       marketingAlarm: false,
+      crewAlarm: true,
       marketingConsentChangedAt: null,
       questEnabled: true,
       personalizedReco: true,
