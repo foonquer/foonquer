@@ -1,6 +1,7 @@
 // 별점·리뷰 API (REVIEW-01~10)
 
 import { api, type Query } from '../lib/api';
+import type { CrewTogether } from './crews';
 import type { QuestAdvance } from './quests';
 
 export type LevelUp = { from: number; to: number; itemBoxCount: number };
@@ -92,6 +93,8 @@ export type RatingResult = {
   nextReward: NextConquestReward | null;
   /** 이번 정복으로 깬 맞춤 퀘스트 (없으면 null) */
   quest: QuestAdvance | null;
+  /** 모임원과 함께 정복했으면 그 모임들 (없으면 null) */
+  crew: { together: CrewTogether[] } | null;
 };
 
 export type NextConquestReward = {

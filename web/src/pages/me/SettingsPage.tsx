@@ -66,7 +66,7 @@ export function SettingsPage() {
   const settings = useAsync(getSettings, []);
   const notification = settings.data?.notification;
 
-  type AlarmKey = 'conquestAlarm' | 'rankAlarm' | 'marketingAlarm';
+  type AlarmKey = 'conquestAlarm' | 'rankAlarm' | 'marketingAlarm' | 'crewAlarm';
   type PersonalKey = keyof PersonalizationSettings;
   // 저장 중인 스위치는 잠근다 (연달아 누르면 요청 순서가 엇갈려 화면과 서버 값이 달라질 수 있다)
   const [saving, setSaving] = useState<Set<AlarmKey | PersonalKey>>(new Set());
@@ -180,7 +180,7 @@ export function SettingsPage() {
           />
         </MenuSection>
 
-        <MenuSection title="맞춤 퀘스트">
+        <MenuSection title="맞춤 퀘스트 · 모임">
           <MenuList
             items={
               settings.error
@@ -193,6 +193,7 @@ export function SettingsPage() {
                   ]
                 : [
                     personal('questEnabled', '맞춤 퀘스트'),
+                    alarm('crewAlarm', '모임 퀘스트 · 초대 알림'),
                     personal('personalizedReco', '방문 기록으로 맞춤 추천'),
                   ]
             }

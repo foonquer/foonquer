@@ -62,8 +62,9 @@ export function RatingPage() {
     setSaving(true);
     try {
       const result = await rateVisit(visitId, score);
-      // 퀘스트를 깼으면 퀘스트 완료(·주간 상자)를 먼저 보여 주고 정복 결과로 이어 간다
-      navigate(`/visits/${visitId}/${result.quest ? 'quest' : 'conquered'}`, {
+      // 모임원과 함께 정복 → 퀘스트 완료(·주간 상자) → 정복 결과 순서로 이어 간다
+      const next = result.crew ? 'together' : result.quest ? 'quest' : 'conquered';
+      navigate(`/visits/${visitId}/${next}`, {
         replace: true,
         state: result,
       });

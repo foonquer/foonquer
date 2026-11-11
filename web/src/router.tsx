@@ -36,6 +36,12 @@ import { RecommendationListPage } from './pages/recommendations/RecommendationLi
 import { RecommendationsPage } from './pages/recommendations/RecommendationsPage';
 import { RestaurantDetailPage } from './pages/restaurant/RestaurantDetailPage';
 import { ConqueredPage } from './pages/review/ConqueredPage';
+import { CrewInvitationPage, CrewJoinPage } from './pages/crew/CrewInvitationPage';
+import { CrewInvitePage } from './pages/crew/CrewInvitePage';
+import { CrewNewPage } from './pages/crew/CrewNewPage';
+import { CrewSpacePage } from './pages/crew/CrewSpacePage';
+import { CrewTogetherPage } from './pages/crew/CrewTogetherPage';
+import { MyCrewsPage } from './pages/crew/MyCrewsPage';
 import { QuestCompletePage } from './pages/quest/QuestCompletePage';
 import { QuestDetailPage } from './pages/quest/QuestDetailPage';
 import { QuestRecordsPage, QuestWeekPage } from './pages/quest/QuestRecordsPage';
@@ -115,6 +121,12 @@ export const routes: RouteObject[] = [
           { path: '/me/quests', element: <QuestRecordsPage /> },
           { path: '/me/quests/:weekId', element: <QuestWeekPage /> },
           { path: '/quests/:questId', element: <QuestDetailPage /> },
+          { path: '/me/crews', element: <MyCrewsPage /> },
+          { path: '/crews/new', element: <CrewNewPage /> },
+          { path: '/crews/join', element: <CrewJoinPage /> }, // ?code=
+          { path: '/crews/:crewId', element: <CrewSpacePage /> },
+          { path: '/crews/:crewId/invite', element: <CrewInvitePage /> },
+          { path: '/crews/:crewId/invitation', element: <CrewInvitationPage /> },
           { path: '/me/reviews', element: <MyReviewsPage /> },
           { path: '/me/conquests', element: <ConquestsPage /> }, // ?seasonId=
           { path: '/me/seasons', element: <SeasonsPage /> },
@@ -146,6 +158,7 @@ export const routes: RouteObject[] = [
           { path: '/visits/:visitId/follow', element: <FollowPage /> },
           { path: '/visits/:visitId/rating', element: <RatingPage /> },
           { path: '/visits/:visitId/conquered', element: <ConqueredPage /> },
+          { path: '/visits/:visitId/together', element: <CrewTogetherPage /> },
           { path: '/visits/:visitId/quest', element: <QuestCompletePage /> },
           { path: '/visits/:visitId/review', element: <ReviewWritePage /> },
           { path: '/visits/:visitId/reward', element: <RewardPage /> },
