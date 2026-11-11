@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app';
 import { toKstIso } from '../../src/common/time';
 import { prisma } from '../../src/lib/prisma';
+import { refreshRestaurantStat } from '../../src/modules/restaurant/restaurant-stat-calc';
 import { resetDb } from '../helpers/db';
 import {
   agreeConsents,
@@ -109,6 +110,7 @@ describe('MAP-02 GET /restaurants/{restaurantId}/preview', () => {
       name: '이가네떡볶이',
       categoryId: 5,
       categoryName: '분식',
+      imageUrl: null,
       sigunguName: '강서구',
       dongName: '가양동',
       distanceM: expect.any(Number),
@@ -268,6 +270,7 @@ describe('REST-01 GET /restaurants/{restaurantId}', () => {
       categoryId: 1,
       categoryName: '한식',
       categoryDetail: '백반/한정식',
+      imageUrl: null,
       phone: '02-1234-5678',
       roadAddress: '서울 강서구 가양로 123',
       jibunAddress: '서울 강서구 가양동 1487',
@@ -477,5 +480,39 @@ describe('REST-01 GET /restaurants/{restaurantId}', () => {
     const res = await detail(me.id, 'abc');
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('VALIDATION_ERROR');
+  });
+});
+
+describe('가게 대표 사진 (restaurant_stat.cover_image_key)', () => {
+  it('공개 리뷰 중 가장 최근 것의 첫 사진, 블라인드된 리뷰 사진은 쓰지 않는다', async () => {
+    const shop = await createRestaurant();
+    const review = async (daysAgo: number, keys: string[]) => {
+      const user = await createMember();
+      const visit = await createVisit(user.id, shop.id);
+      return prisma.review.create({
+        data: {
+          visitId: visit.id,
+          userId: user.id,
+          restaurantId: shop.id,
+          overallScore: 4,
+          imageCount: keys.length,
+          regDate: new Date(Date.now() - daysAgo * 86_400_000),
+          reviewImages: { create: keys.map((imageKey, sortOrder) => ({ imageKey, sortOrder })) },
+        },
+      });
+    };
+    const coverOf = async () =>
+      (await prisma.restaurantStat.findUniqueOrThrow({ where: { restaurantId: shop.id } }))
+        .coverImageKey;
+
+    await review(3, ['review/old-1.jpg']);
+    const latest = await review(1, ['review/new-1.jpg', 'review/new-2.jpg']);
+    await review(0, []); // 사진 없는 리뷰는 건너뛴다
+    await refreshRestaurantStat(prisma, shop.id);
+    expect(await coverOf()).toBe('review/new-1.jpg');
+
+    await prisma.review.update({ where: { id: latest.id }, data: { status: 'H' } });
+    await refreshRestaurantStat(prisma, shop.id);
+    expect(await coverOf()).toBe('review/old-1.jpg');
   });
 });

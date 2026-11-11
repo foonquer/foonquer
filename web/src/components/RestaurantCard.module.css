@@ -19,14 +19,6 @@
   background: var(--mk-photo);
 }
 
-.thumb img {
-  position: absolute;
-  top: -1.5px;
-  left: -10px;
-  width: 82px;
-  max-width: none;
-}
-
 .text {
   display: flex;
   flex: 1;

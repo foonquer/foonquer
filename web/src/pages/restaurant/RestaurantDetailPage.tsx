@@ -3,10 +3,10 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { getRestaurant, type RestaurantDetail } from '../../api/restaurants';
 import { getRestaurantReviews } from '../../api/reviews';
 import { saveRestaurant, unsaveRestaurant } from '../../api/saved';
-import mealHero from '../../assets/illust/meal-hero.svg';
 import { AppHeader } from '../../components/AppHeader';
 import { Button } from '../../components/Button';
 import { ConquestBadge } from '../../components/ConquestBadge';
+import { FoodImage } from '../../components/FoodImage';
 import { ReviewCard } from '../../components/ReviewCard';
 import { Screen } from '../../components/Screen';
 import { EmptyState, Loading } from '../../components/StateViews';
@@ -164,7 +164,7 @@ function Detail({
     >
       <AppHeader title="음식점 상세" />
       <div className={styles.content}>
-        <img src={mealHero} alt="" className={styles.hero} />
+        <FoodImage imageUrl={r.imageUrl} categoryName={r.categoryName} className={styles.hero} />
 
         <div className={styles.titleRow}>
           <h2 className={styles.name}>{r.name}</h2>

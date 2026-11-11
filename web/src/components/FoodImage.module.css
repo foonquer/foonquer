@@ -1,0 +1,29 @@
+/* 기본은 부모를 꽉 채우고 부모 둥글기를 따른다 (className으로 크기를 주면 그 크기) */
+.box {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  background: var(--mk-photo);
+}
+
+.photo,
+.art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+
+.photo {
+  object-fit: cover;
+}
+
+/* 그림은 가운데에 여백을 두고 (넓은 자리에서는 위아래 기준으로 맞춘다) */
+.art {
+  padding: 8%;
+  object-fit: contain;
+}

@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { getRestaurantPreview, type RestaurantPreview } from '../../api/restaurants';
-import mealThumb from '../../assets/illust/meal-thumb.svg';
 import { BottomSheet } from '../../components/BottomSheet';
 import { Button } from '../../components/Button';
 import { ConquestBadge } from '../../components/ConquestBadge';
+import { FoodImage } from '../../components/FoodImage';
 import { Loading } from '../../components/StateViews';
 import { useToast } from '../../components/Toast';
 import { errorMessage } from '../../lib/api';
@@ -63,8 +63,8 @@ function Preview({ p }: { p: RestaurantPreview }) {
   return (
     <div className={styles.body}>
       <div className={styles.head}>
-        <span className={styles.thumb} aria-hidden="true">
-          <img src={mealThumb} alt="" />
+        <span className={styles.thumb}>
+          <FoodImage imageUrl={p.imageUrl} categoryName={p.categoryName} />
         </span>
         <div className={styles.info}>
           <div className={styles.titleRow}>

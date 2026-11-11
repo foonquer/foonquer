@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { dismissQuest, getQuest, type QuestDetail, swapQuest } from '../../api/quests';
-import mealThumb from '../../assets/illust/meal-thumb.svg';
 import { AppHeader } from '../../components/AppHeader';
 import { ButtonLink } from '../../components/Button';
+import { FoodImage } from '../../components/FoodImage';
 import { Screen } from '../../components/Screen';
 import { EmptyState, Loading } from '../../components/StateViews';
 import { useToast } from '../../components/Toast';
@@ -126,7 +126,11 @@ function Detail({ quest }: { quest: QuestDetail }) {
 
         {r ? (
           <section className={styles.place} aria-label="가 볼 가게">
-            <img src={mealThumb} alt="" className={styles.placeThumb} />
+            <FoodImage
+              imageUrl={r.imageUrl}
+              categoryName={r.categoryName}
+              className={styles.placeThumb}
+            />
             <div>
               <p className={styles.placeName}>
                 {r.name}

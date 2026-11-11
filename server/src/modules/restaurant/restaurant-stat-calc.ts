@@ -123,7 +123,7 @@ export async function refreshRestaurantStat(
   params?: RatingParams,
 ) {
   const p = params ?? (await loadRatingParams(tx));
-  const [reviews, visits, conquerors, saveCount] = await Promise.all([
+  const [reviews, visits, conquerors, saveCount, cover] = await Promise.all([
     tx.review.findMany({
       where: { restaurantId, status: 'A' },
       select: {
@@ -148,6 +148,12 @@ export async function refreshRestaurantStat(
       select: { userId: true },
     }),
     tx.savedRestaurant.count({ where: { restaurantId } }),
+    // 대표 사진: 공개 리뷰 중 가장 최근 것의 첫 사진
+    tx.reviewImage.findFirst({
+      where: { review: { restaurantId, status: 'A' } },
+      orderBy: [{ review: { regDate: 'desc' } }, { reviewId: 'desc' }, { sortOrder: 'asc' }],
+      select: { imageKey: true },
+    }),
   ]);
 
   let scoreSum = 0;
@@ -207,6 +213,7 @@ export async function refreshRestaurantStat(
     revisitorCount: [...visitsByUser.values()].filter((n) => n >= 2).length,
     conquerorCount: conquerors.length,
     saveCount,
+    coverImageKey: cover?.imageKey ?? null,
   };
   await tx.restaurantStat.upsert({
     where: { restaurantId },

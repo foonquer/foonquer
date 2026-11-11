@@ -24,14 +24,6 @@
   background: var(--mk-cream);
 }
 
-.thumb img {
-  position: absolute;
-  top: -2.5px;
-  left: -50.5px;
-  width: 173px;
-  max-width: none;
-}
-
 .info {
   display: flex;
   flex: 1;

@@ -12,7 +12,7 @@ import {
 import { Prisma } from '../../generated/prisma/client';
 import { prisma } from '../../lib/prisma';
 import { questStreak } from '../achievement/achievement.service';
-import { myOverallOf, ratingOf } from '../restaurant/restaurant-stats';
+import { coverImageUrlOf, myOverallOf, ratingOf } from '../restaurant/restaurant-stats';
 import { type TasteWeights, weightsOf, WEIGHT_SELECT } from '../user/taste-weights';
 import {
   draftQuest,
@@ -154,6 +154,7 @@ function questView(q: QuestRow, ctx: ViewContext) {
           restaurantId: r.id,
           name: r.name,
           categoryName: r.category?.name ?? null,
+          imageUrl: coverImageUrlOf(r.restaurantStat),
           regionName: r.region?.name ?? null,
           /** 내 동네(첫 번째) 동 중심에서 거리 (m) */
           distanceM:

@@ -391,6 +391,8 @@ model RestaurantStat {
   reviewCount        Int        @default(0) @map("review_count")
   textReviewCount    Int        @default(0) @map("text_review_count")
   photoReviewCount   Int        @default(0) @map("photo_review_count")
+  /// 가게 대표 사진 (공개 리뷰 중 가장 최근 것의 첫 사진, 공개 버킷 key). 없으면 화면은 음식 종류 그림
+  coverImageKey      String?    @map("cover_image_key") @db.VarChar(255)
   /// 리뷰 overall_score(종합 별점)의 합 — 단순 평균 = score_sum / review_count
   scoreSum           Decimal    @default(0) @map("score_sum") @db.Decimal(12, 1)
   /// Σw — 계산에 넣는 공개 리뷰의 최종 가중치 w = score_weight × 시간 감쇠 d 의 합 (ERD v1.0)

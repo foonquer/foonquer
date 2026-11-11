@@ -10,7 +10,7 @@ import { loadMyStates, myStateOf } from './my-state';
 import { RestaurantError } from './restaurant.errors';
 import type { RestaurantLocationQuery } from './restaurant.schema';
 import { REVISIT_INTENT_MIN_SCORE } from './restaurant-stat-calc';
-import { detailStatsOf, myOverallOf, ratingOf } from './restaurant-stats';
+import { coverImageUrlOf, detailStatsOf, myOverallOf, ratingOf } from './restaurant-stats';
 
 /** 숨김(H) 가게는 없는 것처럼 404. 폐업(C)은 기록 확인을 위해 보여 준다 */
 async function findVisibleRestaurant(restaurantId: bigint) {
@@ -120,6 +120,7 @@ export async function getRestaurantPreview(
     name: r.name,
     categoryId: r.categoryId,
     categoryName: r.category?.name ?? null,
+    imageUrl: coverImageUrlOf(r.restaurantStat),
     sigunguName: r.sigungu.name,
     dongName: r.region.name,
     distanceM: distanceMeters(from, { lat: r.lat.toNumber(), lng: r.lng.toNumber() }),
@@ -174,6 +175,8 @@ export async function getRestaurantDetail(
     categoryId: r.categoryId,
     categoryName: r.category?.name ?? null,
     categoryDetail: r.categoryDetail,
+    /** 대표 사진 (인증 리뷰 사진, 없으면 null → 음식 종류 그림) */
+    imageUrl: coverImageUrlOf(r.restaurantStat),
     phone: kakao?.phone || null,
     roadAddress: r.roadAddress,
     jibunAddress: r.jibunAddress,
