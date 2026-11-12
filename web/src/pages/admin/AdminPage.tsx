@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import {
   type AdminInquiry,
@@ -19,9 +19,12 @@ import { Dialog } from '../../components/Dialog';
 import { Screen } from '../../components/Screen';
 import { EmptyState, Loading } from '../../components/StateViews';
 import { useToast } from '../../components/Toast';
-import { ApiError, errorMessage } from '../../lib/api';
+import { errorMessage } from '../../lib/api';
 import { formatDateTime, formatScore, joinDot } from '../../lib/format';
 import { usePaged } from '../../lib/usePaged';
+import { listError, moreError } from './AdminCommon';
+import { Faqs, Notices, Terms } from './AdminContent';
+import { Members } from './AdminMembers';
 import styles from './Admin.module.css';
 
 const ANSWER_MAX = 1000;
@@ -55,23 +58,36 @@ const ACTIONS: Record<ReportAction, { label: string; effect: string }> = {
   REJECT: { label: '반려', effect: '이 신고만 문제없음으로 끝내요.' },
 };
 
-/** 운영 관리 /admin?tab=reports|inquiries — 신고 처리(ADMIN-01·02), 1:1 문의 답변(ADMIN-08·09). 운영자만 */
+const TABS = [
+  ['reports', '신고', Reports],
+  ['inquiries', '1:1 문의', Inquiries],
+  ['notices', '공지', Notices],
+  ['faqs', 'FAQ', Faqs],
+  ['terms', '약관', Terms],
+  ['members', '회원', Members],
+] as const;
+
+/**
+ * 운영 관리 /admin?tab=… — 신고 처리(ADMIN-01·02), 1:1 문의 답변(ADMIN-08·09),
+ * 공지·FAQ(ADMIN-10~13·17·18), 약관 새 버전(ADMIN-14), 회원(ADMIN-15·16). 운영자만
+ */
 export function AdminPage() {
   const [params, setParams] = useSearchParams();
-  const tab = params.get('tab') === 'inquiries' ? 'inquiries' : 'reports';
+  const tab = TABS.find(([value]) => value === params.get('tab'))?.[0] ?? 'reports';
+  // 탭이 가로로 넘치므로 고른 탭(주소로 바로 들어온 경우 포함)이 보이게 민다
+  const selected = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    selected.current?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  }, [tab]);
   return (
     <Screen>
       <AppHeader title="운영 관리" />
       <div className={styles.content}>
         <div className={styles.tabs} role="tablist" aria-label="운영 관리">
-          {(
-            [
-              ['reports', '신고'],
-              ['inquiries', '1:1 문의'],
-            ] as const
-          ).map(([value, label]) => (
+          {TABS.map(([value, label]) => (
             <button
               key={value}
+              ref={tab === value ? selected : undefined}
               id={`admin-tab-${value}`}
               type="button"
               role="tab"
@@ -83,8 +99,8 @@ export function AdminPage() {
             </button>
           ))}
         </div>
-        {/* 패널 자리는 둘 다 두고(aria-controls가 가리키게) 고른 탭만 내용을 부른다 */}
-        {(['reports', 'inquiries'] as const).map((value) => (
+        {/* 패널 자리는 모두 두고(aria-controls가 가리키게) 고른 탭만 내용을 부른다 */}
+        {TABS.map(([value, , Panel]) => (
           <div
             key={value}
             id={`admin-panel-${value}`}
@@ -92,32 +108,11 @@ export function AdminPage() {
             aria-labelledby={`admin-tab-${value}`}
             hidden={tab !== value}
           >
-            {tab === value && (value === 'reports' ? <Reports /> : <Inquiries />)}
+            {tab === value && <Panel />}
           </div>
         ))}
       </div>
     </Screen>
-  );
-}
-
-/** 운영자가 아니면 서버가 403을 준다 */
-/** 목록이 남아 있는데 다시 불러오기·더 보기가 실패했을 때 (실패한 요청을 다시) */
-function moreError(error: unknown, retry: () => void) {
-  return (
-    <p className={styles.moreError} role="alert">
-      {errorMessage(error)}
-      <button type="button" onClick={retry}>
-        다시 시도
-      </button>
-    </p>
-  );
-}
-
-function listError(error: unknown, reload: () => void) {
-  return error instanceof ApiError && error.status === 403 ? (
-    <EmptyState title="운영자만 볼 수 있어요" />
-  ) : (
-    <EmptyState title={errorMessage(error)} onRetry={reload} />
   );
 }
 

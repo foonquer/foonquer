@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { AdminInquiry, AdminReport } from '../api/admin';
+import type { AdminFaq, AdminInquiry, AdminMember, AdminNotice, AdminReport } from '../api/admin';
 import { fail, mockApi, ok } from './http';
 import { renderRoute } from './render';
 
@@ -313,5 +313,189 @@ describe('운영 관리', () => {
     const pages = server.calls('GET /admin/inquiries').map((c) => c.query.get('page'));
     expect(pages).toEqual(['1', '1']);
     expect(screen.getByText('21건 · 오래된 순')).toBeInTheDocument();
+  });
+
+  it('공지: 새 공지를 올리고, 숨긴 공지는 숨김으로 보이며 다시 보이게 할 수 있다', async () => {
+    const notice = (patch: Partial<AdminNotice> = {}): AdminNotice => ({
+      noticeId: 1,
+      title: '시즌 4 안내',
+      tag: null,
+      isPinned: true,
+      status: 'HIDDEN',
+      content: '시즌 4가 시작돼요',
+      regDate: '2026-11-13T10:00:00+09:00',
+      updatedAt: '2026-11-13T10:00:00+09:00',
+      ...patch,
+    });
+    const server = mockApi({
+      'GET /admin/notices': ok(page([notice()])),
+      'POST /admin/notices': ok({}),
+      'PATCH /admin/notices/:id': ok({}),
+    });
+    renderRoute('/admin?tab=notices');
+
+    const card = await screen.findByRole('article', { name: '공지 1' });
+    expect(card).toHaveTextContent('필독');
+    expect(card).toHaveTextContent('숨김');
+    fireEvent.click(within(card).getByRole('button', { name: '다시 보이기' }));
+    await waitFor(() =>
+      expect(server.calls('PATCH /admin/notices/:id')[0].body).toEqual({ status: 'VISIBLE' }),
+    );
+    expect(await within(card).findByRole('button', { name: '숨기기' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '새 공지' }));
+    const form = screen.getByRole('form', { name: '새 공지' });
+    fireEvent.change(within(form).getByLabelText('제목'), { target: { value: '점검 안내' } });
+    fireEvent.change(within(form).getByLabelText('말머리 (선택)'), { target: { value: '점검' } });
+    fireEvent.change(within(form).getByLabelText('내용'), { target: { value: '새벽 2시 점검' } });
+    fireEvent.click(within(form).getByRole('button', { name: '공지 올리기' }));
+    await waitFor(() =>
+      expect(server.calls('POST /admin/notices')[0].body).toEqual({
+        title: '점검 안내',
+        content: '새벽 2시 점검',
+        tag: '점검',
+        isPinned: false,
+      }),
+    );
+    await waitFor(() => expect(server.calls('GET /admin/notices')).toHaveLength(2));
+    expect(screen.queryByRole('form', { name: '새 공지' })).not.toBeInTheDocument();
+  });
+
+  it('FAQ: 유형으로 거르고, 고치면 보낸 내용으로 저장한다', async () => {
+    const faq: AdminFaq = {
+      faqId: 5,
+      category: 'POINT',
+      question: '먹포인트는 어디에 쓰나요?',
+      answer: '상점에서 써요.',
+      sortOrder: 1,
+      status: 'VISIBLE',
+    };
+    const server = mockApi({
+      'GET /admin/faqs': ok({ items: [faq] }),
+      'PATCH /admin/faqs/:id': ok({}),
+    });
+    renderRoute('/admin?tab=faqs');
+
+    const card = await screen.findByRole('article', { name: 'FAQ 5' });
+    expect(card).toHaveTextContent('먹포인트');
+    fireEvent.click(screen.getByRole('radio', { name: '먹포인트' }));
+    await waitFor(() =>
+      expect(server.calls('GET /admin/faqs').at(-1)?.query.get('category')).toBe('POINT'),
+    );
+
+    fireEvent.click(
+      within(await screen.findByRole('article', { name: 'FAQ 5' })).getByRole('button', {
+        name: '고치기',
+      }),
+    );
+    const form = screen.getByRole('form', { name: 'FAQ 고치기' });
+    fireEvent.change(within(form).getByLabelText('답변'), {
+      target: { value: '상점에서 모자·얼굴·소품을 사요.' },
+    });
+    fireEvent.click(within(form).getByRole('button', { name: '고친 내용 저장' }));
+    await waitFor(() =>
+      expect(server.calls('PATCH /admin/faqs/:id')[0].body).toEqual({
+        category: 'POINT',
+        question: '먹포인트는 어디에 쓰나요?',
+        answer: '상점에서 모자·얼굴·소품을 사요.',
+        sortOrder: 1,
+      }),
+    );
+  });
+
+  it('약관: 시행 중인 버전과 기록을 보고, 지금 본문을 채운 채 확인창을 거쳐 새 버전을 올린다', async () => {
+    const server = mockApi({
+      'GET /terms/:type': (call) =>
+        ok({
+          type: call.path.split('/').at(-1),
+          version: '2026-11-13',
+          effectiveDate: '2026-11-13',
+          content: '개인정보 처리방침 본문',
+          versions: [
+            { version: '2099-01-01', effectiveDate: '2099-01-01' },
+            { version: '2026-11-13', effectiveDate: '2026-11-13' },
+          ],
+        }),
+      'POST /admin/policy-documents': ok({}),
+    });
+    renderRoute('/admin?tab=terms');
+
+    fireEvent.click(await screen.findByRole('radio', { name: '개인정보 처리방침' }));
+    await waitFor(() =>
+      expect(server.calls('GET /terms/:type').at(-1)?.path).toBe('/terms/PRIVACY'),
+    );
+    const history = await screen.findByRole('list', { name: '버전 기록' });
+    expect(history).toHaveTextContent('2099-01-01 · 2099.1.1 시행 · 시행 예정');
+    expect(history).toHaveTextContent('2026-11-13 · 2026.11.13 시행 · 지금');
+
+    fireEvent.click(screen.getByRole('button', { name: '새 버전 올리기' }));
+    const form = screen.getByRole('form', { name: '개인정보 처리방침 새 버전' });
+    expect(within(form).getByLabelText('본문')).toHaveValue('개인정보 처리방침 본문');
+    fireEvent.change(within(form).getByLabelText('시행일'), { target: { value: '2099-02-01' } });
+    expect(within(form).getByLabelText('버전 이름')).toHaveValue('2099-02-01');
+    fireEvent.change(within(form).getByLabelText('본문'), { target: { value: '새 본문' } });
+    fireEvent.click(within(form).getByRole('button', { name: '새 버전 올리기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '올리기' }));
+    await waitFor(() =>
+      expect(server.calls('POST /admin/policy-documents')[0].body).toEqual({
+        type: 'PRIVACY',
+        version: '2099-02-01',
+        content: '새 본문',
+        effectiveDate: '2099-02-01',
+      }),
+    );
+  });
+
+  it('회원: 사진 삭제 대기를 거르고, 활동 중인 회원은 확인창을 거쳐 이용 정지한다', async () => {
+    const member = (patch: Partial<AdminMember> = {}): AdminMember => ({
+      userId: 9,
+      nickname: '나쁜탐험가',
+      status: 'ACTIVE',
+      role: 'USER',
+      trustTemp: 48.5,
+      pendingReportCount: 2,
+      regDate: '2026-11-01T10:00:00+09:00',
+      lastLoginAt: null,
+      withdrawnAt: null,
+      photoPurgePending: false,
+      ...patch,
+    });
+    const gone = member({
+      userId: 3,
+      nickname: null,
+      status: 'WITHDRAWN',
+      withdrawnAt: '2026-11-08T10:00:00+09:00',
+      photoPurgePending: true,
+    });
+    const server = mockApi({
+      'GET /admin/members': (call) =>
+        ok(page(call.query.get('photoPurgePending') === 'true' ? [gone] : [member()])),
+      'PATCH /admin/members/:id/status': ok({ userId: 9, status: 'SUSPENDED' }),
+    });
+    renderRoute('/admin?tab=members');
+
+    const card = await screen.findByRole('article', { name: '회원 9' });
+    expect(card).toHaveTextContent('신뢰 온도 48.5° · 처리 전 신고 2건 · 2026.11.1 가입');
+    fireEvent.click(within(card).getByRole('button', { name: '이용 정지' }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('신뢰 온도는 그대로예요');
+    fireEvent.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: '이용 정지' }),
+    );
+    await waitFor(() =>
+      expect(server.calls('PATCH /admin/members/:id/status')[0].body).toEqual({
+        status: 'SUSPENDED',
+      }),
+    );
+    expect(await within(card).findByRole('button', { name: '정지 풀기' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('radio', { name: '사진 삭제 대기' }));
+    const stuck = await screen.findByRole('article', { name: '회원 3' });
+    expect(stuck).toHaveTextContent('탈퇴한 탐험가');
+    expect(stuck).toHaveTextContent('2026.11.8 탈퇴');
+    expect(within(stuck).getByRole('note')).toHaveTextContent('사진 삭제 대기');
+    expect(within(stuck).queryByRole('button')).not.toBeInTheDocument();
+    const last = server.calls('GET /admin/members').at(-1);
+    expect(last?.query.get('photoPurgePending')).toBe('true');
+    expect(last?.query.get('status')).toBeNull();
   });
 });

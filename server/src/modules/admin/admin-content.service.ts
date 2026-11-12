@@ -8,6 +8,8 @@ import { notify } from '../notification/notify';
 import { SupportError } from '../support/support.errors';
 import { AdminError } from './admin.errors';
 import type {
+  AdminFaqListQuery,
+  AdminNoticeListQuery,
   FaqBody,
   FaqUpdateBody,
   InquiryAnswerBody,
@@ -17,7 +19,7 @@ import type {
   PolicyDocumentBody,
 } from './admin.schema';
 
-// ADMIN-08~14 1:1 문의 답변, 공지·FAQ, 약관 새 버전
+// ADMIN-08~14·17·18 1:1 문의 답변, 공지·FAQ, 약관 새 버전
 
 const VISIBILITY = { VISIBLE: 'A', HIDDEN: 'H' } as const;
 const visibilityApi = (status: string) => (status === 'A' ? 'VISIBLE' : 'HIDDEN');
@@ -106,6 +108,24 @@ function toNotice(n: {
   };
 }
 
+/** ADMIN-17 공지 목록 — 숨긴 공지까지, 필독 먼저 최신순(CS-01과 같은 순서). 고칠 수 있게 본문도 준다 */
+export async function listAdminNotices(query: AdminNoticeListQuery) {
+  const [rows, totalCount] = await Promise.all([
+    prisma.notice.findMany({
+      orderBy: [{ isPinned: 'desc' }, { regDate: 'desc' }, { id: 'desc' }],
+      skip: (query.page - 1) * query.size,
+      take: query.size,
+    }),
+    prisma.notice.count(),
+  ]);
+  const items = rows.map((n) => ({
+    ...toNotice(n),
+    content: n.content,
+    updatedAt: toKstIsoOrNull(n.updateDate),
+  }));
+  return toPageResult(items, { ...query, totalCount });
+}
+
 /** ADMIN-10 공지 등록 */
 export async function createNotice(body: NoticeBody, now = new Date()) {
   const notice = await prisma.notice.create({
@@ -148,6 +168,15 @@ function toFaq(f: {
     sortOrder: f.sortOrder,
     status: visibilityApi(f.status),
   };
+}
+
+/** ADMIN-18 FAQ 목록 — 숨긴 FAQ까지, 유형·순서대로(CS-03과 같은 순서) */
+export async function listAdminFaqs(query: AdminFaqListQuery) {
+  const rows = await prisma.faq.findMany({
+    where: { category: query.category },
+    orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }, { id: 'asc' }],
+  });
+  return { items: rows.map(toFaq) };
 }
 
 /** ADMIN-12 FAQ 등록 */

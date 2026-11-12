@@ -78,10 +78,20 @@ export type NoticeBody = z.infer<typeof noticeBody>;
 export const noticeUpdateBody = noticeBody.partial().extend({ status: visibility.optional() });
 export type NoticeUpdateBody = z.infer<typeof noticeUpdateBody>;
 export const noticeParams = z.object({ noticeId: id });
+/** ADMIN-17 공지 목록 (숨긴 공지 포함) */
+export const adminNoticeListQuery = z.object({ ...pageQuery });
+export type AdminNoticeListQuery = z.infer<typeof adminNoticeListQuery>;
+
+const faqCategory = z.enum(['VISIT', 'RANK', 'POINT', 'ACCOUNT'], {
+  error: 'INVALID_FAQ_CATEGORY',
+});
+/** ADMIN-18 FAQ 목록 (숨긴 FAQ 포함) */
+export const adminFaqListQuery = z.object({ category: faqCategory.optional() });
+export type AdminFaqListQuery = z.infer<typeof adminFaqListQuery>;
 
 /** ADMIN-12·13 */
 export const faqBody = z.object({
-  category: z.enum(['VISIT', 'RANK', 'POINT', 'ACCOUNT'], { error: 'INVALID_FAQ_CATEGORY' }),
+  category: faqCategory,
   question: text(100),
   answer: z.string().trim().min(1),
   sortOrder: z.number().int().min(0).optional(),
@@ -111,6 +121,11 @@ export const memberListQuery = z.object({
   ...pageQuery,
   nickname: z.string().trim().min(1).max(10).optional(),
   status: z.enum(['PENDING', 'ACTIVE', 'SUSPENDED', 'WITHDRAWN']).optional(),
+  /** true면 사진 삭제 대기(탈퇴하고 PHOTO_PURGE_ALERT_DAYS가 지나도 사진 폴더를 다 못 지운) 회원만 */
+  photoPurgePending: z
+    .enum(['true', 'false'])
+    .transform((v) => v === 'true')
+    .optional(),
 });
 export type MemberListQuery = z.infer<typeof memberListQuery>;
 export const memberParams = z.object({ userId: id });
