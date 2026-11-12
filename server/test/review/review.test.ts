@@ -46,6 +46,29 @@ function rate(userId: bigint, visitId: bigint, overallScore: number) {
 }
 
 describe('REVIEW-01 종합 별점 등록 및 정복 완료', () => {
+  it('신뢰 온도는 한 주(월요일부터)에 +7°까지만 오른다', async () => {
+    const season = await createActiveSeason(3);
+    const me = await createMember();
+    await prisma.trustTempLog.create({
+      data: {
+        userId: me.id,
+        reason: 'REVIEW_WRITTEN',
+        baseDelta: 6.9,
+        appliedDelta: 6.9,
+        tempAfter: 56.9,
+        refType: 'REVIEW',
+        refId: 999999,
+      },
+    });
+    await prisma.member.update({ where: { id: me.id }, data: { trustTemp: 56.9 } });
+    const shop = await createRestaurant();
+    const visit = await verified(me.id, shop.id, season.id);
+    await rate(me.id, visit.id, 4);
+    expect(
+      (await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).trustTemp.toNumber(),
+    ).toBe(57); // +0.6 중 남은 0.1만
+  });
+
   it('리뷰·정복·구 순위·먹깨비 위치·포인트·신뢰 온도·가게 별점을 한 번에 반영한다', async () => {
     const season = await createActiveSeason(3);
     const me = await createMember();
@@ -91,7 +114,7 @@ describe('REVIEW-01 종합 별점 등록 및 정복 완료', () => {
       (await prisma.mukkaebi.findUniqueOrThrow({ where: { userId: me.id } })).currentRestaurantId,
     ).toBe(shop.id);
     const member = await prisma.member.findUniqueOrThrow({ where: { id: me.id } });
-    expect(member.trustTemp.toNumber()).toBe(50.1);
+    expect(member.trustTemp.toNumber()).toBe(50.6); // 리뷰 작성 +0.6°
     const stat = await prisma.restaurantStat.findUniqueOrThrow({
       where: { restaurantId: shop.id },
     });
@@ -242,6 +265,10 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
       });
     expect(res.status).toBe(201);
     expect(res.body.data.rewards.point).toBe(70);
+    // 신뢰 온도: 리뷰 +0.6°, 세부평가(세부 별점·글) +0.3°
+    expect(
+      (await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).trustTemp.toNumber(),
+    ).toBe(50.9);
     expect(res.body.data.review).toMatchObject({
       detailScores: { cleanliness: 4, price: 3 },
       aspects: [{ name: '맛', polarity: 'G' }],
@@ -314,7 +341,7 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
     const [card] = res.body.data.items;
     expect(card.author).toMatchObject({
       nickname: '동네미식가',
-      trustTemp: 50.1,
+      trustTemp: 50.6,
       title: '강서구의 먹짱',
       isLocal: false,
     });
@@ -409,7 +436,7 @@ describe('REVIEW-08·09 도움돼요·별로예요', () => {
       .set('Authorization', bearer(userId))
       .send({ type });
 
-  it('비방문자의 도움돼요: 작성자 +0.05°·+5P, 누른 사람 +5P, 알림은 하루에 하나로 모은다', async () => {
+  it('비방문자의 도움돼요: 작성자 +0.075°(× 누른 사람 온도 ÷ 50)·+5P, 누른 사람 +5P, 알림은 하루에 하나로 모은다', async () => {
     const { writer, review } = await setup();
     const a = await createMember();
     const b = await createMember();
@@ -418,7 +445,8 @@ describe('REVIEW-08·09 도움돼요·별로예요', () => {
     await react(b.id, review.id, 'HELPFUL');
 
     const author = await prisma.member.findUniqueOrThrow({ where: { id: writer.id } });
-    expect(author.trustTemp.toNumber()).toBe(50.2); // 50 + 0.1(리뷰) + 0.05 × 2
+    // 50 + 0.6(리뷰) + 0.075 × 2 (누른 사람이 50°라 1배, 소수 둘째 자리로 0.08)
+    expect(author.trustTemp.toNumber()).toBe(50.76);
     const received = await prisma.pointHistory.count({
       where: { userId: writer.id, reason: 'HELPFUL_RECEIVED' },
     });
@@ -434,6 +462,42 @@ describe('REVIEW-08·09 도움돼요·별로예요', () => {
       .delete(`/api/v1/reviews/${review.id}/reaction`)
       .set('Authorization', bearer(a.id));
     expect(cancel.body.data).toMatchObject({ myReaction: null, helpfulCount: 1 });
+  });
+
+  it('방문자의 도움돼요는 +0.3° × 누른 사람 온도 ÷ 50 (80°면 1.6배)', async () => {
+    const { season, writer, shop, review } = await setup();
+    const visitor = await createMember({ trustTemp: 80 });
+    await verified(visitor.id, shop.id, season.id);
+    await react(visitor.id, review.id, 'HELPFUL');
+
+    const log = await prisma.trustTempLog.findFirstOrThrow({
+      where: { userId: writer.id, reason: 'HELPFUL_VISITOR' },
+    });
+    expect(log.baseDelta.toNumber()).toBe(0.48);
+    expect(
+      (await prisma.member.findUniqueOrThrow({ where: { id: writer.id } })).trustTemp.toNumber(),
+    ).toBe(51.08); // 50 + 0.6 + 0.48
+  });
+
+  it('같은 사람의 도움돼요는 4주(28일)에 3번까지만 온도에 반영한다', async () => {
+    const { season, writer } = await setup();
+    const fan = await createMember();
+    const reviews = [];
+    for (let i = 0; i < 4; i += 1) {
+      const other = await createRestaurant();
+      const visit = await verified(writer.id, other.id, season.id);
+      await rate(writer.id, visit.id, 4);
+      reviews.push(await prisma.review.findUniqueOrThrow({ where: { visitId: visit.id } }));
+    }
+    for (const r of reviews) await react(fan.id, r.id, 'HELPFUL');
+    expect(
+      await prisma.trustTempLog.count({
+        where: { userId: writer.id, actorId: fan.id, reason: { startsWith: 'HELPFUL' } },
+      }),
+    ).toBe(3);
+    expect(await prisma.reviewReaction.count({ where: { userId: fan.id, isCounted: false } })).toBe(
+      1,
+    );
   });
 
   it('자기 리뷰 403 OWN_REVIEW, 별로예요는 방문 인증한 사람만(403 VISIT_REQUIRED)', async () => {
@@ -463,7 +527,7 @@ describe('REVIEW-08·09 도움돼요·별로예요', () => {
     expect(logs).toHaveLength(1);
     expect(
       (await prisma.member.findUniqueOrThrow({ where: { id: writer.id } })).trustTemp.toNumber(),
-    ).toBe(49.6);
+    ).toBe(50.1); // 50 + 0.6(리뷰) − 0.5
     const weight = (
       await prisma.review.findUniqueOrThrow({ where: { id: review.id } })
     ).scoreWeight.toNumber();

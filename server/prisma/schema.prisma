@@ -1183,12 +1183,12 @@ model RatingParam {
   @@map("rating_param")
 }
 
-/// 신뢰 온도 변화 기록 (2026-11-05 계산식 문서). member.trust_temp를 바꿀 때 같은 트랜잭션에서 넣는다. 하루 상승 한도(오늘 applied_delta > 0 합계 1°), 리뷰당 1번((reason, ref_type, ref_id) unique), 같은 사람 월 한도(이번 달 같은 (user_id, actor_id)의 HELPFUL_* 3개)를 이 표로 센다
+/// 신뢰 온도 변화 기록 (2026-11-05 계산식 문서). member.trust_temp를 바꿀 때 같은 트랜잭션에서 넣는다. 주간 상승 한도(이번 주 applied_delta > 0 합계 7°, 2026-11-12 신뢰 별점 검증 보고서), 리뷰당 1번((reason, ref_type, ref_id) unique), 같은 사람 한도(최근 28일 같은 (user_id, actor_id)의 HELPFUL_* 3개)를 이 표로 센다
 model TrustTempLog {
   id           BigInt   @id @default(autoincrement())
   /// 온도가 바뀐 사람 (리뷰 작성자)
   userId       BigInt   @map("user_id")
-  /// HELPFUL_VISITOR +0.2 / HELPFUL_GUEST +0.05 / REVIEW_WRITTEN +0.1 / UNHELPFUL_MANY −0.5 / REPORT_CONFIRMED −3 / FAKE_REVIEW −5
+  /// HELPFUL_VISITOR +0.3 / HELPFUL_GUEST +0.075 (둘 다 × 누른 사람 온도 ÷ 50) / REVIEW_WRITTEN +0.6 / REVIEW_DETAIL +0.3 / UNHELPFUL_MANY −0.5 / REPORT_CONFIRMED −3 / FAKE_REVIEW −5
   reason       String   @db.VarChar(20)
   /// 규칙대로의 변화량
   baseDelta    Decimal  @map("base_delta") @db.Decimal(4, 2)

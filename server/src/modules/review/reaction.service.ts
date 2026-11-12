@@ -1,6 +1,6 @@
 import type { Tx } from '../../common/db';
 import { AppError } from '../../common/errors/app-error';
-import { kstStartOfMonth, kstStartOfToday } from '../../common/time';
+import { addDays, kstStartOfMonth, kstStartOfToday } from '../../common/time';
 import { prisma } from '../../lib/prisma';
 import { checkAchievements } from '../achievement/achievement.service';
 import { notify } from '../notification/notify';
@@ -8,17 +8,19 @@ import { refreshReviewWeight, refreshRestaurantStat } from '../restaurant/restau
 import { grantReward } from '../reward/reward.service';
 import type { ReactionBody } from './review.schema';
 import { ReviewError } from './review.errors';
-import { changeTrustTemp } from './trust-temp';
+import { changeTrustTemp, voterScale } from './trust-temp';
 
 // REVIEW-08·09 도움돼요·별로예요 (ERD review_reaction, 「신뢰 온도 · 가중 별점 계산식」)
 // - 자기 리뷰에는 못 누른다. 별로예요는 그 가게를 방문 인증한 사람만, 수는 비공개
-// - 같은 사람이 같은 작성자에게 준 반응은 한 달에 도움돼요 3번, 별로예요 1번까지만 계산에 넣는다(is_counted)
-// - 도움돼요(계산에 넣는 것): 작성자 온도 방문자 +0.2° / 비방문자 +0.05°, 작성자 +5P(도움돼요 받기)
+// - 같은 사람이 같은 작성자에게 준 반응은 도움돼요 4주(28일)에 3번, 별로예요 한 달에 1번까지만 계산에 넣는다(is_counted)
+// - 도움돼요(계산에 넣는 것): 작성자 온도 방문자 +0.3° / 비방문자 +0.075° × 누른 사람 온도 ÷ 50, 작성자 +5P(도움돼요 받기)
 // - 누른 사람은 평가 참여 +5P (하루 10번, 한 리뷰에 한 번)
 // - 별로예요 N ≥ 5이고 N ≥ 2H면 작성자 온도 −0.5° (리뷰당 1번)
 // - 취소해도 행은 남기고(type N), 이미 바뀐 온도·포인트는 되돌리지 않는다
 
 const MONTHLY_LIMIT = { H: 3, U: 1 } as const;
+/** 도움돼요 한도를 세는 기간 (신뢰 별점 검증 보고서: 같은 사람의 도움돼요 4주 3회까지) */
+const HELPFUL_WINDOW_DAYS = 28;
 const UNHELPFUL_MIN = 5;
 const TYPE_CODE = { HELPFUL: 'H', UNHELPFUL: 'U' } as const;
 
@@ -56,10 +58,10 @@ async function recountReactions(tx: Tx, reviewId: bigint) {
 }
 
 /**
- * 이번 달에 같은 사람이 같은 작성자의 다른 리뷰에 준 같은 반응 중 계산에 넣은 수.
+ * 같은 사람이 같은 작성자의 다른 리뷰에 준 같은 반응 중 계산에 넣은 수 (도움돼요 최근 28일, 별로예요 이번 달).
  * 도움돼요는 이미 준 효과(온도 기록)로 센다 — 취소하고 다른 리뷰에 다시 눌러 한도를 피하지 못하게
  */
-async function countedThisMonth(
+async function countedRecently(
   tx: Tx,
   actorId: bigint,
   authorId: bigint,
@@ -74,7 +76,7 @@ async function countedThisMonth(
         userId: authorId,
         actorId,
         reason: { in: ['HELPFUL_VISITOR', 'HELPFUL_GUEST'] },
-        regDate: { gte: kstStartOfMonth(now) },
+        regDate: { gte: addDays(now, -HELPFUL_WINDOW_DAYS) },
         ...(exceptReactionId ? { NOT: { refId: exceptReactionId } } : {}),
       },
     });
@@ -163,7 +165,7 @@ export async function reactToReview(
       });
     }
     const isCounted =
-      (await countedThisMonth(tx, userId, review.userId, type, review.id, existing?.id, now)) <
+      (await countedRecently(tx, userId, review.userId, type, review.id, existing?.id, now)) <
       MONTHLY_LIMIT[type];
     const reaction = existing
       ? await tx.reviewReaction.update({
@@ -192,6 +194,10 @@ export async function reactToReview(
       now,
     );
     if (type === 'H' && isCounted) {
+      const voter = await tx.member.findUniqueOrThrow({
+        where: { id: userId },
+        select: { trustTemp: true },
+      });
       await changeTrustTemp(
         tx,
         review.userId,
@@ -199,6 +205,7 @@ export async function reactToReview(
         { type: 'REVIEW_REACTION', id: reaction.id },
         userId,
         now,
+        voterScale(voter.trustTemp.toNumber()),
       );
       await grantReward(
         tx,

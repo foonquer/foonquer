@@ -4,6 +4,7 @@ import { requireSeoulArea } from '../region/region.service';
 import { parseBusinessHours } from '../restaurant/business-hours';
 import { loadMyStates, myStateOf } from '../restaurant/my-state';
 import { loadRestaurantsInOrder, toRestaurantCard } from '../restaurant/restaurant-card';
+import { MIN_REVIEWS_FOR_RATING } from '../restaurant/restaurant-stats';
 import { regionIdOrMyFirst } from '../search/search.service';
 import { loadTasteWeights } from '../user/taste-weights';
 import { type Conditions, titleOf } from './situation-conditions';
@@ -18,8 +19,6 @@ import {
   summaryOf,
 } from './situation-rules';
 
-/** 후보: 인증 리뷰 5개 이상 (RECO-01 RATING과 같은 기준) */
-const MIN_REVIEWS = 5;
 /** 상황 적합도가 이만큼 넘는 가게만 보여 준다 */
 const MIN_FIT = 50;
 const MAX_ITEMS = 20;
@@ -38,7 +37,11 @@ interface Scored {
 /** 동네(또는 구) 후보 가게를 읽어 조건마다 판정한다 */
 async function judgeArea(area: Area, conds: Condition[]): Promise<Scored[]> {
   const shops = await prisma.restaurant.findMany({
-    where: { status: 'A', ...area, restaurantStat: { reviewCount: { gte: MIN_REVIEWS } } },
+    where: {
+      status: 'A',
+      ...area,
+      restaurantStat: { reviewCount: { gte: MIN_REVIEWS_FOR_RATING } },
+    },
     select: {
       id: true,
       name: true,

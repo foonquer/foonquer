@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agoGroup, formatAgo } from '../lib/format';
+import { agoGroup, formatAgo, noRatingText } from '../lib/format';
 
 describe('알림 시각 (formatAgo · agoGroup)', () => {
   // KST 11월 6일 00:30 = UTC 11월 5일 15:30
@@ -17,5 +17,14 @@ describe('알림 시각 (formatAgo · agoGroup)', () => {
   it('같은 시각을 +09:00로 줘도 결과가 같다', () => {
     expect(agoGroup('2026-11-06T00:00:00+09:00', now)).toBe('오늘');
     expect(formatAgo('2026-11-05T23:00:00+09:00', now)).toBe('어제');
+  });
+});
+
+describe('별점이 없을 때 문구 (noRatingText)', () => {
+  it('리뷰 0개면 아직 없음, 1~4개면 5개부터 보인다고 알려 준다', () => {
+    expect(noRatingText(0)).toBe('아직 별점이 없어요');
+    expect(noRatingText(3)).toBe('리뷰 5개부터 별점이 보여요 (지금 3개)');
+    expect(noRatingText(0, true)).toBe('아직 별점 없음');
+    expect(noRatingText(4, true)).toBe('별점은 리뷰 5개부터');
   });
 });

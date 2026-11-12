@@ -25,12 +25,18 @@ function percent(part: number, whole: number) {
 }
 
 /**
+ * 인증 리뷰가 이만큼 있어야 가게 별점을 보여 준다 (신뢰 별점 검증 보고서 2026-11-12: 리뷰 5개 미만은 숨김,
+ * 모든 가게에 똑같이). 맛 별점 순 추천(RECO-01 RATING)·상황 추천 후보도 같은 기준
+ */
+export const MIN_REVIEWS_FOR_RATING = 5;
+
+/**
  * rating { score: 신뢰도 가중 별점 R, reviewCount }.
  * R = (C × m + Σ(w × r)) / (C + Σw)은 리뷰 쪽이 restaurant_stat.display_score에 계산해 둔다(ERD v1.0).
- * 리뷰가 없거나 아직 계산 전이면 null → 화면에 "아직 별점이 없어요"
+ * 리뷰가 5개 미만이거나 아직 계산 전이면 null → 화면에 "리뷰 5개부터 별점이 보여요"(0개면 "아직 별점이 없어요")
  */
 export function ratingOf(stat: Stat) {
-  if (!stat || stat.reviewCount <= 0 || stat.displayScore === null) {
+  if (!stat || stat.reviewCount < MIN_REVIEWS_FOR_RATING || stat.displayScore === null) {
     return { score: null, reviewCount: stat?.reviewCount ?? 0 };
   }
   return { score: stat.displayScore.toNumber(), reviewCount: stat.reviewCount };

@@ -239,6 +239,17 @@ async function grantDetailRewards(
       await grantReward(tx, review.userId, 'REVIEW_DETAIL', `${restaurantName} 세부평가`, ref, now),
     );
   }
+  // 세부 별점·글까지 남기면 신뢰 온도 +0.3° (리뷰당 한 번)
+  if (review.cleanliness !== null || review.content) {
+    await changeTrustTemp(
+      tx,
+      review.userId,
+      'REVIEW_DETAIL',
+      { type: 'REVIEW', id: review.id },
+      null,
+      now,
+    );
+  }
   if (review.content) {
     results.push(
       await grantReward(tx, review.userId, 'REVIEW_TEXT', `${restaurantName} 글 리뷰`, ref, now),

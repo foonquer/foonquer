@@ -13,7 +13,7 @@ import { EmptyState, Loading } from '../../components/StateViews';
 import { TasteCriteriaSheet } from '../../components/TasteSheets';
 import { useToast } from '../../components/Toast';
 import { ApiError, errorMessage } from '../../lib/api';
-import { formatDistance, formatScore, joinDot } from '../../lib/format';
+import { formatDistance, formatScore, joinDot, noRatingText } from '../../lib/format';
 import { eunNeun } from '../../lib/korean';
 import { scoreBand, tasteCriterion } from '../../lib/taste';
 import { useAsync } from '../../lib/useAsync';
@@ -188,7 +188,7 @@ function Detail({
                 <span className={styles.reviewCount}>인증 평가 {r.rating.reviewCount}</span>
               </>
             ) : (
-              '아직 별점이 없어요'
+              noRatingText(r.rating.reviewCount)
             )}
           </p>
           {r.my.conquestState === 'CONQUERED' && myScore && (

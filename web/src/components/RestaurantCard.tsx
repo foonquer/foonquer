@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import type { RestaurantCardItem } from '../api/restaurants';
-import { formatDistance, formatScore, joinDot } from '../lib/format';
+import { formatDistance, formatScore, joinDot, noRatingText } from '../lib/format';
 import { ConquestBadge } from './ConquestBadge';
 import { FoodImage } from './FoodImage';
 import styles from './RestaurantCard.module.css';
@@ -17,7 +17,7 @@ export function RestaurantCard({ item, note }: Props) {
   const myOverall = formatScore(item.myOverallScore);
   // 피그마 3-2: "★ 4.6 맛 · 내 종합 4.4 · 재방문 58%"
   const scoreLine = joinDot([
-    score ? `★ ${score} 맛` : '아직 별점 없음',
+    score ? `★ ${score} 맛` : noRatingText(item.rating.reviewCount, true),
     myOverall ? `내 종합 ${myOverall}` : null,
     item.revisitRate !== null ? `재방문 ${item.revisitRate}%` : null,
   ]);
