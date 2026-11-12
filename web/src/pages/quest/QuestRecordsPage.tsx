@@ -6,6 +6,7 @@ import { Screen } from '../../components/Screen';
 import { EmptyState, Loading } from '../../components/StateViews';
 import { errorMessage } from '../../lib/api';
 import { formatPoint } from '../../lib/format';
+import { eulReul, gwaWa } from '../../lib/korean';
 import { useAsync } from '../../lib/useAsync';
 import { QuestCard } from './QuestCard';
 import { AwardIcon, CheckIcon, CloseIcon, CompassIcon, FlagIcon } from './QuestIcons';
@@ -26,13 +27,20 @@ function weekText(w: QuestWeek) {
     : `${w.doneCount}/${w.baseCount} 완료 · 주간 상자 받음`;
 }
 
-/** 연속 기록 문구 */
+/** 연속 기록 문구 (보상 아이템이 있으면 같이: 칭호 "꾸준한 탐험가"와 탐험가 배낭) */
 function streakHint(r: QuestRecords) {
   const goal = r.streakGoal;
-  if (!goal || goal.achieved) return goal ? `칭호 "${goal.name}"를 받았어요` : null;
+  if (!goal) return null;
+  const title = `칭호 "${goal.name}"`;
+  // 따옴표 안 이름의 받침으로 조사를 고른다
+  const prize = goal.rewardItem
+    ? `${title}${gwaWa(goal.name).slice(-1)} ${goal.rewardItem.name}`
+    : title;
+  if (goal.achieved)
+    return `${prize}${eulReul(goal.rewardItem?.name ?? goal.name).slice(-1)} 받았어요`;
   const left = goal.target - r.streak;
-  if (left <= 1 && !r.thisWeekDone) return `이번 주까지 깨면 칭호 "${goal.name}"`;
-  return `${goal.target}주 연속으로 깨면 칭호 "${goal.name}"`;
+  if (left <= 1 && !r.thisWeekDone) return `이번 주까지 깨면 ${prize}`;
+  return `${goal.target}주 연속으로 깨면 ${prize}`;
 }
 
 /** 내 정보 → 퀘스트 기록 /me/quests (피그마 M2, QUEST-05) */

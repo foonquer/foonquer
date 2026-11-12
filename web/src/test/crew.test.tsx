@@ -133,7 +133,7 @@ const space = (over: Partial<CrewSpace> = {}): CrewSpace => ({
     },
   ],
   badges: [{ code: 'FIRST_FEAST', name: '첫 만찬' }],
-  nextBadge: { code: 'EXPLORERS', name: '강서 탐험대', target: 5 },
+  nextBadge: { code: 'EXPLORERS', name: '강서 탐험대', target: 5, rewardItem: null },
   ...over,
 });
 
@@ -327,6 +327,27 @@ describe('모임 공간 (G5)', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/me/crews'));
     expect(server.calls('DELETE /crews/:id/members/me')).toHaveLength(1);
   });
+
+  it('다음 배지가 단골 모임이면 함께 받는 모임 단체 모자도 알려 준다', async () => {
+    mockApi({
+      'GET /crews/:id': ok(
+        space({
+          nextBadge: {
+            code: 'REGULARS',
+            name: '단골 모임',
+            target: 10,
+            rewardItem: { code: 'HAT_CREW', name: '모임 단체 모자' },
+          },
+        }),
+      ),
+    });
+    renderRoute('/crews/9');
+    expect(
+      await screen.findByText(
+        '함께 정복 10곳이면 "단골 모임" 배지와 모임 단체 모자를 받아요 (3/10)',
+      ),
+    ).toBeInTheDocument();
+  });
 });
 
 describe('함께 정복 완료 (G6)', () => {
@@ -361,6 +382,7 @@ describe('함께 정복 완료 (G6)', () => {
           restaurantName: '화곡동 파스타',
           conquestCount: 7,
           badges: ['첫 만찬'],
+          rewardItems: [],
           rewardPoint: 100,
         },
       ],
@@ -378,6 +400,30 @@ describe('함께 정복 완료 (G6)', () => {
     fireEvent.click(screen.getByRole('button', { name: '정복 결과 보기' }));
     expect(await screen.findByText('화곡동 파스타, 정복 완료!')).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/visits/31/conquered');
+  });
+
+  it('함께 정복 10곳이면 단골 모임 배지와 모임 단체 모자', async () => {
+    mockApi({});
+    const [crew] = rating.crew!.together;
+    renderRoute('/visits/31/together', {
+      state: {
+        ...rating,
+        crew: {
+          together: [
+            {
+              ...crew,
+              conquestCount: 10,
+              badges: ['단골 모임'],
+              rewardItems: [{ itemId: 27, code: 'HAT_CREW', name: '모임 단체 모자' }],
+              rewardPoint: 0,
+            },
+          ],
+        },
+      },
+    });
+    expect(await screen.findByText('모임 배지 "단골 모임"')).toBeInTheDocument();
+    expect(screen.getByText('모임 단체 모자를 받았어요')).toBeInTheDocument();
+    expect(screen.getByText('모임원 모두 받았어요 · 꾸미기에서 착용해 보세요')).toBeInTheDocument();
   });
 
   it('함께 정복이 없으면 바로 다음 화면', async () => {

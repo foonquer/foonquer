@@ -85,7 +85,13 @@ export const swapQuest = (questId: number) => api.post<Quest>(`/quests/${questId
 /** QUEST-04 관심 없어요 */
 export const dismissQuest = (questId: number) => api.post<Quest>(`/quests/${questId}/dismiss`);
 
-export type QuestGoal = { name: string; target: number; achieved: boolean };
+export type QuestGoal = {
+  name: string;
+  target: number;
+  achieved: boolean;
+  /** 업적 보상 아이템 (꾸준한 탐험가 → 탐험가 배낭) */
+  rewardItem: { code: string; name: string } | null;
+};
 
 export type QuestRecords = {
   streak: number;
@@ -123,5 +129,9 @@ export type QuestAdvance = {
     summary: string;
     rewardPoint: number;
   } | null;
-  achievements: { name: string; rewardPoint: number }[];
+  achievements: {
+    name: string;
+    rewardPoint: number;
+    rewardItems: { itemId: number; code: string; name: string }[];
+  }[];
 };

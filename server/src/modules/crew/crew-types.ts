@@ -20,11 +20,11 @@ export const CREW_QUEST_REASON: Record<CrewQuestType, string> = {
 };
 export const CREW_QUEST_DEFAULT_POINT: Record<CrewQuestType, number> = { TOGETHER: 100, SPLIT: 80 };
 
-/** 모임 배지: 함께 정복 수로 받는다 */
+/** 모임 배지: 함께 정복 수로 받는다. itemCode가 있으면 그때 모임원 모두 그 아이템도 받는다 */
 export const CREW_BADGES = [
-  { code: 'FIRST_FEAST', target: 1 },
-  { code: 'EXPLORERS', target: 5 },
-  { code: 'REGULARS', target: 10 },
+  { code: 'FIRST_FEAST', target: 1, itemCode: null },
+  { code: 'EXPLORERS', target: 5, itemCode: null },
+  { code: 'REGULARS', target: 10, itemCode: 'HAT_CREW' },
 ] as const;
 
 /** 배지 이름: 탐험대는 모임 동네 이름을 붙인다 (강서구 → 강서 탐험대) */

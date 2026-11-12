@@ -243,6 +243,7 @@ describe('CREW-08 모임 퀘스트', () => {
           restaurantName: '모두맛집',
           conquestCount: 1,
           badges: ['첫 만찬'],
+          rewardItems: [],
           rewardPoint: 100,
         },
       ],
@@ -279,7 +280,12 @@ describe('CREW-08 모임 퀘스트', () => {
     expect(space.conquests[0].members).toHaveLength(2);
     expect(space.conquests[0]).not.toHaveProperty('verifiedAt');
     expect(space.badges).toEqual([{ code: 'FIRST_FEAST', name: '첫 만찬' }]);
-    expect(space.nextBadge).toEqual({ code: 'EXPLORERS', name: '강서 탐험대', target: 5 });
+    expect(space.nextBadge).toEqual({
+      code: 'EXPLORERS',
+      name: '강서 탐험대',
+      target: 5,
+      rewardItem: null,
+    });
     expect(space.quests[0]).toMatchObject({ type: 'TOGETHER', status: 'DONE', progress: 2 });
 
     // 3시간 넘게 떨어져 인증하면 묶지 않는다
@@ -288,6 +294,70 @@ describe('CREW-08 모임 퀘스트', () => {
     const apart = await visitAndRate(minji.id, later.id, season.id, 1);
     expect(apart.res.body.data.crew).toBeNull();
     expect(await prisma.crewConquest.count()).toBe(1);
+  });
+
+  it('함께 정복 10곳이면 "단골 모임" 배지와 함께 참여 중인 모임원 모두 모임 단체 모자를 받는다', async () => {
+    const season = await createActiveSeason(3);
+    const minji = await member('민지');
+    const junho = await member('준호');
+    const home = await member('집콕');
+    const shop = await rated('열번째집', 4.5);
+    const { crewId } = await crewOf(minji.id, junho.id, home.id);
+    // 이미 함께 정복한 9곳과 받은 배지 (단골 모임 직전)
+    for (let i = 0; i < 9; i += 1) {
+      const before = await createRestaurant({ name: `지난집${i}` });
+      await prisma.crewConquest.create({
+        data: {
+          crewId: BigInt(crewId),
+          restaurantId: before.id,
+          conqueredOn: new Date(Date.UTC(2026, 9, i + 1)),
+        },
+      });
+    }
+    await prisma.crewBadge.createMany({
+      data: [
+        { crewId: BigInt(crewId), code: 'FIRST_FEAST' },
+        { crewId: BigInt(crewId), code: 'EXPLORERS' },
+      ],
+    });
+    const before = (await api(home.id).get(`/crews/${crewId}`)).body.data;
+    expect(before.nextBadge).toEqual({
+      code: 'REGULARS',
+      name: '단골 모임',
+      target: 10,
+      rewardItem: { code: 'HAT_CREW', name: '모임 단체 모자' },
+    });
+
+    await visitAndRate(junho.id, shop.id, season.id, 20);
+    const { res } = await visitAndRate(minji.id, shop.id, season.id, 1);
+    expect(res.body.data.crew.together[0]).toMatchObject({
+      conquestCount: 10,
+      badges: ['단골 모임'],
+      rewardItems: [{ code: 'HAT_CREW', name: '모임 단체 모자' }],
+    });
+
+    // 같이 가지 않은 모임원도 받고, 상점 명예 탭에서도 보인다
+    const hat = await prisma.item.findUniqueOrThrow({ where: { code: 'HAT_CREW' } });
+    const owners = await prisma.memberItem.findMany({
+      where: { itemId: hat.id },
+      orderBy: { userId: 'asc' },
+    });
+    expect(owners.map((o) => [o.userId, o.acquiredType])).toEqual([
+      [minji.id, 'C'],
+      [junho.id, 'C'],
+      [home.id, 'C'],
+    ]);
+    const notis = await api(home.id).get('/notifications');
+    expect(notis.body.data.items[0]).toMatchObject({
+      title: '모임 단체 모자를 얻었어요!',
+      content: '점심 원정대 "단골 모임" 배지 보상이에요. 꾸미기에서 착용해 보세요',
+    });
+    const after = (await api(home.id).get(`/crews/${crewId}`)).body.data;
+    expect(after.nextBadge).toBeNull();
+    const honor = await api(home.id).get('/shop/items?category=HONOR');
+    expect(
+      honor.body.data.items.find((i: { code: string }) => i.code === 'HAT_CREW'),
+    ).toMatchObject({ owned: true, purchasable: false, rarity: 'H' });
   });
 
   it('맛집 나눠 찾기: 모임 동네에서 처음 가 본 곳을 모임원마다 다른 곳으로 채우면 각자 포인트', async () => {

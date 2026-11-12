@@ -82,7 +82,7 @@ function toShopItem(item: ItemRow, own: Awaited<ReturnType<typeof ownership>>, n
 export async function listShopItems(userId: bigint, query: ShopQuery, now = new Date()) {
   const where: Prisma.ItemWhereInput =
     query.category === 'HONOR'
-      ? { status: 'A', unlockType: { in: ['S', 'M', 'A'] } }
+      ? { status: 'A', unlockType: { in: ['S', 'M', 'A', 'C'] } }
       : { status: 'A', category: query.category };
   const [items, own, sets] = await Promise.all([
     prisma.item.findMany({

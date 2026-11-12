@@ -727,3 +727,11 @@
   font-weight: 400;
   color: var(--mk-muted);
 }
+
+/* 퀘스트 완료 · 업적 보상 아이템 (꾸준한 탐험가 → 탐험가 배낭) */
+.achievementItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}

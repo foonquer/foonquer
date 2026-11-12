@@ -762,6 +762,12 @@
   background: var(--mk-cream);
 }
 
+/* 다음 배지와 함께 받는 아이템 (단골 모임 → 모임 단체 모자) */
+.badgeReward {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .badgeIcon {
   display: flex;
   flex-shrink: 0;

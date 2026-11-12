@@ -2,9 +2,11 @@ import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import type { RatingResult } from '../../api/reviews';
 import mukkaebi from '../../assets/illust/mukkaebi.svg';
 import { Button } from '../../components/Button';
+import { ItemIcon } from '../../components/ItemIcon';
 import { Screen } from '../../components/Screen';
 import { avatarColor, ME_COLOR } from '../../lib/crew';
 import { formatPoint } from '../../lib/format';
+import { categoryOfCode } from '../../lib/itemArt';
 import { eulReul, gwaWa } from '../../lib/korean';
 import { AwardIcon, SparkleIcon, UsersIcon } from '../quest/QuestIcons';
 import quest from '../quest/Quest.module.css';
@@ -82,6 +84,16 @@ export function CrewTogetherPage() {
                 <p className={quest.panelText}>
                   {first.crewName} · 함께 정복 {first.conquestCount}곳째
                 </p>
+              </div>
+            </div>
+          ))}
+          {/* 서버가 먼저 배포되기 전 옛 응답에는 rewardItems가 없다 */}
+          {(first.rewardItems ?? []).map((i) => (
+            <div key={i.code} className={quest.panelRow}>
+              <ItemIcon category={categoryOfCode(i.code)} rarity="H" code={i.code} size={36} />
+              <div>
+                <p className={quest.panelTitle}>{eulReul(i.name)} 받았어요</p>
+                <p className={quest.panelText}>모임원 모두 받았어요 · 꾸미기에서 착용해 보세요</p>
               </div>
             </div>
           ))}

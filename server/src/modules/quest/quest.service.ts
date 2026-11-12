@@ -357,7 +357,13 @@ export async function getQuestRecords(userId: bigint, now = new Date()) {
     questStreak(prisma, userId, now),
     prisma.achievement.findMany({
       where: { code: { in: [STREAK_ACHIEVEMENT, PLACES_ACHIEVEMENT] } },
-      select: { id: true, code: true, name: true, conditionValue: true },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        conditionValue: true,
+        items: { where: { status: 'A' }, select: { code: true, name: true }, take: 1 },
+      },
     }),
     prisma.memberAchievement.findMany({
       where: { userId, achievement: { code: { in: [STREAK_ACHIEVEMENT, PLACES_ACHIEVEMENT] } } },
@@ -371,6 +377,8 @@ export async function getQuestRecords(userId: bigint, now = new Date()) {
           name: a.name,
           target: a.conditionValue,
           achieved: owned.some((o) => o.achievementId === a.id),
+          // 업적 보상 아이템 (꾸준한 탐험가 → 탐험가 배낭)
+          rewardItem: a.items[0] ?? null,
         }
       : null;
   };

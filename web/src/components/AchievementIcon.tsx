@@ -8,6 +8,7 @@ const REWARD_ART: Record<string, string | undefined> = {
   ACH_MUKJJANG: itemArt('HAT_CROWN'),
   ACH_SEASON_CONQUEST_30: itemArt('CLUB_GOLD'),
   ACH_SEASON_TOP10: nightsky,
+  ACH_QUEST_STREAK_4: itemArt('PROP_EXPLORER_BAG'),
 };
 
 type Props = { iconKey: string | null; size?: number; done?: boolean };

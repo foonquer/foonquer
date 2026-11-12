@@ -76,7 +76,13 @@ export type CrewSpace = CrewHead & {
     members: { userId: number; nickname: string | null }[];
   }[];
   badges: { code: string; name: string }[];
-  nextBadge: { code: string; name: string; target: number } | null;
+  /** rewardItem: 그 배지와 함께 모임원 모두 받는 아이템 (단골 모임 → 모임 단체 모자) */
+  nextBadge: {
+    code: string;
+    name: string;
+    target: number;
+    rewardItem: { code: string; name: string } | null;
+  } | null;
 };
 
 /** CREW-01 모임 만들기 (동네를 안 보내면 내 동네의 구) */
@@ -127,5 +133,7 @@ export type CrewTogether = {
   restaurantName: string;
   conquestCount: number;
   badges: string[];
+  /** 배지와 함께 받은 아이템 (단골 모임 → 모임 단체 모자) */
+  rewardItems: { itemId: number; code: string; name: string }[];
   rewardPoint: number;
 };

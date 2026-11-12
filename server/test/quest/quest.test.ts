@@ -250,8 +250,13 @@ describe('퀘스트 완료 (REVIEW-01 방문 인증 + 맛 별점)', () => {
       completedCount: 2,
       placeCount: 2,
       pointTotal: 150,
-      streakGoal: { name: '꾸준한 탐험가', target: 4, achieved: false },
-      placesGoal: { name: '새 맛 수집가', target: 10, achieved: false },
+      streakGoal: {
+        name: '꾸준한 탐험가',
+        target: 4,
+        achieved: false,
+        rewardItem: { code: 'PROP_EXPLORER_BAG', name: '탐험가 배낭' },
+      },
+      placesGoal: { name: '새 맛 수집가', target: 10, achieved: false, rewardItem: null },
     });
     expect(records.weeks[0]).toMatchObject({
       isCurrent: true,
@@ -320,6 +325,16 @@ describe('퀘스트 완료 (REVIEW-01 방문 인증 + 맛 별점)', () => {
     expect(r2.body.data.quest.achievements.map((x: { name: string }) => x.name)).toContain(
       '꾸준한 탐험가',
     );
+    // 업적 보상 탐험가 배낭
+    expect(
+      r2.body.data.quest.achievements.find((x: { name: string }) => x.name === '꾸준한 탐험가'),
+    ).toMatchObject({ rewardItems: [{ code: 'PROP_EXPLORER_BAG', name: '탐험가 배낭' }] });
+    const bag = await prisma.item.findUniqueOrThrow({ where: { code: 'PROP_EXPLORER_BAG' } });
+    expect(
+      await prisma.memberItem.findUnique({
+        where: { userId_itemId: { userId: me.id, itemId: bag.id } },
+      }),
+    ).toMatchObject({ quantity: 1, acquiredType: 'A' });
   });
 });
 

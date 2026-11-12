@@ -323,6 +323,26 @@ describe('퀘스트 완료 · 주간 상자 (Q4·Q5)', () => {
     expect(await screen.findByText('옛날순대국, 정복 완료!')).toBeInTheDocument();
   });
 
+  it('업적 "꾸준한 탐험가"를 달성하면 탐험가 배낭도 보여 준다', async () => {
+    mockApi({});
+    renderRoute('/visits/31/quest', {
+      state: rating({
+        completed: [completed],
+        week: { baseCount: 3, doneCount: 2, boxId: null, streak: 4 },
+        bonusQuest: null,
+        achievements: [
+          {
+            name: '꾸준한 탐험가',
+            rewardPoint: 200,
+            rewardItems: [{ itemId: 26, code: 'PROP_EXPLORER_BAG', name: '탐험가 배낭' }],
+          },
+        ],
+      }),
+    });
+    expect(await screen.findByText('업적 달성 · 꾸준한 탐험가')).toBeInTheDocument();
+    expect(screen.getByText('탐험가 배낭을 받았어요')).toBeInTheDocument();
+  });
+
   it('퀘스트를 안 깼으면 바로 정복 결과', async () => {
     mockApi({});
     const { router } = renderRoute('/visits/31/quest', { state: rating(null) });
@@ -337,8 +357,13 @@ describe('퀘스트 기록 · 설정 (M2·M3)', () => {
       'GET /quests/records': ok({
         streak: 3,
         thisWeekDone: false,
-        streakGoal: { name: '꾸준한 탐험가', target: 4, achieved: false },
-        placesGoal: { name: '새 맛 수집가', target: 10, achieved: false },
+        streakGoal: {
+          name: '꾸준한 탐험가',
+          target: 4,
+          achieved: false,
+          rewardItem: { code: 'PROP_EXPLORER_BAG', name: '탐험가 배낭' },
+        },
+        placesGoal: { name: '새 맛 수집가', target: 10, achieved: false, rewardItem: null },
         completedCount: 14,
         placeCount: 8,
         pointTotal: 1250,
@@ -365,7 +390,9 @@ describe('퀘스트 기록 · 설정 (M2·M3)', () => {
     });
     renderRoute('/me/quests');
     expect(await screen.findByText('3주 연속 완료 중')).toBeInTheDocument();
-    expect(screen.getByText('이번 주까지 깨면 칭호 "꾸준한 탐험가"')).toBeInTheDocument();
+    expect(
+      screen.getByText('이번 주까지 깨면 칭호 "꾸준한 탐험가"와 탐험가 배낭'),
+    ).toBeInTheDocument();
     expect(screen.getByText('14개')).toBeInTheDocument();
     expect(screen.getByText('1,250P')).toBeInTheDocument();
     expect(screen.getByText('업적 "새 맛 수집가"까지 퀘스트로 2곳 더')).toBeInTheDocument();
