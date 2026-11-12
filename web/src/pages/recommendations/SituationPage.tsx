@@ -111,10 +111,10 @@ export function SituationPage() {
     input.current?.focus();
   };
 
-  const recommend = (next: Conditions) => {
+  // ③ 적용: 이해한 조건 화면에서는 조건만 바꾸고, 결과 화면에서는 바뀐 조건으로 다시 찾는다
+  const applySheet = (next: Conditions) => {
     setConditions(next);
     setSheetOpen(false);
-    setStep('result');
   };
 
   const onSuggestion = (s: SituationSuggestion) => {
@@ -133,7 +133,7 @@ export function SituationPage() {
     ) : step === 'reading' ? (
       <Button disabled>조건 읽는 중…</Button>
     ) : step === 'conditions' ? (
-      <Button disabled={conditionCount(conditions) === 0} onClick={() => recommend(conditions)}>
+      <Button disabled={conditionCount(conditions) === 0} onClick={() => setStep('result')}>
         이 조건으로 추천 받기
       </Button>
     ) : step === 'notFound' ? (
@@ -238,7 +238,7 @@ export function SituationPage() {
         onClose={() => setSheetOpen(false)}
         value={conditions}
         initial={parsed?.conditions ?? EMPTY_CONDITIONS}
-        onApply={recommend}
+        onApply={applySheet}
       />
       <RegionSelectSheet open={regionOpen} onClose={() => setRegionOpen(false)} />
     </Screen>

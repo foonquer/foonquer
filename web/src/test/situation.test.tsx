@@ -218,7 +218,7 @@ describe('상황 직접 입력 추천 /recommendations/situation', () => {
     expect(screen.getByRole('button', { name: '맞춤 추천 받기' })).toBeEnabled();
   });
 
-  it('③ 시트: 초기화는 AI 조건으로, 중요해요는 5개까지, 적용하면 바로 추천', async () => {
+  it('③ 시트: 초기화는 AI 조건으로, 중요해요는 5개까지, 적용하면 이해한 조건이 바뀐다', async () => {
     const server = mockApi({
       ...base,
       'POST /recommendations/situation/parse': ok(parsed),
@@ -240,6 +240,10 @@ describe('상황 직접 입력 추천 /recommendations/situation', () => {
     fireEvent.click(within(sheet).getByRole('button', { name: '초기화' }));
     fireEvent.click(pick('친구'));
     fireEvent.click(within(sheet).getByRole('button', { name: '적용하기 (조건 7개)' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '친구 빼기' })).toBeInTheDocument();
+    expect(server.calls('POST /recommendations/situation')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: '이 조건으로 추천 받기' }));
 
     await waitFor(() =>
       expect(server.calls('POST /recommendations/situation')[0].body).toEqual({
