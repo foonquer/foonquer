@@ -1,7 +1,9 @@
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app';
+import { POLICY_DRAFT_VERSION } from '../../prisma/policies';
 import { seedBaseData } from '../../prisma/seed-data';
+import { kstTodayAsDbDate } from '../../src/common/time';
 import { prisma } from '../../src/lib/prisma';
 import { createOAuthResultCode } from '../../src/modules/auth/social-login.service';
 import { resetDb } from '../helpers/db';
@@ -295,15 +297,25 @@ describe('AUTH-15 POST /users/me/consents', () => {
       {
         type: 'TERMS',
         agreed: true,
-        policyVersion: '2026-09-01',
+        policyVersion: POLICY_DRAFT_VERSION,
         agreedAt: expect.stringMatching(/\+09:00$/),
       },
-      { type: 'PRIVACY', agreed: true, policyVersion: '2026-09-01', agreedAt: expect.any(String) },
-      { type: 'LOCATION', agreed: true, policyVersion: '2026-09-01', agreedAt: expect.any(String) },
+      {
+        type: 'PRIVACY',
+        agreed: true,
+        policyVersion: POLICY_DRAFT_VERSION,
+        agreedAt: expect.any(String),
+      },
+      {
+        type: 'LOCATION',
+        agreed: true,
+        policyVersion: POLICY_DRAFT_VERSION,
+        agreedAt: expect.any(String),
+      },
       {
         type: 'MARKETING',
         agreed: true,
-        policyVersion: '2026-09-01',
+        policyVersion: POLICY_DRAFT_VERSION,
         agreedAt: expect.any(String),
       },
     ]);
@@ -337,12 +349,13 @@ describe('AUTH-15 POST /users/me/consents', () => {
   it('동의한 뒤 약관 버전이 바뀌었으면 다시 동의할 때 새 버전으로 기록한다', async () => {
     const member = await createMember({ status: 'P', nickname: null });
     await agree(member.id, { terms: true, privacy: true, location: true, marketing: false });
+    // 오늘 시행하는 새 버전 (같은 시행일이면 나중에 넣은 것이 최신)
     await prisma.policyDocument.create({
       data: {
         type: 'TERMS',
-        version: '2026-10-01',
+        version: 'NEW-TEST',
         content: '새 버전',
-        effectiveDate: new Date('2026-10-01'),
+        effectiveDate: kstTodayAsDbDate(),
       },
     });
 
@@ -353,7 +366,7 @@ describe('AUTH-15 POST /users/me/consents', () => {
       marketing: false,
     });
 
-    expect(res.body.data.consents[0]).toMatchObject({ type: 'TERMS', policyVersion: '2026-10-01' });
+    expect(res.body.data.consents[0]).toMatchObject({ type: 'TERMS', policyVersion: 'NEW-TEST' });
     // TERMS 한 줄만 새로 쌓인다 (MARKETING은 동의하지 않아 그대로)
     expect(await prisma.memberConsent.count({ where: { userId: member.id } })).toBe(5);
   });

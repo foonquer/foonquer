@@ -1,5 +1,6 @@
 import type { PrismaClient } from '../src/generated/prisma/client';
 import { SEOUL, SEOUL_DONG, SEOUL_SIGUNGU } from '../src/modules/region/seoul-regions';
+import { POLICY_DRAFT_VERSION, POLICY_TEXTS } from './policies';
 
 // 바뀌지 않는 기본 데이터. 여러 번 실행해도 같은 결과가 되도록 upsert만 쓴다.
 // prisma/seed.ts(배포·로컬)와 테스트 준비(test/global-setup.ts)가 같이 쓴다.
@@ -33,7 +34,7 @@ async function seedCategories(prisma: PrismaClient) {
 }
 
 // 약관 문서. 회원가입·약관 동의(member_consent.policy_version)가 지금 시행 중인 버전을 가리켜야 해서 첫 버전을 넣어 둔다.
-// 본문은 초안 자리표시다. 실제 문구는 약관 조회(CS-07) 담당과 정해서 새 version 행으로 추가하고,
+// 첫 버전 본문은 자리표시였고, 실제 문구는 새 version 행(prisma/policies.ts, 2026-11-12 초안)으로 추가했다.
 // 이미 있는 행은 덮어쓰지 않는다(동의 기록이 가리키는 버전의 내용이 바뀌면 안 되므로).
 const FIRST_POLICY_VERSION = '2026-09-01';
 const policyDocuments = [
@@ -43,20 +44,28 @@ const policyDocuments = [
 ] as const;
 
 async function seedPolicyDocuments(prisma: PrismaClient) {
+  // 버전 이름이 곧 시행일이다
+  const rows = [
+    ...policyDocuments.map((doc) => ({
+      type: doc.type,
+      version: FIRST_POLICY_VERSION,
+      content: `${doc.title} (초안)\n\n본문은 준비 중입니다.`,
+    })),
+    ...policyDocuments.map((doc) => ({
+      type: doc.type,
+      version: POLICY_DRAFT_VERSION,
+      content: POLICY_TEXTS[doc.type],
+    })),
+  ];
   let created = 0;
-  for (const doc of policyDocuments) {
+  for (const row of rows) {
     const exists = await prisma.policyDocument.findUnique({
-      where: { type_version: { type: doc.type, version: FIRST_POLICY_VERSION } },
+      where: { type_version: { type: row.type, version: row.version } },
       select: { id: true },
     });
     if (exists) continue;
     await prisma.policyDocument.create({
-      data: {
-        type: doc.type,
-        version: FIRST_POLICY_VERSION,
-        content: `${doc.title} (초안)\n\n본문은 준비 중입니다.`,
-        effectiveDate: new Date(`${FIRST_POLICY_VERSION}T00:00:00Z`),
-      },
+      data: { ...row, effectiveDate: new Date(`${row.version}T00:00:00Z`) },
     });
     created += 1;
   }

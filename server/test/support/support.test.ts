@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { POLICY_DRAFT_VERSION } from '../../prisma/policies';
 import { createApp } from '../../src/app';
 import { prisma } from '../../src/lib/prisma';
 import * as storage from '../../src/lib/storage';
@@ -129,8 +130,19 @@ describe('CS 공지·FAQ·문의·약관', () => {
   it('약관은 로그인 없이 최신(또는 지정) 버전', async () => {
     const res = await request(app).get('/api/v1/terms/TERMS');
     expect(res.status).toBe(200);
-    expect(res.body.data).toMatchObject({ type: 'TERMS', version: '2026-09-01' });
-    expect(res.body.data.versions).toHaveLength(1);
+    expect(res.body.data).toMatchObject({ type: 'TERMS', version: POLICY_DRAFT_VERSION });
+    expect(res.body.data.content).toMatch(/^먹장깨기 서비스 이용약관\n\n제1조 \(목적\)/);
+    expect(res.body.data.versions.map((v: { version: string }) => v.version)).toEqual([
+      POLICY_DRAFT_VERSION,
+      '2026-09-01',
+    ]);
+    // 지난 버전(자리표시)도 볼 수 있다
+    const first = await request(app).get('/api/v1/terms/PRIVACY?version=2026-09-01');
+    expect(first.body.data.content).toContain('본문은 준비 중입니다.');
+    const privacy = await request(app).get('/api/v1/terms/PRIVACY');
+    expect(privacy.body.data.content).toContain('네이버클라우드㈜ (CLOVA OCR)');
+    const location = await request(app).get('/api/v1/terms/LOCATION');
+    expect(location.body.data.content).toMatch(/^먹장깨기 위치기반 서비스 이용약관/);
     expect((await request(app).get('/api/v1/terms/TERMS?version=1999')).body.code).toBe(
       'TERMS_NOT_FOUND',
     );
