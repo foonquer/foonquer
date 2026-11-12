@@ -405,6 +405,98 @@ describe('ADMIN 관리자 API', () => {
     ).toBe(400);
   });
 
+  it('공지·FAQ 목록은 숨긴 것까지 본문과 함께 보인다 (ADMIN-17·18)', async () => {
+    const admin = await createAdmin();
+    const user = await createMember();
+    const shown = await as(admin.id).post('/admin/notices', {
+      title: '보이는 공지',
+      content: '본문',
+    });
+    const hidden = await as(admin.id).post('/admin/notices', {
+      title: '숨길 공지',
+      content: '숨길 본문',
+      isPinned: true,
+    });
+    await as(admin.id).patch(`/admin/notices/${hidden.body.data.noticeId}`, { status: 'HIDDEN' });
+
+    const notices = await as(admin.id).get('/admin/notices');
+    expect(notices.body.data).toMatchObject({ totalCount: 2, hasNext: false });
+    expect(notices.body.data.items).toEqual([
+      expect.objectContaining({
+        noticeId: hidden.body.data.noticeId,
+        content: '숨길 본문',
+        isPinned: true,
+        status: 'HIDDEN',
+      }),
+      expect.objectContaining({
+        noticeId: shown.body.data.noticeId,
+        content: '본문',
+        status: 'VISIBLE',
+      }),
+    ]);
+    // 회원 공지 목록에는 숨긴 공지가 없다
+    expect((await as(user.id).get('/notices')).body.data.totalCount).toBe(1);
+
+    const faq = await as(admin.id).post('/admin/faqs', {
+      category: 'VISIT',
+      question: '영수증이 안 읽혀요',
+      answer: '밝은 곳에서 다시 찍어 주세요.',
+    });
+    await as(admin.id).post('/admin/faqs', {
+      category: 'RANK',
+      question: '순위는?',
+      answer: '정복 수',
+    });
+    await as(admin.id).patch(`/admin/faqs/${faq.body.data.faqId}`, { status: 'HIDDEN' });
+    const visit = await as(admin.id).get('/admin/faqs?category=VISIT');
+    expect(visit.body.data.items).toEqual([
+      expect.objectContaining({ faqId: faq.body.data.faqId, status: 'HIDDEN' }),
+    ]);
+    expect((await as(admin.id).get('/admin/faqs')).body.data.items).toHaveLength(2);
+    expect((await as(admin.id).get('/admin/faqs?category=ETC')).status).toBe(400);
+    expect((await as(user.id).get('/admin/faqs')).status).toBe(403);
+  });
+
+  it('탈퇴하고 3일이 지나도 사진 폴더를 다 못 지운 회원은 사진 삭제 대기로 보인다', async () => {
+    const admin = await createAdmin();
+    const daysAgo = (d: number) => new Date(Date.now() - d * 24 * 60 * 60 * 1000);
+    const stuck = await createMember({ status: 'D', nickname: null, deleteDate: daysAgo(4) });
+    const recent = await createMember({ status: 'D', nickname: null, deleteDate: daysAgo(1) });
+    const purged = await createMember({
+      status: 'D',
+      nickname: null,
+      deleteDate: daysAgo(10),
+      filesPurgedAt: daysAgo(10),
+    });
+
+    const pending = await as(admin.id).get('/admin/members?photoPurgePending=true');
+    expect(pending.body.data.items).toEqual([
+      expect.objectContaining({
+        userId: Number(stuck.id),
+        status: 'WITHDRAWN',
+        withdrawnAt: expect.stringMatching(/\+09:00$/),
+        photoPurgePending: true,
+      }),
+    ]);
+    const withdrawn = await as(admin.id).get('/admin/members?status=WITHDRAWN');
+    const flags = Object.fromEntries(
+      withdrawn.body.data.items.map((m: { userId: number; photoPurgePending: boolean }) => [
+        m.userId,
+        m.photoPurgePending,
+      ]),
+    );
+    expect(flags).toEqual({
+      [Number(stuck.id)]: true,
+      [Number(recent.id)]: false,
+      [Number(purged.id)]: false,
+    });
+    const active = await as(admin.id).get(`/admin/members?status=ACTIVE`);
+    expect(active.body.data.items[0]).toMatchObject({
+      withdrawnAt: null,
+      photoPurgePending: false,
+    });
+  });
+
   it('없는 대상·잘못된 처리·다른 가게 리뷰는 거절하고, 일반 회원의 쓰기 요청은 403이며 DB는 그대로', async () => {
     await createActiveSeason(3);
     const admin = await createAdmin();

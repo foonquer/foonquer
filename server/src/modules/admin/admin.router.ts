@@ -11,6 +11,8 @@ import {
   createFaq,
   createNotice,
   createPolicyDocument,
+  listAdminFaqs,
+  listAdminNotices,
   listInquiries,
   updateFaq,
   updateNotice,
@@ -27,6 +29,10 @@ import {
   releaseMapae,
 } from './admin-moderation.service';
 import {
+  type AdminFaqListQuery,
+  adminFaqListQuery,
+  type AdminNoticeListQuery,
+  adminNoticeListQuery,
   type FaqBody,
   faqBody,
   faqParams,
@@ -78,7 +84,7 @@ const requireAdmin: RequestHandler = async (req, _res, next) => {
 
 const params = <T extends z.ZodType>(req: { params: unknown }) => req.params as z.infer<T>;
 
-/** /api/v1/admin — ADMIN-01~16 */
+/** /api/v1/admin — ADMIN-01~18 */
 export const adminRouter = Router();
 adminRouter.use(requireAuth(), requireAdmin);
 
@@ -143,6 +149,14 @@ adminRouter.patch(
   },
 );
 
+adminRouter.get('/notices', validate({ query: adminNoticeListQuery }), async (req, res) => {
+  ok(
+    res,
+    await listAdminNotices(req.query as unknown as AdminNoticeListQuery),
+    '공지 목록을 조회했어요.',
+  );
+});
+
 adminRouter.post('/notices', validate({ body: noticeBody }), async (req, res) => {
   created(res, await createNotice(req.body as NoticeBody), '공지를 등록했어요.');
 });
@@ -155,6 +169,10 @@ adminRouter.patch(
     ok(res, await updateNotice(noticeId, req.body as NoticeUpdateBody), '공지를 수정했어요.');
   },
 );
+
+adminRouter.get('/faqs', validate({ query: adminFaqListQuery }), async (req, res) => {
+  ok(res, await listAdminFaqs(req.query as unknown as AdminFaqListQuery), 'FAQ 목록을 조회했어요.');
+});
 
 adminRouter.post('/faqs', validate({ body: faqBody }), async (req, res) => {
   created(res, await createFaq(req.body as FaqBody), 'FAQ를 등록했어요.');

@@ -378,14 +378,33 @@ export async function releaseMapae(mapaeId: number, body: MapaeReleaseBody, now 
   return { mapaeId: mapae.id, status: 'RELEASED', releasedAt: toKstIsoOrNull(mapae.releasedAt) };
 }
 
-/** ADMIN-15 회원 찾기 (닉네임 일부, 최근 가입 순) */
-export async function listMembers(query: MemberListQuery) {
+/**
+ * 탈퇴하고 이만큼 지나도 사진 폴더(영수증·현장·문의·프로필)를 다 못 지웠으면 회원 목록에 "사진 삭제 대기"로 보인다.
+ * 지우기는 cleanup 작업이 다 지울 때까지 매일 다시 한다 (2026-11-13 팀 결정)
+ */
+export const PHOTO_PURGE_ALERT_DAYS = 3;
+
+/** ADMIN-15 회원 찾기 (닉네임 일부, 최근 가입 순). photoPurgePending이면 사진 삭제 대기 회원만 */
+export async function listMembers(query: MemberListQuery, now = new Date()) {
   const status = query.status
     ? Object.entries(MEMBER_STATUS_API).find(([, api]) => api === query.status)?.[0]
     : undefined;
+  const purgeDue = new Date(now.getTime() - PHOTO_PURGE_ALERT_DAYS * 24 * 60 * 60 * 1000);
+  const isPurgePending = (m: {
+    status: string;
+    filesPurgedAt: Date | null;
+    deleteDate: Date | null;
+  }) =>
+    m.status === MemberStatus.WITHDRAWN &&
+    m.filesPurgedAt === null &&
+    m.deleteDate !== null &&
+    m.deleteDate <= purgeDue;
   const where: Prisma.MemberWhereInput = {
     status,
     nickname: query.nickname ? { contains: query.nickname } : undefined,
+    ...(query.photoPurgePending && {
+      AND: [{ status: MemberStatus.WITHDRAWN, filesPurgedAt: null, deleteDate: { lte: purgeDue } }],
+    }),
   };
   const [rows, totalCount] = await Promise.all([
     prisma.member.findMany({ where, orderBy: { id: 'desc' }, ...page(query) }),
@@ -404,6 +423,8 @@ export async function listMembers(query: MemberListQuery) {
     pendingReportCount: reports.get(m.id) ?? 0,
     regDate: toKstIso(m.regDate),
     lastLoginAt: toKstIsoOrNull(m.lastLoginAt),
+    withdrawnAt: toKstIsoOrNull(m.deleteDate),
+    photoPurgePending: isPurgePending(m),
   }));
   return toPageResult(items, { ...query, totalCount });
 }

@@ -141,7 +141,7 @@ export const routes: RouteObject[] = [
           { path: '/me/mukkaebi/boxes', element: <ItemBoxesPage /> },
           { path: '/me/points', element: <PointsPage /> },
           { path: '/me/withdraw', element: <WithdrawPage /> },
-          { path: '/admin', element: <AdminPage /> }, // ?tab=reports|inquiries
+          { path: '/admin', element: <AdminPage /> }, // ?tab=reports|inquiries|notices|faqs|terms|members
           { path: '/users/:userId', element: <ExplorerProfilePage /> }, // ?tab=pick|visited|reviews
           { path: '/users/:userId/picks', element: <PickMapPage /> },
           { path: '/users/:userId/report', element: <ReportPage /> },
