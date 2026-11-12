@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { POLICY_DRAFT_VERSION } from '../../prisma/policies';
 import { createApp } from '../../src/app';
 import { toKstIso } from '../../src/common/time';
 import { prisma } from '../../src/lib/prisma';
@@ -135,7 +136,7 @@ describe('SET-02 PATCH /users/me/notification-settings', () => {
     expect(rows.map((r) => r.agreed)).toEqual([false, true, false]);
     const [, agreed, withdrawn] = rows;
     expect(agreed.agreedAt).not.toBeNull();
-    expect(agreed.policyVersion).toBe('2026-09-01');
+    expect(agreed.policyVersion).toBe(POLICY_DRAFT_VERSION);
     expect(withdrawn.withdrawnAt).not.toBeNull();
     expect(off.body.data.marketingConsentChangedAt).toBe(toKstIso(withdrawn.regDate));
     expect((await prisma.member.findUniqueOrThrow({ where: { id: me.id } })).marketingAlarm).toBe(
