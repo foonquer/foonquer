@@ -26,6 +26,7 @@ import {
   visitReviewRouter,
 } from './modules/review/review.router';
 import { savedRouter } from './modules/saved/saved.router';
+import { situationRouter } from './modules/situation/situation.router';
 import {
   faqRouter,
   inquiryRouter,
@@ -56,6 +57,7 @@ router.use('/map', mapRouter);
 router.use('/restaurants', restaurantRouter);
 router.use('/restaurants', restaurantReviewRouter);
 router.use('/search', searchRouter);
+router.use('/recommendations/situation', situationRouter);
 router.use('/recommendations', recommendationRouter);
 router.use('/uploads', uploadRouter);
 router.use('/visit-verifications', visitRouter);

@@ -38,6 +38,21 @@ export function parseBusinessHours(value: unknown): BusinessHours | null {
   return hours;
 }
 
+/** 요일(0 = 일요일)·시각(0시부터 분)에 영업 중인지. 전날 밤에 열어 새벽에 닫는 구간도 본다 */
+export function isOpenAt(hours: BusinessHours, day: number, minute: number) {
+  const openToday = hours[DAYS[day]].some(({ open, close }) => {
+    const o = minutes(open);
+    const c = minutes(close);
+    return c > o ? o <= minute && minute < c : o <= minute; // 자정을 넘기는 구간은 오늘 여는 시각 이후
+  });
+  const openFromYesterday = hours[DAYS[(day + 6) % 7]].some(({ open, close }) => {
+    const o = minutes(open);
+    const c = minutes(close);
+    return c <= o && minute < c; // 어제 열어 오늘 새벽에 닫는 구간
+  });
+  return openToday || openFromYesterday;
+}
+
 /**
  * 지금(KST) 영업 중인지와 오늘 여는·닫는 시각 (MAP-02, REST-01 businessStatus).
  * 오늘 구간이 여러 개면 첫 구간의 여는 시각과 마지막 구간의 닫는 시각. 오늘 휴무면 둘 다 null.
@@ -45,24 +60,9 @@ export function parseBusinessHours(value: unknown): BusinessHours | null {
 export function businessStatusOf(hours: BusinessHours | null, now = new Date()) {
   if (!hours) return null;
   const kst = new Date(now.getTime() + KST_OFFSET_MS);
-  const today = DAYS[kst.getUTCDay()];
-  const yesterday = DAYS[(kst.getUTCDay() + 6) % 7];
-  const nowMin = kst.getUTCHours() * 60 + kst.getUTCMinutes();
-
-  const openToday = hours[today].some(({ open, close }) => {
-    const o = minutes(open);
-    const c = minutes(close);
-    return c > o ? o <= nowMin && nowMin < c : o <= nowMin; // 자정을 넘기는 구간은 오늘 여는 시각 이후
-  });
-  const openFromYesterday = hours[yesterday].some(({ open, close }) => {
-    const o = minutes(open);
-    const c = minutes(close);
-    return c <= o && nowMin < c; // 어제 열어 오늘 새벽에 닫는 구간
-  });
-
-  const todays = hours[today];
+  const todays = hours[DAYS[kst.getUTCDay()]];
   return {
-    isOpen: openToday || openFromYesterday,
+    isOpen: isOpenAt(hours, kst.getUTCDay(), kst.getUTCHours() * 60 + kst.getUTCMinutes()),
     todayOpenTime: todays[0]?.open ?? null,
     todayCloseTime: todays.at(-1)?.close ?? null,
   };

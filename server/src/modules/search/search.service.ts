@@ -24,7 +24,7 @@ const MIN_VISITORS_FOR_REVISIT = 5;
 const MIN_REVIEWS_FOR_RATING = 5;
 
 /** regionId가 없으면 내 동네 0번 동 */
-async function regionIdOrMyFirst(userId: bigint, regionId: number | undefined) {
+export async function regionIdOrMyFirst(userId: bigint, regionId: number | undefined) {
   if (regionId !== undefined) return regionId;
   const first = await prisma.memberLocalRegion.findFirst({
     where: { userId },
