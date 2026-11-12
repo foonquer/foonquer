@@ -10,7 +10,7 @@ import { Screen } from '../../components/Screen';
 import { EmptyState, Loading } from '../../components/StateViews';
 import { Stars } from '../../components/StarRating';
 import { errorMessage } from '../../lib/api';
-import { formatScore, joinDot } from '../../lib/format';
+import { formatScore, joinDot, noRatingText } from '../../lib/format';
 import { scoreBand, tasteCriterion } from '../../lib/taste';
 import { useAsync } from '../../lib/useAsync';
 import { usePaged } from '../../lib/usePaged';
@@ -66,7 +66,7 @@ export function RestaurantReviewsPage() {
                 </div>
               </div>
             ) : (
-              <p className={styles.summaryText}>아직 별점이 없어요</p>
+              <p className={styles.summaryText}>{noRatingText(r?.rating.reviewCount ?? 0)}</p>
             )}
             <ScoreStats r={r} />
           </section>

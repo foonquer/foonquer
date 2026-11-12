@@ -12,6 +12,20 @@ export function formatScore(score: number | null | undefined) {
   return score === null || score === undefined ? null : score.toFixed(1);
 }
 
+/** 인증 리뷰가 이만큼 있어야 가게 별점이 보인다 (서버 MIN_REVIEWS_FOR_RATING, 신뢰 별점 검증 보고서) */
+export const MIN_REVIEWS_FOR_RATING = 5;
+
+/**
+ * 가게 별점이 없을 때 문구. 리뷰 0개면 "아직 별점이 없어요", 1~4개면 "리뷰 5개부터 별점이 보여요 (지금 3개)".
+ * short는 카드 한 줄용: "아직 별점 없음" / "별점은 리뷰 5개부터"
+ */
+export function noRatingText(reviewCount: number, short = false) {
+  if (reviewCount <= 0) return short ? '아직 별점 없음' : '아직 별점이 없어요';
+  return short
+    ? `별점은 리뷰 ${MIN_REVIEWS_FOR_RATING}개부터`
+    : `리뷰 ${MIN_REVIEWS_FOR_RATING}개부터 별점이 보여요 (지금 ${reviewCount}개)`;
+}
+
 /** "2026-09-14T12:00:00+09:00" → "2026.9.14" */
 export function formatDate(iso: string | null | undefined) {
   if (!iso) return null;

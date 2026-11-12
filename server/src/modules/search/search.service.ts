@@ -8,6 +8,7 @@ import { RegionError } from '../region/region.errors';
 import { type RegionNode, requireSeoulArea, requireSeoulDong } from '../region/region.service';
 import { requireCategory } from '../restaurant/category';
 import { loadMyStates, myStateOf } from '../restaurant/my-state';
+import { MIN_REVIEWS_FOR_RATING } from '../restaurant/restaurant-stats';
 import {
   likeContains,
   loadRestaurantsInOrder,
@@ -20,8 +21,6 @@ import { similarKeywordsOf } from './similar-keywords';
 const MAX_KEYWORD_LENGTH = 30;
 /** 재방문 % 순서를 믿을 수 있는 최소 방문자 수 (SEARCH-02 REVISIT 정렬, RECO-01 REVISIT 대상) */
 const MIN_VISITORS_FOR_REVISIT = 5;
-/** RECO-01 RATING 대상: 인증 평가 5개 이상 */
-const MIN_REVIEWS_FOR_RATING = 5;
 
 /** regionId가 없으면 내 동네 0번 동 */
 export async function regionIdOrMyFirst(userId: bigint, regionId: number | undefined) {

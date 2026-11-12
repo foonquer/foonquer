@@ -32,12 +32,12 @@ const HOURS = {
   sun: [],
 };
 
-/** 리뷰 4개(세부 평가 3개), 방문 10번(로컬 7번), 방문자 8명(재방문 3명) */
+/** 리뷰 5개(세부 평가 3개), 방문 10번(로컬 7번), 방문자 8명(재방문 3명) */
 async function giveStats(restaurantId: bigint) {
   await prisma.restaurantStat.create({
     data: {
       restaurantId,
-      reviewCount: 4,
+      reviewCount: 5,
       textReviewCount: 3,
       photoReviewCount: 1,
       scoreSum: 17,
@@ -114,7 +114,7 @@ describe('MAP-02 GET /restaurants/{restaurantId}/preview', () => {
       sigunguName: '강서구',
       dongName: '가양동',
       distanceM: expect.any(Number),
-      rating: { score: 4.2, reviewCount: 4 },
+      rating: { score: 4.2, reviewCount: 5 },
       // 취향을 안 골랐으면 다섯 항목 같은 비중: (4.2 + 4.3 + 4.0 + 4.7 + 3.7) ÷ 5 = 4.18
       myOverallScore: 4.2,
       hasMapae: false,
@@ -282,7 +282,7 @@ describe('REST-01 GET /restaurants/{restaurantId}', () => {
       kakaoPlaceUrl: 'https://place.map.kakao.com/1234567890',
       businessHours: { ...HOURS, sun: [] },
       businessStatus: { isOpen: false, todayOpenTime: null, todayCloseTime: null },
-      rating: { score: 4.2, reviewCount: 4 },
+      rating: { score: 4.2, reviewCount: 5 },
       // 서비스만 아주 중요: (4.2 + 4.3 + 4.0 + 4.7×3 + 3.7) ÷ 7 = 4.33
       myOverall: {
         score: 4.3,
@@ -301,7 +301,7 @@ describe('REST-01 GET /restaurants/{restaurantId}', () => {
         service: 4.7,
         price: 3.7,
         revisitIntentCount: 2,
-        revisitIntentRate: 50,
+        revisitIntentRate: 40,
         localVisitRate: 70,
         revisitRate: 38,
         textReviewCount: 3,
@@ -392,6 +392,17 @@ describe('REST-01 GET /restaurants/{restaurantId}', () => {
     const r = await createRestaurant({ hasMapae: true });
     const res = await detail(me.id, r.id);
     expect(res.body.data.hasMapae).toBe(true);
+  });
+
+  it('인증 리뷰가 5개 미만이면 계산해 둔 별점이 있어도 숨긴다 (내 종합도 null)', async () => {
+    const me = await createMember();
+    const r = await createRestaurant();
+    await prisma.restaurantStat.create({
+      data: { restaurantId: r.id, reviewCount: 4, displayScore: 4.6 },
+    });
+    const res = await detail(me.id, r.id);
+    expect(res.body.data.rating).toEqual({ score: null, reviewCount: 4 });
+    expect(res.body.data.myOverall.score).toBeNull();
   });
 
   it('리뷰는 있지만 신뢰도 가중 별점을 아직 계산하지 않았으면 score null', async () => {

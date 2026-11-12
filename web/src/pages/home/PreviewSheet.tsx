@@ -8,7 +8,7 @@ import { FoodImage } from '../../components/FoodImage';
 import { Loading } from '../../components/StateViews';
 import { useToast } from '../../components/Toast';
 import { errorMessage } from '../../lib/api';
-import { formatDate, formatDistance, formatScore, joinDot } from '../../lib/format';
+import { formatDate, formatDistance, formatScore, joinDot, noRatingText } from '../../lib/format';
 import type { Coords } from '../../lib/geolocation';
 import { euro } from '../../lib/korean';
 import { useAsync } from '../../lib/useAsync';
@@ -79,7 +79,7 @@ function Preview({ p }: { p: RestaurantPreview }) {
                 평가 {p.rating.reviewCount}
               </>
             ) : (
-              '아직 별점이 없어요'
+              noRatingText(p.rating.reviewCount)
             )}
           </p>
           <p className={styles.meta}>
