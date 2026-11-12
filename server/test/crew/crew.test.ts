@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app';
 import { prisma } from '../../src/lib/prisma';
 import { resetDb } from '../helpers/db';
@@ -181,6 +181,15 @@ describe('CREW-01~07 모임 만들기·초대·참여·나가기', () => {
 });
 
 describe('CREW-08 모임 퀘스트', () => {
+  // 방문을 지금보다 최대 300분 전으로 만들므로, 날(KST 자정)·주(월요일)가 바뀌지 않게 수요일 낮으로 고정한다
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-11T04:00:00Z')); // 2026-11-11(수) 13:00 KST
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('2명부터 이번 주 함께 정복(모두 안 가 본 곳 중 모두의 만족이 높은 곳)과 맛집 나눠 찾기를 만든다', async () => {
     const minji = await member('민지');
     const junho = await member('준호');
