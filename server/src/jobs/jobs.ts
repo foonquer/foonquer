@@ -10,32 +10,23 @@ import { analyzeReview, reviewAiEnabled } from '../modules/review/review-ai';
 import { runStoreImportJob } from '../modules/restaurant/store-import';
 import { purgeMemberFiles } from '../modules/user/member-files';
 import {
+  loadNeighborhoodTotals,
   loadRatingParams,
   refreshRestaurantStat,
   refreshReviewWeight,
 } from '../modules/restaurant/restaurant-stat-calc';
+import { runConsensus } from '../modules/review/consensus';
 
 // 하루 1번 도는 작업 (pnpm -C server job <이름>, 운영은 crontab — README "주기 작업")
 
-/** 리뷰가 이만큼 쌓여야 전체 평균 m을 실제 평균으로 바꾼다 (그 전에는 초기값 3.8) */
-const GLOBAL_MEAN_MIN_REVIEWS = 30;
-
-/** rating: 전체 평균 m 갱신, 작성자 온도·시간 감쇠를 반영해 리뷰 가중치와 가게 별점을 다시 계산 */
+/**
+ * rating: 합의 일치도 감점(지난주 새 리뷰를 쓴 사람)과 일관성 가중치를 정한 뒤,
+ * 작성자 온도·일관성·반응·시간 감쇠·동네 평균을 반영해 리뷰 가중치와 가게 별점을 모두 다시 계산
+ */
 export async function runRatingJob(now = new Date()) {
-  const agg = await prisma.review.aggregate({
-    where: { status: 'A' },
-    _avg: { overallScore: true },
-    _count: true,
-  });
-  if (agg._count >= GLOBAL_MEAN_MIN_REVIEWS && agg._avg.overallScore) {
-    const mean = Math.round(agg._avg.overallScore.toNumber() * 10_000) / 10_000;
-    await prisma.ratingParam.upsert({
-      where: { code: 'GLOBAL_MEAN' },
-      update: { value: mean },
-      create: { code: 'GLOBAL_MEAN', value: mean, description: '전체 평균 별점 m' },
-    });
-  }
   const params = await loadRatingParams(prisma);
+  const consensus = await runConsensus(params, now);
+  const neighborhood = await loadNeighborhoodTotals(prisma);
   const restaurants = await prisma.review.findMany({
     where: { status: 'A' },
     distinct: ['restaurantId'],
@@ -52,7 +43,7 @@ export async function runRatingJob(now = new Date()) {
             select: { id: true },
           });
           for (const r of reviews) await refreshReviewWeight(tx, r.id, params);
-          await refreshRestaurantStat(tx, restaurantId, now, params);
+          await refreshRestaurantStat(tx, restaurantId, now, params, neighborhood);
         },
         { timeout: 15_000 },
       );
@@ -61,7 +52,12 @@ export async function runRatingJob(now = new Date()) {
       console.error(`[job] rating 가게 ${restaurantId.toString()} 실패`, err);
     }
   }
-  return { restaurants: restaurants.length, reviewCount: agg._count, failed };
+  return {
+    restaurants: restaurants.length,
+    reviewCount: neighborhood.seoul.count,
+    ...consensus,
+    failed,
+  };
 }
 
 /** cleanup이 다시 지울 탈퇴 회원을 한 번에 읽는 수 (파일 삭제가 실패했던 회원) */

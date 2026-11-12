@@ -140,25 +140,42 @@ async function seedRegions(prisma: PrismaClient) {
   return { sigunguCount: SEOUL_SIGUNGU.length, dongCount: SEOUL_DONG.length };
 }
 
-// 신뢰도 가중 별점 계산식의 계수 (「신뢰 온도 · 가중 별점 계산식」 2026-11-05, ERD v1.0 rating_param).
-// 베타 운영 뒤 DB에서 바로 조정하므로, 이미 있는 행은 덮어쓰지 않는다. GLOBAL_MEAN은 하루 1번 배치가 바꾼다.
+// 신뢰도 가중 별점 계산식의 계수 (「신뢰 별점 계산 규칙 정리」 2026-11-13, rating_param).
+// 베타 운영 뒤 DB에서 바로 조정하므로, 이미 있는 행은 덮어쓰지 않는다 (값을 바꿀 때는 마이그레이션으로).
 const ratingParams = [
+  { code: 'PRIOR_WEIGHT', value: 5, description: '동네 평균으로 당기는 힘 C' },
   {
-    code: 'GLOBAL_MEAN',
-    value: 3.8,
-    description: '전체 평균 별점 m (하루 1번 갱신, 리뷰가 쌓이기 전 초기값)',
+    code: 'PRIOR_BLEND',
+    value: 30,
+    description: '동네 평균을 위 단계(구·서울) 평균과 섞는 기준 리뷰 수',
   },
-  { code: 'PRIOR_WEIGHT', value: 5, description: '리뷰 수 보정 강도 C' },
+  { code: 'PRIOR_DEFAULT', value: 3.5, description: '서울에 리뷰가 거의 없을 때의 기본 평균' },
   { code: 'TEMP_BASE', value: 50, description: '작성자 가중치 w_user = 1 + (T − 50) / 50' },
+  { code: 'GUEST_VOTE', value: 0.1, description: '비방문자 도움돼요 한 표의 힘 (방문자 1)' },
   { code: 'HELP_POS', value: 0.5, description: '공감 가중치 계수 (s ≥ 0)' },
   { code: 'HELP_NEG', value: 0.3, description: '공감 가중치 계수 (s < 0)' },
-  { code: 'HELP_FULL_COUNT', value: 10, description: '반응이 이 개수부터 공감을 100% 반영 (k)' },
-  { code: 'REVISIT_WEIGHT', value: 1.1, description: '재방문 리뷰 가중치 v' },
-  { code: 'DECAY_RATE', value: 0.7, description: '시간 감쇠 d = 0.7 ^ n' },
+  {
+    code: 'HELP_FULL_COUNT',
+    value: 10,
+    description: '반응 신뢰 가중 합이 이만큼부터 공감을 100% 반영 (k)',
+  },
+  {
+    code: 'CONSISTENCY_GAMMA',
+    value: 0.3,
+    description: '일관성 가중치 w_cons = 1 + γ × (ē − e) ÷ ē',
+  },
+  { code: 'DECAY_RATE', value: 0.7, description: '시간 감쇠 d = 0.7 ^ (오래된 정도 × 강도)' },
   { code: 'DECAY_MIN', value: 0.3, description: '시간 감쇠 최솟값' },
-  { code: 'DECAY_MONTHS', value: 6, description: '시간 감쇠 단위 개월 수' },
-  { code: 'TRUST_MIN', value: 0.5, description: 'clamp(w_user × w_help) 하한' },
+  { code: 'DECAY_MONTHS', value: 6, description: '최근·이전을 나누는 개월 수' },
+  { code: 'CHANGE_MIN_GAP', value: 0.3, description: '변화 판정: 최근·이전 평균 차이' },
+  { code: 'CHANGE_MIN_T', value: 2, description: '변화 판정: Welch t' },
+  { code: 'CHANGE_MIN_REVIEWS', value: 5, description: '변화 판정: 기간마다 최소 리뷰 수' },
+  { code: 'TRUST_MIN', value: 0.1, description: 'clamp(w_user × w_help) 하한' },
   { code: 'TRUST_MAX', value: 2.0, description: 'clamp(w_user × w_help) 상한' },
+  { code: 'CONSENSUS_STRENGTH', value: 32, description: '합의 일치도 감점 세기' },
+  { code: 'CONSENSUS_TOLERANCE', value: 2, description: '보통 어긋남의 몇 배부터 감점' },
+  { code: 'CONSENSUS_SHRINK', value: 3, description: '리뷰 수 수축 n ÷ (n + 3)' },
+  { code: 'CONSENSUS_MIN_REVIEWS', value: 10, description: '합의 일치도 감점을 시작하는 리뷰 수' },
 ];
 
 async function seedRatingParams(prisma: PrismaClient) {

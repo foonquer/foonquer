@@ -119,8 +119,9 @@ describe('REVIEW-01 종합 별점 등록 및 정복 완료', () => {
       where: { restaurantId: shop.id },
     });
     expect(stat).toMatchObject({ reviewCount: 1, conquerorCount: 1, revisitIntentCount: 1 });
-    // R = (5 × 3.8 + 1.002 × 4.5) / (5 + 1.002) ≈ 3.9
-    expect(stat.displayScore?.toNumber()).toBe(3.9);
+    // 동네 평균 m = 3.5 (다른 리뷰 없음), w = 1 + (50.6 − 50) ÷ 50 = 1.012
+    // R = (5 × 3.5 + 1.012 × 4.5) / (5 + 1.012) ≈ 3.7
+    expect(stat.displayScore?.toNumber()).toBe(3.7);
 
     const again = await rate(me.id, visit.id, 3);
     expect(again.status).toBe(409);
@@ -514,24 +515,25 @@ describe('REVIEW-08·09 도움돼요·별로예요', () => {
     ).toBe(1);
   });
 
-  it('별로예요가 5개 이상이고 도움돼요(방문자)의 2배 이상이면 작성자 온도 −0.5° (리뷰당 1번)', async () => {
+  it('별로예요의 신뢰 가중 합이 3 이상이고 도움돼요의 2배 이상이면 작성자 온도 −0.5° (리뷰당 1번)', async () => {
     const { season, writer, shop, review } = await setup();
-    for (let i = 0; i < 6; i += 1) {
+    const logs = () =>
+      prisma.trustTempLog.count({ where: { userId: writer.id, reason: 'UNHELPFUL_MANY' } });
+    for (let i = 0; i < 4; i += 1) {
       const visitor = await createMember();
       await verified(visitor.id, shop.id, season.id);
       await react(visitor.id, review.id, 'UNHELPFUL');
+      // 방문자(50°) 한 표의 힘은 1 → 3표째에 깎는다
+      expect(await logs()).toBe(i < 2 ? 0 : 1);
     }
-    const logs = await prisma.trustTempLog.findMany({
-      where: { userId: writer.id, reason: 'UNHELPFUL_MANY' },
-    });
-    expect(logs).toHaveLength(1);
     expect(
       (await prisma.member.findUniqueOrThrow({ where: { id: writer.id } })).trustTemp.toNumber(),
     ).toBe(50.1); // 50 + 0.6(리뷰) − 0.5
+    // 별로예요 4표: s = −1, k = 0.4 → w_help = 0.88, w = 1.002 × 0.88 ≈ 0.882
     const weight = (
       await prisma.review.findUniqueOrThrow({ where: { id: review.id } })
     ).scoreWeight.toNumber();
-    expect(weight).toBeLessThan(1);
+    expect(weight).toBe(0.882);
   });
 
   it('같은 사람이 같은 작성자에게 준 도움돼요는 한 달에 3번까지만 계산에 넣는다', async () => {
