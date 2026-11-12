@@ -278,7 +278,19 @@ describe('랭킹 확인용 가짜 데이터 (demo-data)', () => {
       .set('Authorization', bearer(me.id));
     expect(reco.status).toBe(200);
     expect(reco.body.data.items.length).toBeGreaterThan(0);
-    await expect(seedDemoReviews('안준형')).rejects.toThrow('이미 있어요');
+    // 끊겼다가 다시 돌려도 이어서 한다: 동네 가게는 다시 채우지 않고, 리뷰가 빠진 방문에만 다시 쓴다
+    const total = await prisma.review.count({ where: { userId } });
+    const dropped = await prisma.review.findMany({
+      where: { userId },
+      take: 30,
+      select: { id: true },
+    });
+    const droppedIds = { in: dropped.map((r) => r.id) };
+    await prisma.reviewAspectMark.deleteMany({ where: { reviewId: droppedIds } });
+    await prisma.review.deleteMany({ where: { id: droppedIds } });
+    const again = await seedDemoReviews('안준형');
+    expect(again).toMatchObject({ localVisits: 0, reviews: 30, totalReviews: total });
+    expect(await seedDemoReviews('안준형')).toMatchObject({ localVisits: 0, reviews: 0 });
 
     await clearDemoData('안준형');
     expect(await prisma.review.count()).toBe(0);
