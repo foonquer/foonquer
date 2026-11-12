@@ -21,13 +21,16 @@ import { formatDistance, formatScore } from '../../lib/format';
 import { useViewRegion } from '../../lib/region';
 import {
   conditionCount,
+  CRAVING_OPTIONS,
   EMPTY_CONDITIONS,
   EXCLUDE_OPTIONS,
   IMPORTANT_OPTIONS,
   labelOf,
   MAX_SITUATION_TEXT,
+  normalizeConditions,
   RETRY_EXAMPLES,
   SITUATION_EXAMPLES,
+  WEATHER_OPTIONS,
   WHEN_OPTIONS,
   WHO_OPTIONS,
 } from '../../lib/situation';
@@ -87,8 +90,9 @@ export function SituationPage() {
     try {
       const res = await parseSituation(trimmed, controller.signal);
       if (controller.signal.aborted) return;
-      setParsed(res);
-      setConditions(res.conditions);
+      const parsedConditions = normalizeConditions(res.conditions);
+      setParsed({ ...res, conditions: parsedConditions });
+      setConditions(parsedConditions);
       setStep(res.found ? 'conditions' : 'notFound');
     } catch (err) {
       if (controller.signal.aborted) return;
@@ -252,6 +256,10 @@ function withoutCondition(c: Conditions, s: SituationSuggestion): Conditions {
       return { ...c, who: null };
     case 'WHEN':
       return { ...c, when: null };
+    case 'WEATHER':
+      return { ...c, weather: null };
+    case 'CRAVING':
+      return { ...c, craving: c.craving.filter((v) => v !== s.condition) };
     case 'EXCLUDE':
       return { ...c, exclude: c.exclude.filter((v) => v !== s.condition) };
     case 'IMPORTANT':
@@ -338,6 +346,28 @@ function UnderstoodCard({
       name: '언제',
       chips: c.when ? [remove(labelOf(WHEN_OPTIONS, c.when), { ...c, when: null })] : [],
     },
+    // 날씨·먹고 싶어요는 찾았을 때만 줄을 보여 준다 (피그마는 4줄)
+    ...(c.weather
+      ? [
+          {
+            name: '날씨',
+            chips: [remove(labelOf(WEATHER_OPTIONS, c.weather), { ...c, weather: null })],
+          },
+        ]
+      : []),
+    ...(c.craving.length > 0
+      ? [
+          {
+            name: '먹고 싶어요',
+            chips: c.craving.map((v) =>
+              remove(labelOf(CRAVING_OPTIONS, v), {
+                ...c,
+                craving: c.craving.filter((x) => x !== v),
+              }),
+            ),
+          },
+        ]
+      : []),
     {
       name: '빼기',
       chips: c.exclude.map((v) =>
@@ -403,7 +433,7 @@ function NotFoundCard({ onPick }: { onPick: (text: string) => void }) {
   );
 }
 
-/** 결과 화면 칩: 누구랑 · 언제 · 중요해요 묶음 · 빼기 */
+/** 결과 화면 칩: 누구랑 · 언제 · 날씨 · 먹고 싶어요 묶음 · 중요해요 묶음 · 빼기 */
 function conditionChips(c: Conditions) {
   const important = c.important.map(
     (v) => IMPORTANT_OPTIONS.find((o) => o.value === v)?.short ?? v,
@@ -411,6 +441,10 @@ function conditionChips(c: Conditions) {
   return [
     ...(c.who ? [{ label: labelOf(WHO_OPTIONS, c.who), red: false }] : []),
     ...(c.when ? [{ label: labelOf(WHEN_OPTIONS, c.when), red: false }] : []),
+    ...(c.weather ? [{ label: labelOf(WEATHER_OPTIONS, c.weather), red: false }] : []),
+    ...(c.craving.length > 0
+      ? [{ label: c.craving.map((v) => labelOf(CRAVING_OPTIONS, v)).join('·'), red: false }]
+      : []),
     ...(important.length > 0 ? [{ label: important.join('·'), red: false }] : []),
     ...c.exclude.map((v) => ({ label: `${labelOf(EXCLUDE_OPTIONS, v)} 빼기`, red: true })),
   ];

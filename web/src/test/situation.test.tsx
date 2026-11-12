@@ -35,6 +35,8 @@ const me = {
 const PARENTS = {
   who: 'FAMILY',
   when: 'WEEKEND_LUNCH',
+  weather: null,
+  craving: [],
   exclude: ['SPICY'],
   important: ['SPACIOUS', 'PARKING', 'QUIET', 'KIND'],
 } as const;
@@ -81,7 +83,12 @@ const region = { regionId: 11, level: 3, dongName: '가양동', sigunguId: 2, si
 
 const result = (over: Partial<SituationResult> = {}): SituationResult => ({
   title: '가족과 주말 점심',
-  conditions: { ...PARENTS, exclude: [...PARENTS.exclude], important: [...PARENTS.important] },
+  conditions: {
+    ...PARENTS,
+    craving: [],
+    exclude: [...PARENTS.exclude],
+    important: [...PARENTS.important],
+  },
   region,
   items: [item],
   suggestions: [],
@@ -174,6 +181,54 @@ describe('상황 직접 입력 추천 /recommendations/situation', () => {
     expect(server.calls('POST /recommendations/situation/parse')[0].body).toEqual({
       text: '혼밥 빠르게',
     });
+  });
+
+  it('"비 오는 날 국물": 날씨·먹고 싶어요 줄이 생기고, 결과 칩에도 보인다', async () => {
+    const rainy = {
+      ...PARENTS,
+      who: null,
+      when: null,
+      weather: 'RAINY',
+      craving: ['SOUP'],
+      exclude: [],
+      important: [],
+    };
+    const server = mockApi({
+      ...base,
+      'POST /recommendations/situation/parse': ok({
+        found: true,
+        conditions: rainy,
+        title: '비 오는 날 국물',
+        source: 'RULE',
+      }),
+      'POST /recommendations/situation': ok(
+        result({ title: '비 오는 날 국물', conditions: rainy as never }),
+      ),
+    });
+    renderRoute('/recommendations/situation');
+    fireEvent.click(screen.getByRole('button', { name: '비 오는 날 국물' }));
+
+    const card = await screen.findByRole('region', { name: '이렇게 이해했어요' });
+    expect(within(card).getByText('날씨')).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: '비 오는 날 빼기' })).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: '국물 빼기' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '+ 조건 추가' }));
+    const sheet = screen.getByRole('dialog', { name: '조건 추가 · 수정' });
+    const pick = (name: string) => within(sheet).getByRole('button', { name: new RegExp(name) });
+    fireEvent.click(pick('^고기$'));
+    fireEvent.click(pick('^면$'));
+    expect(pick('해산물')).toBeDisabled(); // 먹고 싶어요는 3개까지
+    fireEvent.click(within(sheet).getByRole('button', { name: '적용하기 (조건 4개)' }));
+    fireEvent.click(screen.getByRole('button', { name: '이 조건으로 추천 받기' }));
+
+    await waitFor(() =>
+      expect(server.calls('POST /recommendations/situation')[0].body).toEqual({
+        regionId: 11,
+        conditions: { ...rainy, craving: ['SOUP', 'NOODLE', 'MEAT'] },
+      }),
+    );
+    expect(await screen.findByText('비 오는 날')).toBeInTheDocument();
   });
 
   it('조건을 못 찾으면 ⑤, "다시 입력하기"는 입력을 비운다', async () => {

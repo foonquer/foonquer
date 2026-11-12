@@ -65,6 +65,18 @@ async function judgeArea(area: Area, conds: Condition[]): Promise<Scored[]> {
       aspectMarks: { select: { polarity: true, aspect: { select: { code: true } } } },
     },
   });
+  // 인증 영수증 메뉴 (먹고 싶어요·날씨 판정). 같은 메뉴가 여러 번 나오면 그만큼 센다
+  const receiptItems = await prisma.visitReceiptItem.findMany({
+    where: { visit: { restaurantId: { in: shops.map((s) => s.id) }, status: 'C' } },
+    select: { menuName: true, visit: { select: { restaurantId: true } } },
+  });
+  const menusOf = new Map<string, string[]>();
+  for (const item of receiptItems) {
+    const key = item.visit.restaurantId?.toString();
+    if (!key) continue;
+    menusOf.set(key, [...(menusOf.get(key) ?? []), item.menuName]);
+  }
+
   const reviewsOf = new Map<string, ShopSignals['reviews']>();
   for (const r of reviews) {
     const key = r.restaurantId.toString();
@@ -96,6 +108,7 @@ async function judgeArea(area: Area, conds: Condition[]): Promise<Scored[]> {
       service: stat ? detail(stat.serviceSum, stat.detailReviewCount) : null,
       price: stat ? detail(stat.priceSum, stat.detailReviewCount) : null,
       reviews: reviewsOf.get(s.id.toString()) ?? [],
+      menus: menusOf.get(s.id.toString()) ?? [],
     };
     return {
       id: s.id,
@@ -104,6 +117,13 @@ async function judgeArea(area: Area, conds: Condition[]): Promise<Scored[]> {
       judged: judgeShop(signals, conds, averages),
     };
   });
+}
+
+/** ⑥ "하나만 빼면" 문구. 예) 주차 빼기, 매운 음식도 보기, 국물 말고도 보기 */
+function suggestionLabel(cond: Condition) {
+  if (cond.kind === 'EXCLUDE') return `${cond.label.replace(/ 빼기$/, '')}도 보기`;
+  if (cond.kind === 'CRAVING') return `${cond.label} 말고도 보기`;
+  return `${cond.label} 빼기`;
 }
 
 const countFits = (scored: Scored[], conds: Condition[], skip = -1) =>
@@ -181,10 +201,7 @@ export async function getSituationRecommendations(
             kind: cond.kind,
             condition: cond.code,
             regionId: null,
-            label:
-              cond.kind === 'EXCLUDE'
-                ? `${cond.label.replace(/ 빼기$/, '')}도 보기`
-                : `${cond.label} 빼기`,
+            label: suggestionLabel(cond),
             count: countFits(scored, conds, i),
           }))
           .filter((s) => s.count > 0)

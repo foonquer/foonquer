@@ -5,6 +5,9 @@ import {
   type Conditions,
   conditionCount,
   conditionsSchema,
+  CRAVING,
+  CRAVING_CODES,
+  type Craving,
   DEFAULT_IMPORTANT,
   EMPTY_CONDITIONS,
   EXCLUDE,
@@ -13,8 +16,12 @@ import {
   IMPORTANT,
   IMPORTANT_CODES,
   type Important,
+  MAX_CRAVING,
   MAX_IMPORTANT,
   titleOf,
+  type Weather,
+  WEATHER,
+  WEATHER_CODES,
   WHEN,
   WHEN_CODES,
   WHO,
@@ -68,6 +75,22 @@ const IMPORTANT_RULES: [Important, RegExp][] = [
   ['FAST', /(빨리|빠르게|빠른|금방|급하|시간 ?없)/],
 ];
 
+const WEATHER_RULES: [Weather, RegExp][] = [
+  ['RAINY', /(비 ?오|비가|비 ?내|장마|우산|소나기)/],
+  ['COLD', /(추운|춥|쌀쌀|겨울|눈 ?오|눈이 ?와|영하)/],
+  ['HOT', /(더운|덥|무더|여름|폭염|땀)/],
+];
+
+const CRAVING_RULES: [Craving, RegExp][] = [
+  ['SOUP', /(국물|국밥|찌개|전골|칼국수|수제비|해장|뜨끈|따뜻한 ?거|[^수]탕(?!수))/],
+  ['NOODLE', /(국수|라멘|우동|파스타|짜장|짬뽕|냉면|쌀국수|면 ?요리|면 ?(먹|땡|당)|면이 ?(먹|땡))/],
+  ['MEAT', /(고기|삼겹|갈비|한우|소고기|돼지|곱창|스테이크|족발|보쌈)/],
+  ['RICE', /((?<!혼)밥(?!약)|백반|덮밥|정식|든든)/],
+  ['SEAFOOD', /(해산물|해물|조개|생선|회 ?(먹|땡)|횟집|초밥|대게|꽃게|새우|낙지)/],
+  ['LIGHT', /(가볍|가벼운|샐러드|샌드위치|다이어트|간단히)/],
+  ['DESSERT', /(디저트|카페|케이크|빵|빙수|커피|달달|달콤)/],
+];
+
 function whenOf(text: string): Conditions['when'] {
   if (/(늦은 ?밤|야식|새벽|심야|밤늦게|밤 ?늦|2차)/.test(text)) return 'LATE_NIGHT';
   if (/(저녁|퇴근|디너)/.test(text)) return 'DINNER';
@@ -82,6 +105,10 @@ export function parseByRules(text: string): Conditions {
   return {
     who: WHO_RULES.find(([, re]) => re.test(text))?.[0] ?? null,
     when: whenOf(text),
+    weather: WEATHER_RULES.find(([, re]) => re.test(text))?.[0] ?? null,
+    craving: CRAVING_RULES.filter(([, re]) => re.test(text))
+      .map(([code]) => code)
+      .slice(0, MAX_CRAVING),
     exclude: EXCLUDE_RULES.filter(([, re]) => re.test(text)).map(([code]) => code),
     important: IMPORTANT_RULES.filter(([, re]) => re.test(text)).map(([code]) => code),
   };
@@ -100,9 +127,12 @@ const SYSTEM = [
   '너는 맛집 추천 앱의 상황 이해 도우미다. 사용자가 지금 상황을 한 문장으로 적으면, 아래 값 목록 안에서만 골라 조건으로 바꾼다.',
   `who 누구랑(하나 또는 null): ${list(WHO)}`,
   `when 언제(하나 또는 null): ${list(WHEN)}`,
+  `weather 날씨(하나 또는 null): ${list(WEATHER)}`,
+  `craving 먹고 싶은 것(최대 ${MAX_CRAVING}개): ${list(CRAVING)}`,
   `exclude 빼고 싶은 것(여러 개): ${list(EXCLUDE)}`,
   `important 중요한 것(최대 ${MAX_IMPORTANT}개): ${list(IMPORTANT)}`,
   '문장에 분명히 드러난 것만 고른다. 예) "아빠가 매운 거 못 드셔" → exclude SPICY. "매운 거 먹고 싶어"는 SPICY를 빼는 게 아니다.',
+  '예) "비 오는 날 국물" → weather RAINY, craving SOUP. "회식"의 회는 해산물이 아니다.',
   '목록에 맞는 값이 없으면 고르지 않는다 (who·when은 null, 배열은 빈 배열). 지어내지 않는다.',
 ].join('\n');
 
@@ -111,16 +141,20 @@ const SCHEMA = {
   properties: {
     who: { type: 'STRING', enum: WHO_CODES, nullable: true },
     when: { type: 'STRING', enum: WHEN_CODES, nullable: true },
+    weather: { type: 'STRING', enum: WEATHER_CODES, nullable: true },
+    craving: { type: 'ARRAY', items: { type: 'STRING', enum: CRAVING_CODES } },
     exclude: { type: 'ARRAY', items: { type: 'STRING', enum: EXCLUDE_CODES } },
     important: { type: 'ARRAY', items: { type: 'STRING', enum: IMPORTANT_CODES } },
   },
-  required: ['who', 'when', 'exclude', 'important'],
+  required: ['who', 'when', 'weather', 'craving', 'exclude', 'important'],
 };
 
 // AI가 목록 밖 값이나 6개 이상을 주면 버리거나 자른다 (전체를 버리지 않는다)
 const aiAnswer = z.object({
   who: z.enum(WHO_CODES).nullable().catch(null),
   when: z.enum(WHEN_CODES).nullable().catch(null),
+  weather: z.enum(WEATHER_CODES).nullable().catch(null),
+  craving: z.array(z.string()).catch([]),
   exclude: z.array(z.string()).catch([]),
   important: z.array(z.string()).catch([]),
 });
@@ -152,6 +186,7 @@ async function parseByAi(text: string): Promise<Conditions | null> {
     );
     return conditionsSchema.parse({
       ...answer,
+      craving: answer.craving.filter((c): c is Craving => c in CRAVING).slice(0, MAX_CRAVING),
       exclude: answer.exclude.filter((c): c is ExcludeCode => c in EXCLUDE),
       important: answer.important
         .filter((c): c is Important => c in IMPORTANT)
