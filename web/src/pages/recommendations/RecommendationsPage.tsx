@@ -17,6 +17,7 @@ import { useMyCoords } from '../../lib/useMyCoords';
 import { NearbyStores } from './NearbyStores';
 import { parseRecoType, RECO_EMPTY, RECO_OPTIONS, RECO_REASON } from './recoTypes';
 import styles from './Recommendations.module.css';
+import situationStyles from './Situation.module.css';
 
 /** 카드로 넘겨 보는 추천 수 */
 const CAROUSEL_SIZE = 5;
@@ -60,7 +61,12 @@ export function RecommendationsPage() {
     >
       <AppHeader title="추천맛집" hideBack />
       <div className={styles.content}>
-        <RegionChip region={region} onClick={() => setRegionOpen(true)} />
+        <div className={situationStyles.topRow}>
+          <RegionChip region={region} onClick={() => setRegionOpen(true)} />
+          <Link to="/recommendations/situation" className={situationStyles.situationButton}>
+            <span aria-hidden="true">✎</span> 내 상황으로 추천
+          </Link>
+        </div>
         <h2 className={styles.title}>이 동네의 다음 한 끼</h2>
         <p className={styles.subtitle}>현지인 방문·재방문·인증 리뷰를 바탕으로 골랐어요.</p>
         {shownPreferred.length > 0 && (
