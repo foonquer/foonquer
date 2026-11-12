@@ -911,6 +911,7 @@ model ExpHistory {
 }
 
 /// 개발 대상: 모자 6개 + 왕관, 얼굴 6개, 소품 6개, 밤하늘, 방망이 5종. 등·오라·배경 아이템과 음식 분야 깨비·색깔은 만들지 않는다 (2026-10-06)
+/// 2026-11-12: 탐험가 배낭(소품, 업적 "꾸준한 탐험가" 보상)과 모임 단체 모자(모자, 모임 함께 정복 10곳 보상)를 더했다
 model Item {
   id                      Int                @id @default(autoincrement())
   /// HAT_STRAWBERRY, FACE_HEART_SUNGLASSES, PROP_TTEOKKKOCHI, HAT_CROWN, SKIN_NIGHTSKY, CLUB_GOLD 같은 코드 — 프론트 에셋 이름과 맞춘다
@@ -921,7 +922,7 @@ model Item {
   description             String?            @db.VarChar(255)
   /// 먹포인트 가격 · 모자·얼굴·소품만 판매 · null이면 판매하지 않음
   price                   Int?
-  /// D 기본 지급 / P 포인트 구매(모자·얼굴·소품) / S 시즌 보상(방망이 1~4단계) / M 합성(전설의 방망이) / A 업적 보상(왕관·밤하늘, v1.3) / E 이벤트
+  /// D 기본 지급 / P 포인트 구매(모자·얼굴·소품) / S 시즌 보상(방망이 1~4단계) / M 합성(전설의 방망이) / A 업적 보상(왕관·밤하늘·탐험가 배낭, v1.3) / C 모임 보상(모임 단체 모자) / E 이벤트
   unlockType              String             @default("P") @map("unlock_type") @db.Char(1)
   /// 등급 (v1.3, 피그마 에셋 보드) — N 일반 / R 레어 / E 에픽 / L 전설 / H 명예(업적·시즌으로만). 아이템 상자는 레어가 20%
   rarity                  String             @default("N") @db.Char(1)
@@ -976,7 +977,7 @@ model MemberItem {
   itemId       Int       @map("item_id")
   /// 가진 개수 — 방망이만 2개 이상이 될 수 있다 (시즌마다 받으면 +1, 합성하면 황금 -3). 모자·얼굴·소품·밤하늘은 항상 1
   quantity     Int       @default(1)
-  /// D 기본 지급 / P 구매 / A 업적 보상 / S 시즌 보상 / M 합성 / B 아이템 상자(v1.3) / E 이벤트
+  /// D 기본 지급 / P 구매 / A 업적 보상 / S 시즌 보상 / M 합성 / B 아이템 상자(v1.3) / C 모임 보상 / E 이벤트
   acquiredType String    @map("acquired_type") @db.Char(1)
   /// acquired_type = S일 때 처음 받은 시즌
   seasonId     Int?      @map("season_id")

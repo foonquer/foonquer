@@ -159,7 +159,7 @@ describe('CHAR 먹깨비', () => {
     expect(off.body.data.equipped.hat).toBeNull();
 
     const collection = await api(me.id).get('/characters/me/collection');
-    expect(collection.body.data).toMatchObject({ collectedCount: 2, totalCount: 25 + 25 });
+    expect(collection.body.data).toMatchObject({ collectedCount: 2, totalCount: 27 + 25 });
     expect(collection.body.data.nextGoal).toMatchObject({ name: '반짝 별 스티커', price: 150 });
   });
 
@@ -495,7 +495,15 @@ describe('v1.3 아이템 상자 · 세트 · 업적 보상 아이템', () => {
     const me = await createMember();
     const honor = await api(me.id).get('/shop/items?category=HONOR');
     const codes = honor.body.data.items.map((i: { code: string }) => i.code);
-    expect(codes).toEqual(expect.arrayContaining(['HAT_CROWN', 'SKIN_NIGHTSKY', 'CLUB_GOLD']));
+    expect(codes).toEqual(
+      expect.arrayContaining([
+        'HAT_CROWN',
+        'SKIN_NIGHTSKY',
+        'CLUB_GOLD',
+        'PROP_EXPLORER_BAG',
+        'HAT_CREW',
+      ]),
+    );
     expect(
       honor.body.data.items.find((i: { code: string }) => i.code === 'HAT_CROWN'),
     ).toMatchObject({

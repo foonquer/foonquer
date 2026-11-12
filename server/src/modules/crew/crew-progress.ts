@@ -22,6 +22,8 @@ export interface CrewTogether {
   conquestCount: number;
   /** 이번에 받은 모임 배지 */
   badges: string[];
+  /** 배지와 함께 내가 받은 아이템 (단골 모임 → 모임 단체 모자) */
+  rewardItems: { itemId: number; code: string; name: string }[];
   /** 모임 퀘스트 "함께 정복"을 깼으면 각자 받은 먹포인트 (아니면 0) */
   rewardPoint: number;
 }
@@ -131,6 +133,7 @@ export async function advanceCrews(
           skipDuplicates: true,
         });
       }
+      const rewardItems = await giveBadgeItems(tx, crew, newBadges, userId, now);
 
       let rewardPoint = 0;
       const quest = await tx.crewQuest.findUnique({
@@ -184,6 +187,7 @@ export async function advanceCrews(
         restaurantName: restaurant.name,
         conquestCount,
         badges: newBadges.map((b) => badgeName(b.code, crew.sigungu.name)),
+        rewardItems,
         rewardPoint,
       });
     }
@@ -228,4 +232,57 @@ export async function advanceCrews(
     }
   }
   return together.length > 0 ? { together } : null;
+}
+
+/**
+ * 모임 배지에 걸린 아이템(단골 모임 → 모임 단체 모자)을 지금 참여 중인 모임원 모두에게 준다.
+ * 이미 가진 사람(다른 모임에서 받음)은 그대로 둔다.
+ * @returns 별점을 남긴 내가 이번에 받은 아이템
+ */
+async function giveBadgeItems(
+  tx: Tx,
+  crew: { id: bigint; name: string; sigungu: { name: string } },
+  badges: readonly (typeof CREW_BADGES)[number][],
+  userId: bigint,
+  now: Date,
+) {
+  const mine: CrewTogether['rewardItems'] = [];
+  for (const badge of badges) {
+    if (!badge.itemCode) continue;
+    const item = await tx.item.findFirst({
+      where: { code: badge.itemCode, status: 'A' },
+      select: { id: true, code: true, name: true },
+    });
+    if (!item) continue;
+    const members = await tx.crewMember.findMany({
+      where: {
+        crewId: crew.id,
+        status: 'A',
+        user: { memberItems: { none: { itemId: item.id, quantity: { gt: 0 } } } },
+      },
+      select: { userId: true },
+    });
+    for (const m of members) {
+      await tx.memberItem.upsert({
+        where: { userId_itemId: { userId: m.userId, itemId: item.id } },
+        update: { quantity: 1, acquiredType: 'C', acquiredAt: now, seenAt: null },
+        create: { userId: m.userId, itemId: item.id, acquiredType: 'C', acquiredAt: now },
+      });
+      await notify(
+        tx,
+        m.userId,
+        {
+          category: 'MUKKAEBI',
+          type: 'NEW_ITEM',
+          title: `${withObjectParticle(item.name)} 얻었어요!`,
+          content: `${crew.name} "${badgeName(badge.code, crew.sigungu.name)}" 배지 보상이에요. 꾸미기에서 착용해 보세요`,
+          refType: 'ITEM',
+          refId: item.id,
+        },
+        now,
+      );
+      if (m.userId === userId) mine.push({ itemId: item.id, code: item.code, name: item.name });
+    }
+  }
+  return mine;
 }

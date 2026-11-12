@@ -197,6 +197,13 @@ export async function getCrew(userId: bigint, crewId: bigint, now = new Date()) 
     prisma.crewBadge.findMany({ where: { crewId }, orderBy: { regDate: 'asc' } }),
   ]);
   const next = CREW_BADGES.find((b) => !badges.some((x) => x.code === b.code));
+  // 다음 배지에 걸린 아이템 (단골 모임 → 모임 단체 모자)
+  const nextItem = next?.itemCode
+    ? await prisma.item.findFirst({
+        where: { code: next.itemCode, status: 'A' },
+        select: { code: true, name: true },
+      })
+    : null;
   return {
     ...crewHead(crew, userId),
     inviteCode: crew.inviteCode,
@@ -216,7 +223,12 @@ export async function getCrew(userId: bigint, crewId: bigint, now = new Date()) 
     })),
     badges: badges.map((b) => ({ code: b.code, name: badgeName(b.code, crew.sigungu.name) })),
     nextBadge: next
-      ? { code: next.code, name: badgeName(next.code, crew.sigungu.name), target: next.target }
+      ? {
+          code: next.code,
+          name: badgeName(next.code, crew.sigungu.name),
+          target: next.target,
+          rewardItem: nextItem,
+        }
       : null,
   };
 }

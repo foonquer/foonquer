@@ -3,8 +3,10 @@ import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import type { RatingResult } from '../../api/reviews';
 import mukkaebi from '../../assets/illust/mukkaebi.svg';
 import { Button } from '../../components/Button';
+import { ItemIcon } from '../../components/ItemIcon';
 import { Screen } from '../../components/Screen';
 import { formatPoint } from '../../lib/format';
+import { categoryOfCode } from '../../lib/itemArt';
 import { eulReul } from '../../lib/korean';
 import { CheckIcon, FlagIcon, GiftIcon, SparkleIcon } from './QuestIcons';
 import styles from './Quest.module.css';
@@ -162,6 +164,14 @@ export function QuestCompletePage() {
           <section key={a.name} className={styles.panel} aria-label="업적 달성">
             <p className={styles.panelTitle}>업적 달성 · {a.name}</p>
             {a.rewardPoint > 0 && <p className={styles.panelText}>+{formatPoint(a.rewardPoint)}</p>}
+            {a.rewardItems.map((i) => (
+              <div key={i.code} className={styles.achievementItem}>
+                <ItemIcon category={categoryOfCode(i.code)} rarity="H" code={i.code} size={40} />
+                <p className={styles.panelText}>
+                  <strong>{eulReul(i.name)} 받았어요</strong> · 꾸미기에서 착용해 보세요
+                </p>
+              </div>
+            ))}
           </section>
         ))}
       </div>

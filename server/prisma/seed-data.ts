@@ -265,7 +265,7 @@ type ItemSeed = {
   category: 'HAT' | 'FACE' | 'PROP' | 'SKIN' | 'CLUB';
   name: string;
   price?: number;
-  unlockType?: 'P' | 'S' | 'M' | 'A';
+  unlockType?: 'P' | 'S' | 'M' | 'A' | 'C';
   clubTier?: number;
   description: string;
   /** N 일반(기본) / R 레어 / L 전설 / H 명예 — 피그마 에셋 보드 (v1.3) */
@@ -472,6 +472,24 @@ const items: ItemSeed[] = [
     clubTier: 5,
     description: '황금 방망이 3개를 합쳐 만들어요.',
     rarity: 'L',
+  },
+  // 맞춤 퀘스트·모임 보상 (2026-11-12). 이미 넣은 아이템의 sort_order와 겹치지 않게 맨 뒤에 둔다
+  {
+    code: 'PROP_EXPLORER_BAG',
+    category: 'PROP',
+    name: '탐험가 배낭',
+    unlockType: 'A',
+    rarity: 'H',
+    achievementCode: 'QUEST_STREAK_4',
+    description: '4주 연속 이번 주 퀘스트를 모두 깨면 받아요.',
+  },
+  {
+    code: 'HAT_CREW',
+    category: 'HAT',
+    name: '모임 단체 모자',
+    unlockType: 'C',
+    rarity: 'H',
+    description: '모임에서 함께 정복 10곳을 채우면 모임원 모두 받아요.',
   },
 ];
 

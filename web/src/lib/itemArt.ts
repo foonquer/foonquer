@@ -1,4 +1,7 @@
 // 아이템 그림 (피그마 먹깨비 에셋 보드 298:2900·521:12587에서 내보낸 SVG). 파일 이름 = item.code
+// 탐험가 배낭·모임 단체 모자는 피그마에 그림이 없어 같은 색·선으로 새로 그렸다 (2026-11-12)
+
+import type { ItemCategory } from '../api/mukkaebi';
 
 const ART = import.meta.glob<string>('../assets/items/*.svg', { eager: true, import: 'default' });
 
@@ -6,6 +9,9 @@ const ART = import.meta.glob<string>('../assets/items/*.svg', { eager: true, imp
 export function itemArt(code: string | null | undefined) {
   return code ? ART[`../assets/items/${code}.svg`] : undefined;
 }
+
+/** 코드 앞부분이 종류 (HAT_CREW → HAT, PROP_EXPLORER_BAG → PROP) */
+export const categoryOfCode = (code: string) => code.split('_')[0] as ItemCategory;
 
 /** 그림 원래 크기 (px, 먹깨비 몸 그림 140×150과 같은 배율) — 꾸민 먹깨비에 입힐 때 크기를 맞춘다 */
 export const ITEM_SIZE: Record<string, [number, number]> = {
@@ -23,11 +29,13 @@ export const ITEM_SIZE: Record<string, [number, number]> = {
   HAT_ACORN: [64, 58],
   HAT_BEAR: [64, 58],
   HAT_CHICK: [64, 60],
+  HAT_CREW: [76, 48],
   HAT_CROWN: [64, 55],
   HAT_SNAPBACK: [74, 44],
   HAT_SPROUT: [64, 59],
   HAT_STRAWBERRY: [64, 59],
   PROP_COTTON_CANDY: [48, 80],
+  PROP_EXPLORER_BAG: [46, 60],
   PROP_FLAG: [57, 84],
   PROP_HEART_BALLOON: [40, 90],
   PROP_ICE_CREAM: [34, 74],

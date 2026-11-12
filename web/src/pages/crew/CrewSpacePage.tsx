@@ -5,11 +5,14 @@ import { AppHeader } from '../../components/AppHeader';
 import { Dialog } from '../../components/Dialog';
 import { MapView } from '../../components/MapView';
 import { Screen } from '../../components/Screen';
+import { ItemIcon } from '../../components/ItemIcon';
 import { EmptyState, Loading } from '../../components/StateViews';
 import { useToast } from '../../components/Toast';
 import { errorMessage } from '../../lib/api';
 import { crewQuestPeople, myIdOf } from '../../lib/crew';
 import { formatMonthDay, formatScore } from '../../lib/format';
+import { categoryOfCode } from '../../lib/itemArt';
+import { eulReul } from '../../lib/korean';
 import { useAsync } from '../../lib/useAsync';
 import { AwardIcon, GearIcon, SplitIcon, UtensilsIcon } from '../quest/QuestIcons';
 import { Avatars } from './CrewParts';
@@ -195,11 +198,25 @@ export function CrewSpacePage() {
             </p>
             {data.nextBadge && (
               <p className={styles.badgeText}>
-                함께 정복 {data.nextBadge.target}곳이면 "{data.nextBadge.name}" 배지를 받아요 (
-                {Math.min(data.conquestCount, data.nextBadge.target)}/{data.nextBadge.target})
+                함께 정복 {data.nextBadge.target}곳이면 "{data.nextBadge.name}"{' '}
+                {data.nextBadge.rewardItem
+                  ? `배지와 ${eulReul(data.nextBadge.rewardItem.name)}`
+                  : '배지를'}{' '}
+                받아요 ({Math.min(data.conquestCount, data.nextBadge.target)}/
+                {data.nextBadge.target})
               </p>
             )}
           </div>
+          {data.nextBadge?.rewardItem && (
+            <span className={styles.badgeReward}>
+              <ItemIcon
+                category={categoryOfCode(data.nextBadge.rewardItem.code)}
+                rarity="H"
+                code={data.nextBadge.rewardItem.code}
+                size={44}
+              />
+            </span>
+          )}
         </section>
       </div>
 
