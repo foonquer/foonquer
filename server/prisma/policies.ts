@@ -265,3 +265,20 @@ const LOCATION = `먹장깨기 위치기반 서비스 이용약관
 이 약관은 2026년 11월 12일부터 시행합니다.`;
 
 export const POLICY_TEXTS = { TERMS, PRIVACY, LOCATION } as const;
+
+// 2026-11-13: 처리방침(11항)·위치 약관(제8조) 책임자 항목에 팀 이메일을 더한 새 버전. 이용약관은 2026-11-12 그대로.
+// 위 2026-11-12 본문에서 책임자 줄 아래에 이메일 줄을 넣고 시행일만 바꾼다. 전화번호는 넣지 않는다.
+export const POLICY_CONTACT_VERSION = '2026-11-13';
+const CONTACT_EMAILS =
+  '  - 이메일: skyjsy0331@gmail.com, rachelwl321@gmail.com, anjun0423@gmail.com';
+
+function withContact(text: string, officerLine: string) {
+  return text
+    .replace(`${officerLine}\n`, `${officerLine}\n${CONTACT_EMAILS}\n`)
+    .replace('2026년 11월 12일부터 시행', '2026년 11월 13일부터 시행');
+}
+
+export const POLICY_CONTACT_TEXTS = {
+  PRIVACY: withContact(PRIVACY, '  - 개인정보 보호책임자: 먹장깨기 운영팀'),
+  LOCATION: withContact(LOCATION, '  - 위치정보 관리책임자: 먹장깨기 운영팀'),
+} as const;
