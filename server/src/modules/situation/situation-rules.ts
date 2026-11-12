@@ -1,10 +1,14 @@
 import { type BusinessHours, isOpenAt } from '../restaurant/business-hours';
 import {
   type Conditions,
+  CRAVING,
+  type Craving,
   EXCLUDE,
   type ExcludeCode,
   IMPORTANT,
   type Important,
+  type Weather,
+  WEATHER,
   WHEN,
   type When,
   WHO,
@@ -12,11 +16,11 @@ import {
 } from './situation-conditions';
 
 // 조건마다 맞음 / 부분 / 안 맞음 판정 (피그마 3-4 개발 메모 4·5번, 서버 계산 · AI 아님).
-// 근거는 인증 리뷰 글·좋았던/아쉬웠던 점·세부 별점·영업시간. 신뢰 별점 숫자는 바꾸지 않는다.
-// 기준 숫자(언급 2건, 평균 4.2·3.5, 가중치 1.5, 적합 50%)는 초안 — 팀 확정 필요.
+// 근거는 인증 리뷰 글·좋았던/아쉬웠던 점·세부 별점·영업시간·업종·영수증 메뉴. 신뢰 별점 숫자는 바꾸지 않는다.
+// 기준 숫자(언급 2건, 평균 4.2·3.5, 가중치 1.5, 적합 50%)는 2026-11-12 팀 확정.
 
 export type Status = 'MATCH' | 'PARTIAL' | 'NONE';
-export type Kind = 'WHO' | 'WHEN' | 'EXCLUDE' | 'IMPORTANT';
+export type Kind = 'WHO' | 'WHEN' | 'WEATHER' | 'CRAVING' | 'EXCLUDE' | 'IMPORTANT';
 
 /** 판정에 쓰는 가게 정보 */
 export interface ShopSignals {
@@ -28,6 +32,8 @@ export interface ShopSignals {
   price: { avg: number; count: number } | null;
   /** 공개 리뷰 글과 좋았던(G)/아쉬웠던(B) 점 */
   reviews: { text: string; marks: Map<string, string> }[];
+  /** 인증 영수증의 메뉴 이름 */
+  menus: string[];
 }
 
 /** 동네 평균 (근거 "서비스 4.5 (동네 평균 +0.7)") */
@@ -50,7 +56,7 @@ export interface Condition {
   weight: number;
 }
 
-/** 중요해요는 무게를 조금 더 둔다 */
+/** 중요해요·먹고 싶어요는 무게를 조금 더 둔다 */
 const IMPORTANT_WEIGHT = 1.5;
 const SCORE: Record<Status, number> = { MATCH: 1, PARTIAL: 0.5, NONE: 0 };
 /** 언급 n건 이상이면 맞음 */
@@ -59,11 +65,20 @@ const DETAIL_MIN_REVIEWS = 3;
 const AVG_MATCH = 4.2;
 const AVG_PARTIAL = 3.5;
 
-/** 조건 목록 (누구랑 → 언제 → 빼기 → 중요해요) */
+/** 조건 목록 (누구랑 → 언제 → 날씨 → 먹고 싶어요 → 빼기 → 중요해요) */
 export function conditionList(c: Conditions): Condition[] {
   return [
     ...(c.who ? [{ kind: 'WHO' as const, code: c.who, label: WHO[c.who], weight: 1 }] : []),
     ...(c.when ? [{ kind: 'WHEN' as const, code: c.when, label: WHEN[c.when], weight: 1 }] : []),
+    ...(c.weather
+      ? [{ kind: 'WEATHER' as const, code: c.weather, label: WEATHER[c.weather], weight: 1 }]
+      : []),
+    ...c.craving.map((code) => ({
+      kind: 'CRAVING' as const,
+      code,
+      label: CRAVING[code],
+      weight: IMPORTANT_WEIGHT,
+    })),
     ...c.exclude.map((code) => ({
       kind: 'EXCLUDE' as const,
       code,
@@ -312,6 +327,96 @@ function byHours(shop: ShopSignals, when: When): Judged {
   return { status: 'PARTIAL', evidence: `${slot.of} 중 ${open}일만 ${slot.hour}시 영업` };
 }
 
+// ── 날씨 · 먹고 싶어요 (메뉴) ───────────────────────────────
+
+interface MenuRule {
+  /** 상호·업종 소분류·카테고리·영수증 메뉴에서 찾는 말 */
+  shop: RegExp;
+  /** 리뷰 글에서 찾는 말 (일상어와 겹치지 않게 shop보다 좁게) */
+  review: RegExp;
+  label: string;
+}
+
+/** "탕수육"이 국물(…탕)로 잡히지 않게 먼저 지운다 */
+const clean = (text: string) => text.replace(/탕수육/g, '');
+
+const CRAVING_RULES: Record<Craving, MenuRule> = {
+  SOUP: {
+    shop: /(국밥|[가-힣]탕|찌개|전골|국물|칼국수|수제비|우동|라멘|쌀국수|짬뽕|해장국|샤브|훠궈|국수)/,
+    review: /(국물|국밥|찌개|전골|칼국수|수제비|우동|라멘|쌀국수|짬뽕|해장|육수)/,
+    label: '국물 메뉴',
+  },
+  NOODLE: {
+    shop: /(면|국수|라멘|우동|파스타|짜장|짬뽕|쌀국수|소바|모밀|스파게티)/,
+    review: /(면발|국수|냉면|라멘|우동|파스타|짜장면|짬뽕|쌀국수|소바|모밀|막국수|스파게티)/,
+    label: '면 메뉴',
+  },
+  MEAT: {
+    shop: /(고깃집|고기|갈비|삼겹|목살|한우|소고기|돼지|숯불|불고기|족발|보쌈|곱창|막창|스테이크)/,
+    review: /(고기|갈비|삼겹|목살|한우|소고기|돼지|불고기|족발|보쌈|곱창|막창|스테이크)/,
+    label: '고기 메뉴',
+  },
+  RICE: {
+    shop: /(백반|한정식|정식|덮밥|비빔밥|김밥|솥밥|돈까스|밥집|도시락|제육|국밥|한식)/,
+    review: /(백반|정식|덮밥|비빔밥|솥밥|돈까스|제육|밥이|반찬)/,
+    label: '밥 메뉴',
+  },
+  SEAFOOD: {
+    shop: /(해산물|해물|조개|생선|수산|낙지|쭈꾸미|주꾸미|새우|장어|초밥|스시|대게|꽃게|횟집|회센터|물회|아구|아귀|오징어|굴)/,
+    review: /(해산물|해물|조개|생선|낙지|쭈꾸미|주꾸미|새우|장어|초밥|대게|꽃게|물회|오징어)/,
+    label: '해산물 메뉴',
+  },
+  LIGHT: {
+    shop: /(샐러드|샌드위치|포케|브런치|토스트|베이글|죽)/,
+    review: /(샐러드|샌드위치|포케|브런치|토스트|가볍|담백)/,
+    label: '가벼운 메뉴',
+  },
+  DESSERT: {
+    shop: /(카페|디저트|케이크|빵|베이커리|제과|빙수|아이스크림|마카롱|와플|커피|떡집|한과)/,
+    review: /(디저트|케이크|빵|빙수|아이스크림|마카롱|와플|커피|라떼)/,
+    label: '디저트',
+  },
+};
+
+/** 날씨에 어울리는 메뉴 */
+const WEATHER_RULES: Record<Weather, MenuRule> = {
+  RAINY: {
+    shop: /(국밥|[가-힣]탕|찌개|칼국수|수제비|짬뽕|우동|라멘|전집|파전|부침|막걸리|국수)/,
+    review: /(국물|칼국수|수제비|짬뽕|파전|부침개|막걸리|비 ?오는|비 ?올 ?때)/,
+    label: '비 오는 날 메뉴',
+  },
+  COLD: {
+    shop: /(국밥|[가-힣]탕|찌개|전골|샤브|훠궈|우동|라멘|어묵|오뎅|칼국수)/,
+    review: /(국물|뜨끈|따끈|따뜻|몸이 ?녹|추운 ?날)/,
+    label: '따뜻한 메뉴',
+  },
+  HOT: {
+    shop: /(냉면|막국수|콩국수|물회|밀면|모밀|소바|빙수|아이스크림|냉채)/,
+    review: /(시원|냉면|막국수|콩국수|물회|빙수|더운 ?날)/,
+    label: '시원한 메뉴',
+  },
+};
+
+/**
+ * 메뉴 판정: 업종·상호·영수증 메뉴에 있으면 맞음, 리뷰에서 2건 이상이면 맞음, 1건이면 부분, 없으면 안 맞음.
+ * 메뉴는 가게가 파느냐의 문제라 근거가 없으면 "정보 부족"이 아니라 안 맞음으로 본다
+ */
+function byMenu(shop: ShopSignals, rule: MenuRule): Judged {
+  const shopWord = clean(shop.text).match(rule.shop)?.[0];
+  if (shopWord) return { status: 'MATCH', evidence: `${rule.label} 가게 (${shopWord})` };
+  const menus = shop.menus.filter((m) => rule.shop.test(clean(m)));
+  if (menus.length > 0) {
+    const names = [...new Set(menus)].slice(0, 2).join('·');
+    return { status: 'MATCH', evidence: `영수증 메뉴 ${names} ${menus.length}건` };
+  }
+  const mentions = shop.reviews.filter((r) => rule.review.test(clean(r.text))).length;
+  if (mentions >= MATCH_MENTIONS) {
+    return { status: 'MATCH', evidence: `${rule.label} 리뷰 ${mentions}건` };
+  }
+  if (mentions === 1) return { status: 'PARTIAL', evidence: `${rule.label} 리뷰 1건` };
+  return { status: 'NONE', evidence: `${rule.label} 없음` };
+}
+
 /** 가게 하나를 조건마다 판정 (conds와 같은 순서) */
 export function judgeShop(shop: ShopSignals, conds: Condition[], area: AreaAverages): Judged[] {
   return conds.map((cond) => {
@@ -320,6 +425,10 @@ export function judgeShop(shop: ShopSignals, conds: Condition[], area: AreaAvera
         return byMentions(shop, WHO_RULES[cond.code as Who]);
       case 'WHEN':
         return byHours(shop, cond.code as When);
+      case 'WEATHER':
+        return byMenu(shop, WEATHER_RULES[cond.code as Weather]);
+      case 'CRAVING':
+        return byMenu(shop, CRAVING_RULES[cond.code as Craving]);
       case 'EXCLUDE':
         return byExclude(shop, EXCLUDE_RULES[cond.code as ExcludeCode]);
       case 'IMPORTANT': {
@@ -333,7 +442,7 @@ export function judgeShop(shop: ShopSignals, conds: Condition[], area: AreaAvera
   });
 }
 
-/** 결과 카드 태그 (중요해요 중 맞음) */
+/** 결과 카드 태그 (먹고 싶어요·중요해요 중 맞음) */
 const TAGS: Record<Important, string> = {
   SPACIOUS: '좌석 넉넉',
   ROOM: '룸 좌석',
@@ -345,22 +454,29 @@ const TAGS: Record<Important, string> = {
   FAST: '빨리 나옴',
 };
 
-/** "왜?" 한 줄 (맞음 근거 2개, 중요해요 먼저)과 태그 3개까지 */
+/** 먹고 싶어요·중요해요가 먼저 */
+const isPreferred = (kind: Kind) => kind === 'CRAVING' || kind === 'IMPORTANT';
+
+/** "왜?" 한 줄 (맞음 근거 2개, 먹고 싶어요·중요해요 먼저)과 태그 3개까지 */
 export function summaryOf(conds: Condition[], judged: Judged[]) {
   const matched = conds
     .map((cond, i) => ({ cond, judged: judged[i] }))
     .filter((x) => x.judged.status === 'MATCH');
   const why = [
-    ...matched.filter((x) => x.cond.kind === 'IMPORTANT'),
-    ...matched.filter((x) => x.cond.kind !== 'IMPORTANT'),
+    ...matched.filter((x) => isPreferred(x.cond.kind)),
+    ...matched.filter((x) => !isPreferred(x.cond.kind)),
   ]
     .slice(0, 2)
     .map((x) => x.judged.evidence);
   return {
     why: why.length > 0 ? why.join(' · ') : null,
     tags: matched
-      .filter((x) => x.cond.kind === 'IMPORTANT')
+      .filter((x) => isPreferred(x.cond.kind))
       .slice(0, 3)
-      .map((x) => TAGS[x.cond.code as Important]),
+      .map((x) =>
+        x.cond.kind === 'CRAVING'
+          ? CRAVING[x.cond.code as Craving]
+          : TAGS[x.cond.code as Important],
+      ),
   };
 }

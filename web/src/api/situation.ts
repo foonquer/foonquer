@@ -5,6 +5,8 @@ import type { RestaurantCardItem } from './restaurants';
 
 export type Who = 'SOLO' | 'FRIEND' | 'COUPLE' | 'FAMILY' | 'KIDS' | 'GROUP';
 export type When = 'WEEKDAY_LUNCH' | 'WEEKEND_LUNCH' | 'DINNER' | 'LATE_NIGHT';
+export type Weather = 'RAINY' | 'COLD' | 'HOT';
+export type Craving = 'SOUP' | 'NOODLE' | 'MEAT' | 'RICE' | 'SEAFOOD' | 'LIGHT' | 'DESSERT';
 export type ExcludeCode = 'SPICY' | 'RAW' | 'BAR' | 'LONG_WAIT';
 export type Important =
   'SPACIOUS' | 'ROOM' | 'PARKING' | 'QUIET' | 'KIND' | 'SOLO_FRIENDLY' | 'VALUE' | 'FAST';
@@ -12,11 +14,13 @@ export type Important =
 export type Conditions = {
   who: Who | null;
   when: When | null;
+  weather: Weather | null;
+  craving: Craving[];
   exclude: ExcludeCode[];
   important: Important[];
 };
 
-export type ConditionKind = 'WHO' | 'WHEN' | 'EXCLUDE' | 'IMPORTANT';
+export type ConditionKind = 'WHO' | 'WHEN' | 'WEATHER' | 'CRAVING' | 'EXCLUDE' | 'IMPORTANT';
 export type FitStatus = 'MATCH' | 'PARTIAL' | 'NONE';
 
 export type SituationParse = {

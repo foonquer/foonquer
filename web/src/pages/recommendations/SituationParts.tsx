@@ -5,10 +5,13 @@ import { Button } from '../../components/Button';
 import { formatScore } from '../../lib/format';
 import {
   conditionCount,
+  CRAVING_OPTIONS,
   EXCLUDE_OPTIONS,
   IMPORTANT_OPTIONS,
+  MAX_CRAVING,
   MAX_IMPORTANT,
   sortConditions,
+  WEATHER_OPTIONS,
   WHEN_OPTIONS,
   WHO_OPTIONS,
 } from '../../lib/situation';
@@ -135,6 +138,40 @@ function ConditionForm({
             {o.label}
           </Chip>
         ))}
+      </fieldset>
+      <fieldset className={styles.group}>
+        <legend>
+          날씨<small>하나만</small>
+        </legend>
+        {WEATHER_OPTIONS.map((o) => (
+          <Chip
+            key={o.value}
+            on={draft.weather === o.value}
+            onClick={() =>
+              setDraft({ ...draft, weather: draft.weather === o.value ? null : o.value })
+            }
+          >
+            {o.label}
+          </Chip>
+        ))}
+      </fieldset>
+      <fieldset className={styles.group}>
+        <legend>
+          먹고 싶어요<small>최대 {MAX_CRAVING}개</small>
+        </legend>
+        {CRAVING_OPTIONS.map((o) => {
+          const on = draft.craving.includes(o.value);
+          return (
+            <Chip
+              key={o.value}
+              on={on}
+              disabled={!on && draft.craving.length >= MAX_CRAVING}
+              onClick={() => setDraft({ ...draft, craving: toggle(draft.craving, o.value) })}
+            >
+              {o.label}
+            </Chip>
+          );
+        })}
       </fieldset>
       <fieldset className={styles.group}>
         <legend>

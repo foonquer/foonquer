@@ -31,16 +31,28 @@ async function shop(
     score?: number;
     service?: { sum: number; count: number };
     businessHours?: object;
+    categoryId?: number;
+    categoryDetail?: string;
+    /** 첫 방문 영수증의 메뉴 */
+    menus?: string[];
   } = {},
 ) {
   const r = await createRestaurant({
     ...(opts.name && { name: opts.name }),
     ...(opts.dongCode && { dongCode: opts.dongCode }),
     ...(opts.businessHours && { businessHours: opts.businessHours }),
+    ...(opts.categoryId && { categoryId: opts.categoryId }),
+    ...(opts.categoryDetail && { categoryDetail: opts.categoryDetail }),
   });
   for (const content of texts) {
     const writer = await createMember();
     const visit = await createVisit(writer.id, r.id);
+    if (opts.menus && content === texts[0]) {
+      await prisma.visitReceiptItem.createMany({
+        data: opts.menus.map((menuName) => ({ visitId: visit.id, menuName })),
+      });
+      opts.menus = undefined;
+    }
     await prisma.review.create({
       data: {
         visitId: visit.id,
@@ -109,12 +121,33 @@ describe('POST /recommendations/situation/parse', () => {
       conditions: {
         who: 'FAMILY',
         when: 'WEEKEND_LUNCH',
+        weather: null,
+        craving: [],
         exclude: ['SPICY'],
         important: ['SPACIOUS', 'PARKING', 'QUIET', 'KIND'],
       },
       title: '가족과 주말 점심',
       source: 'RULE',
     });
+  });
+
+  it('날씨·먹고 싶은 것: "비 오는 날 국물" → 비 오는 날 + 국물 (회식의 "회"는 해산물이 아님)', async () => {
+    const me = await createMember();
+    const rainy = await request(app)
+      .post('/api/v1/recommendations/situation/parse')
+      .set('Authorization', bearer(me.id))
+      .send({ text: '비 오는 날 국물' });
+    expect(rainy.body.data).toMatchObject({
+      found: true,
+      conditions: { who: null, weather: 'RAINY', craving: ['SOUP'] },
+      title: '비 오는 날 국물',
+    });
+
+    const team = await request(app)
+      .post('/api/v1/recommendations/situation/parse')
+      .set('Authorization', bearer(me.id))
+      .send({ text: '10명 회식 고기' });
+    expect(team.body.data.conditions).toMatchObject({ who: 'GROUP', craving: ['MEAT'] });
   });
 
   it('조건을 하나도 못 찾으면 found = false (화면 ⑤)', async () => {
@@ -126,7 +159,14 @@ describe('POST /recommendations/situation/parse', () => {
 
     expect(res.body.data).toEqual({
       found: false,
-      conditions: { who: null, when: null, exclude: [], important: [] },
+      conditions: {
+        who: null,
+        when: null,
+        weather: null,
+        craving: [],
+        exclude: [],
+        important: [],
+      },
       title: null,
       source: 'RULE',
     });
@@ -139,6 +179,8 @@ describe('POST /recommendations/situation/parse', () => {
         answer({
           who: 'COUPLE',
           when: 'DINNER',
+          weather: null,
+          craving: ['PIZZA'],
           exclude: ['BAR', 'NOISE'],
           important: ['QUIET', 'VIEW'],
         }),
@@ -154,7 +196,14 @@ describe('POST /recommendations/situation/parse', () => {
 
     expect(res.body.data).toEqual({
       found: true,
-      conditions: { who: 'COUPLE', when: 'DINNER', exclude: ['BAR'], important: ['QUIET'] },
+      conditions: {
+        who: 'COUPLE',
+        when: 'DINNER',
+        weather: null,
+        craving: [],
+        exclude: ['BAR'],
+        important: ['QUIET'],
+      },
       title: '연인과 저녁',
       source: 'AI',
     });
@@ -180,7 +229,14 @@ describe('POST /recommendations/situation/parse', () => {
 
     expect(res.body.data).toMatchObject({
       found: true,
-      conditions: { who: 'SOLO', when: null, exclude: [], important: ['SOLO_FRIENDLY', 'FAST'] },
+      conditions: {
+        who: 'SOLO',
+        when: null,
+        weather: null,
+        craving: [],
+        exclude: [],
+        important: ['SOLO_FRIENDLY', 'FAST'],
+      },
       title: '혼밥할 곳',
       source: 'RULE',
     });
@@ -313,6 +369,57 @@ describe('POST /recommendations/situation', () => {
     });
     expect(second.reasons[1]).toMatchObject({ status: 'PARTIAL', evidence: '영업시간 정보 없음' });
     expect(second.reasons[3]).toMatchObject({ status: 'PARTIAL', evidence: '관련 리뷰 아직 없음' });
+  });
+
+  it('날씨·먹고 싶어요는 업종·상호·영수증 메뉴·리뷰로 판정하고, 안 파는 가게는 빠진다', async () => {
+    const me = await memberInGayang();
+    await shop(Array(5).fill('맛있어요'), {
+      name: '할머니 칼국수',
+      categoryDetail: '국수/칼국수',
+      score: 4.5,
+    });
+    await shop(Array(5).fill('맛있어요'), {
+      name: '가양 식당',
+      categoryDetail: '백반/한정식',
+      menus: ['된장찌개', '된장찌개', '제육볶음'],
+      score: 4,
+    });
+    await shop(Array(5).fill('맛있어요'), {
+      name: '스윗',
+      categoryId: 11,
+      categoryDetail: '카페',
+    });
+
+    const res = await request(app)
+      .post('/api/v1/recommendations/situation')
+      .set('Authorization', bearer(me.id))
+      .send({ conditions: { weather: 'RAINY', craving: ['SOUP'] } });
+
+    expect(res.body.data.title).toBe('비 오는 날 국물');
+    const items = res.body.data.items as {
+      name: string;
+      fitScore: number;
+      tags: string[];
+      reasons: { kind: string; status: string; evidence: string }[];
+    }[];
+    expect(items.map((i) => i.name)).toEqual(['할머니 칼국수', '가양 식당']);
+    expect(items[0]).toMatchObject({ fitScore: 100, tags: ['국물'] });
+    expect(items[0].reasons).toEqual([
+      expect.objectContaining({
+        kind: 'WEATHER',
+        status: 'MATCH',
+        evidence: '비 오는 날 메뉴 가게 (칼국수)',
+      }),
+      expect.objectContaining({
+        kind: 'CRAVING',
+        status: 'MATCH',
+        evidence: '국물 메뉴 가게 (칼국수)',
+      }),
+    ]);
+    expect(items[1].reasons[1]).toMatchObject({
+      status: 'MATCH',
+      evidence: '영수증 메뉴 된장찌개 2건',
+    });
   });
 
   it('딱 맞는 곳이 없으면 하나만 뺐을 때 가게 수와 동네 넓히기를 제안한다 (⑥)', async () => {
