@@ -354,14 +354,14 @@ export async function seedDemoData(nickname: string) {
   };
 }
 
-/** reviews: 가짜 리뷰·내 동네 가짜 방문. 가짜 탐험가가 없거나 가짜 리뷰가 이미 있으면 멈춘다 */
+/**
+ * reviews: 가짜 리뷰·내 동네 가짜 방문. 중간에 끊겨도 다시 돌리면 이어서 한다
+ * (가짜 방문이 이미 있는 동네 가게는 건너뛰고, 리뷰는 아직 없는 방문에만 붙이고, 가중치·별점은 모두 다시 센다)
+ */
 export async function seedDemoReviews(nickname: string) {
   const me = await findMe(nickname);
   const demo = await demoMemberIds();
   if (demo.length === 0) throw new Error('가짜 탐험가가 없어요. seed를 먼저 돌려 주세요');
-  if ((await prisma.review.count({ where: { userId: { in: demo } } })) > 0) {
-    throw new Error('가짜 리뷰가 이미 있어요. clear를 먼저 돌려 주세요');
-  }
   const current = await prisma.season.findFirst({ where: { status: 'A' } });
   if (!current) throw new Error('진행 중인 시즌이 없어요');
   const rand = random(20261111);
@@ -376,6 +376,7 @@ export async function seedDemoReviews(nickname: string) {
   });
   const touched = new Set<string>();
   let localVisits = 0;
+  console.log(`[demo-data] 1/3 내 동네 ${locals.length}곳에 가짜 방문 넣는 중`);
   for (const { regionId } of locals) {
     const shops = await prisma.$queryRaw<{ id: bigint; sigungu_id: number }[]>`
       SELECT id, sigungu_id FROM restaurant WHERE status = 'A' AND region_id = ${regionId}
@@ -383,6 +384,11 @@ export async function seedDemoReviews(nickname: string) {
     for (const shop of shops) {
       const restaurantId = BigInt(shop.id);
       const sigunguId = Number(shop.sigungu_id);
+      // 다시 돌릴 때: 가짜 방문을 이미 넣은 가게는 건너뛴다 (가게마다 한 트랜잭션이라 반쯤 들어간 가게는 없다)
+      const filled = await prisma.visit.count({
+        where: { userId: { in: demo }, restaurantId, seasonId: current.id },
+      });
+      if (filled >= 5) continue;
       const visitors = shuffle(demo, rand).slice(0, 5 + Math.floor(rand() * 5));
       await prisma.$transaction(async (tx) => {
         for (const userId of visitors) {
@@ -432,7 +438,7 @@ export async function seedDemoReviews(nickname: string) {
   }
   await recompute(new Set([...touched].map((k) => k.split(':').slice(0, 2).join(':'))));
 
-  // 2. 가짜 탐험가의 방문마다 리뷰. 가게마다 맛 수준(3.2~4.8)을 정해 두고 그 근처로 준다
+  // 2. 가짜 탐험가의 방문마다 리뷰 (아직 리뷰가 없는 방문만). 가게마다 맛 수준(3.2~4.8)을 정해 두고 그 근처로 준다
   const visits = await prisma.visit.findMany({
     where: { userId: { in: demo }, status: 'C', review: null, restaurantId: { not: null } },
     orderBy: [{ verifiedAt: 'asc' }, { id: 'asc' }],
@@ -444,19 +450,25 @@ export async function seedDemoReviews(nickname: string) {
       restaurant: { select: { category: { select: { name: true } } } },
     },
   });
+  console.log(`[demo-data] 2/3 리뷰 ${visits.length}개 쓰는 중`);
   const aspects = await prisma.reviewAspect.findMany({ select: { id: true, code: true } });
   const aspectOf = (code: string) => aspects.find((a) => a.code === code)?.id;
+  // 맛 수준은 가게 id로 정해서 다시 돌려도 같은 가게는 같은 수준
   const levelOf = new Map<string, number>();
-  const been = new Set<string>();
-  const reviewIds: bigint[] = [];
-  const shops = new Set<bigint>();
+  // 이미 리뷰를 쓴 사람·가게 (다시 간 방문은 재방문 리뷰)
+  const written = await prisma.review.findMany({
+    where: { userId: { in: demo } },
+    select: { userId: true, restaurantId: true },
+  });
+  const been = new Set(written.map((r) => `${r.userId}:${r.restaurantId}`));
+  let created = 0;
   for (let i = 0; i < visits.length; i += 200) {
     await prisma.$transaction(
       async (tx) => {
         for (const v of visits.slice(i, i + 200)) {
           const restaurantId = v.restaurantId as bigint;
           const key = restaurantId.toString();
-          const level = levelOf.get(key) ?? 3.2 + rand() * 1.6;
+          const level = levelOf.get(key) ?? 3.2 + random(Number(restaurantId % 1_000_003n))() * 1.6;
           levelOf.set(key, level);
           const score = half(level + (rand() - 0.5));
           const isRevisit = been.has(`${v.userId}:${key}`);
@@ -504,15 +516,28 @@ export async function seedDemoReviews(nickname: string) {
               }),
             });
           }
-          reviewIds.push(review.id);
-          shops.add(restaurantId);
+          created += 1;
         }
       },
       { timeout: 60_000 },
     );
+    console.log(`[demo-data]   리뷰 ${Math.min(i + 200, visits.length)}/${visits.length}`);
   }
 
-  // 3. 리뷰 가중치(같은 사람 재방문·신뢰도)와 가게 별점·방문 수를 다시 계산한다
+  // 3. 가짜 리뷰 가중치(같은 사람 재방문·신뢰도)와 가짜 방문이 있는 가게의 별점·방문 수를 모두 다시 센다
+  const reviewIds = (
+    await prisma.review.findMany({ where: { userId: { in: demo } }, select: { id: true } })
+  ).map((r) => r.id);
+  const shops = (
+    await prisma.visit.findMany({
+      where: { userId: { in: demo }, restaurantId: { not: null } },
+      distinct: ['restaurantId'],
+      select: { restaurantId: true },
+    })
+  ).flatMap((v) => (v.restaurantId === null ? [] : [v.restaurantId]));
+  console.log(
+    `[demo-data] 3/3 리뷰 ${reviewIds.length}개 가중치·가게 ${shops.length}곳 별점 다시 계산 중`,
+  );
   const params = await loadRatingParams(prisma);
   for (let i = 0; i < reviewIds.length; i += 200) {
     await prisma.$transaction(
@@ -522,8 +547,16 @@ export async function seedDemoReviews(nickname: string) {
       { timeout: 60_000 },
     );
   }
-  for (const id of shops) await refreshRestaurantStat(prisma, id, now, params);
-  return { localVisits, reviews: reviewIds.length, restaurants: shops.size };
+  for (const [i, id] of shops.entries()) {
+    await refreshRestaurantStat(prisma, id, now, params);
+    if ((i + 1) % 100 === 0) console.log(`[demo-data]   가게 ${i + 1}/${shops.length}`);
+  }
+  return {
+    localVisits,
+    reviews: created,
+    totalReviews: reviewIds.length,
+    restaurants: shops.length,
+  };
 }
 
 export async function clearDemoData(nickname: string) {
