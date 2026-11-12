@@ -1,6 +1,11 @@
 import type { PrismaClient } from '../src/generated/prisma/client';
 import { SEOUL, SEOUL_DONG, SEOUL_SIGUNGU } from '../src/modules/region/seoul-regions';
-import { POLICY_DRAFT_VERSION, POLICY_TEXTS } from './policies';
+import {
+  POLICY_CONTACT_TEXTS,
+  POLICY_CONTACT_VERSION,
+  POLICY_DRAFT_VERSION,
+  POLICY_TEXTS,
+} from './policies';
 
 // 바뀌지 않는 기본 데이터. 여러 번 실행해도 같은 결과가 되도록 upsert만 쓴다.
 // prisma/seed.ts(배포·로컬)와 테스트 준비(test/global-setup.ts)가 같이 쓴다.
@@ -55,6 +60,11 @@ async function seedPolicyDocuments(prisma: PrismaClient) {
       type: doc.type,
       version: POLICY_DRAFT_VERSION,
       content: POLICY_TEXTS[doc.type],
+    })),
+    ...(['PRIVACY', 'LOCATION'] as const).map((type) => ({
+      type,
+      version: POLICY_CONTACT_VERSION,
+      content: POLICY_CONTACT_TEXTS[type],
     })),
   ];
   let created = 0;

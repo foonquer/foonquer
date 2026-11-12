@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { POLICY_DRAFT_VERSION } from '../../prisma/policies';
+import { POLICY_CONTACT_VERSION, POLICY_DRAFT_VERSION } from '../../prisma/policies';
 import { createApp } from '../../src/app';
 import { prisma } from '../../src/lib/prisma';
 import * as storage from '../../src/lib/storage';
@@ -143,6 +143,17 @@ describe('CS 공지·FAQ·문의·약관', () => {
     expect(privacy.body.data.content).toContain('네이버클라우드㈜ (CLOVA OCR)');
     const location = await request(app).get('/api/v1/terms/LOCATION');
     expect(location.body.data.content).toMatch(/^먹장깨기 위치기반 서비스 이용약관/);
+    // 처리방침·위치 약관은 책임자 이메일을 더한 2026-11-13 버전이 최신이고, 2026-11-12 본문은 그대로다
+    const emails = '이메일: skyjsy0331@gmail.com, rachelwl321@gmail.com, anjun0423@gmail.com';
+    for (const doc of [privacy.body.data, location.body.data]) {
+      expect(doc.version).toBe(POLICY_CONTACT_VERSION);
+      expect(doc.content).toContain(emails);
+      expect(doc.content).toContain('2026년 11월 13일부터 시행');
+      expect(doc.content).not.toMatch(/010-?\d{4}/);
+    }
+    const before = await request(app).get(`/api/v1/terms/PRIVACY?version=${POLICY_DRAFT_VERSION}`);
+    expect(before.body.data.content).not.toContain(emails);
+    expect(before.body.data.content).toContain('2026년 11월 12일부터 시행');
     expect((await request(app).get('/api/v1/terms/TERMS?version=1999')).body.code).toBe(
       'TERMS_NOT_FOUND',
     );

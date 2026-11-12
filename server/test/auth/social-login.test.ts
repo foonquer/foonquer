@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../src/app';
-import { POLICY_DRAFT_VERSION } from '../../prisma/policies';
+import { POLICY_CONTACT_VERSION, POLICY_DRAFT_VERSION } from '../../prisma/policies';
 import { seedBaseData } from '../../prisma/seed-data';
 import { kstTodayAsDbDate } from '../../src/common/time';
 import { prisma } from '../../src/lib/prisma';
@@ -303,13 +303,13 @@ describe('AUTH-15 POST /users/me/consents', () => {
       {
         type: 'PRIVACY',
         agreed: true,
-        policyVersion: POLICY_DRAFT_VERSION,
+        policyVersion: POLICY_CONTACT_VERSION,
         agreedAt: expect.any(String),
       },
       {
         type: 'LOCATION',
         agreed: true,
-        policyVersion: POLICY_DRAFT_VERSION,
+        policyVersion: POLICY_CONTACT_VERSION,
         agreedAt: expect.any(String),
       },
       {
