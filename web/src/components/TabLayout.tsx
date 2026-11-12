@@ -26,7 +26,8 @@ export function TabLayout() {
       <CelebrationLayer key={pathname} />
       <nav className={styles.tabBar} aria-label="하단 메뉴">
         {TABS.map((tab) => (
-          <NavLink key={tab.to} to={tab.to} end className={styles.tab}>
+          // 홈(/)만 정확히 같을 때. 추천맛집은 /recommendations/situation에서도 켜진다
+          <NavLink key={tab.to} to={tab.to} end={tab.to === '/'} className={styles.tab}>
             <Icon src={tab.icon} size={22} width={tab.w} height={tab.h} />
             <span>{tab.label}</span>
           </NavLink>

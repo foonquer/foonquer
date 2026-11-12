@@ -34,6 +34,7 @@ import { SigunguStatusPage } from './pages/ranking/SigunguStatusPage';
 import { ProfileSetupPage } from './pages/profile-setup/ProfileSetupPage';
 import { RecommendationListPage } from './pages/recommendations/RecommendationListPage';
 import { RecommendationsPage } from './pages/recommendations/RecommendationsPage';
+import { SituationPage } from './pages/recommendations/SituationPage';
 import { RestaurantDetailPage } from './pages/restaurant/RestaurantDetailPage';
 import { ConqueredPage } from './pages/review/ConqueredPage';
 import { CrewInvitationPage, CrewJoinPage } from './pages/crew/CrewInvitationPage';
@@ -106,6 +107,7 @@ export const routes: RouteObject[] = [
               { path: '/', element: <HomePage /> },
               { path: '/ranking', element: <RankingPage /> }, // ?tab=status|rank&seasonId=
               { path: '/recommendations', element: <RecommendationsPage /> }, // ?type=
+              { path: '/recommendations/situation', element: <SituationPage /> },
               { path: '/list', element: <ListPage /> }, // ?tab=WANT|CONQUERED
               { path: '/me', element: <MyPage /> },
             ],

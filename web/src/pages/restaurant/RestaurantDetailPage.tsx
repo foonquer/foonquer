@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { getRestaurant, type RestaurantDetail } from '../../api/restaurants';
 import { getRestaurantReviews } from '../../api/reviews';
 import { saveRestaurant, unsaveRestaurant } from '../../api/saved';
@@ -19,6 +19,11 @@ import { scoreBand, tasteCriterion } from '../../lib/taste';
 import { useAsync } from '../../lib/useAsync';
 import { useMyCoords } from '../../lib/useMyCoords';
 import { businessLine } from './business';
+import {
+  FitSheet,
+  type SituationContext,
+  SituationReasonCard,
+} from '../recommendations/SituationParts';
 
 /**
  * "가양동 · 강서구 양천로49길 20". 주소 앞의 "서울특별시"를 빼고, 주소에 구 이름이 있으면 동만 앞에 둔다
@@ -94,6 +99,9 @@ function Detail({
   const toast = useToast();
   const [criteriaOpen, setCriteriaOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  // 상황 맞춤 결과에서 열었으면 "…에 맞는 이유" 카드 (피그마 3-4 ⑦)
+  const situation = (useLocation().state as { situation?: SituationContext } | null)?.situation;
+  const [fitOpen, setFitOpen] = useState(false);
   const { data: reviews, mutate: mutateReviews } = useAsync(
     () => getRestaurantReviews(r.restaurantId, { sort: 'HELPFUL', size: 2 }),
     [r.restaurantId],
@@ -194,6 +202,9 @@ function Detail({
             <span className={styles.criteriaLink}>기준표 ›</span>
           </button>
         )}
+        {situation && (
+          <SituationReasonCard context={situation} onOpenFit={() => setFitOpen(true)} />
+        )}
         <p className={styles.meta}>
           {joinDot([
             r.categoryName,
@@ -263,6 +274,16 @@ function Detail({
           </p>
         )}
       </div>
+      {situation && (
+        <FitSheet
+          open={fitOpen}
+          onClose={() => setFitOpen(false)}
+          name={r.name}
+          ratingScore={r.rating.score}
+          fitScore={situation.fitScore}
+          reasons={situation.reasons}
+        />
+      )}
       <TasteCriteriaSheet
         open={criteriaOpen}
         onClose={() => setCriteriaOpen(false)}
