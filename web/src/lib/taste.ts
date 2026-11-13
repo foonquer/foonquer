@@ -25,9 +25,9 @@ export function tasteCriterion(score: number) {
   return TASTE_CRITERIA.find((c) => c.score <= step) ?? TASTE_CRITERIA[TASTE_CRITERIA.length - 1];
 }
 
-/** 가게 맛 별점의 점수대. 4.4 → "4.0점대" */
+/** 가게 맛 별점의 점수대 (맛 기준표와 같은 0.5점 구간, 「신뢰 별점 계산 규칙 정리」). 3.6 → "3.5점대", 4.4 → "4.0점대" */
 export function scoreBand(score: number) {
-  return `${Math.floor(score).toFixed(1)}점대`;
+  return `${(Math.floor(score * 2) / 2).toFixed(1)}점대`;
 }
 
 export const TASTE_ITEMS: { key: TasteKey; label: string; hint: string }[] = [

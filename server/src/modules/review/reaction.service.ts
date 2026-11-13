@@ -4,7 +4,12 @@ import { addDays, kstStartOfMonth, kstStartOfToday } from '../../common/time';
 import { prisma } from '../../lib/prisma';
 import { checkAchievements } from '../achievement/achievement.service';
 import { notify } from '../notification/notify';
-import { refreshReviewWeight, refreshRestaurantStat } from '../restaurant/restaurant-stat-calc';
+import {
+  loadRatingParams,
+  reactionSums,
+  refreshReviewWeight,
+  refreshRestaurantStat,
+} from '../restaurant/restaurant-stat-calc';
 import { grantReward } from '../reward/reward.service';
 import type { ReactionBody } from './review.schema';
 import { ReviewError } from './review.errors';
@@ -15,13 +20,15 @@ import { changeTrustTemp, voterScale } from './trust-temp';
 // - 같은 사람이 같은 작성자에게 준 반응은 도움돼요 4주(28일)에 3번, 별로예요 한 달에 1번까지만 계산에 넣는다(is_counted)
 // - 도움돼요(계산에 넣는 것): 작성자 온도 방문자 +0.3° / 비방문자 +0.075° × 누른 사람 온도 ÷ 50, 작성자 +5P(도움돼요 받기)
 // - 누른 사람은 평가 참여 +5P (하루 10번, 한 리뷰에 한 번)
-// - 별로예요 N ≥ 5이고 N ≥ 2H면 작성자 온도 −0.5° (리뷰당 1번)
+// - 별로예요 신뢰 가중 합 ≥ 3이고 도움돼요 신뢰 가중 합의 2배 이상이면 작성자 온도 −0.5° (리뷰당 1번)
+//   한 표의 힘 = (방문자 1 · 비방문자 0.1) × 누른 사람 온도 ÷ 50 (restaurant-stat-calc voteStrength)
 // - 취소해도 행은 남기고(type N), 이미 바뀐 온도·포인트는 되돌리지 않는다
 
 const MONTHLY_LIMIT = { H: 3, U: 1 } as const;
 /** 도움돼요 한도를 세는 기간 (신뢰 별점 검증 보고서: 같은 사람의 도움돼요 4주 3회까지) */
 const HELPFUL_WINDOW_DAYS = 28;
-const UNHELPFUL_MIN = 5;
+/** 별로예요 감점에 필요한 별로예요 신뢰 가중 합 (「신뢰 별점 계산 규칙 정리」 3장) */
+const UNHELPFUL_MIN_POWER = 3;
 const TYPE_CODE = { HELPFUL: 'H', UNHELPFUL: 'U' } as const;
 
 async function findReactable(reviewId: number) {
@@ -225,10 +232,9 @@ export async function reactToReview(
       );
       await checkAchievements(tx, review.userId, ['HELPFUL_RECEIVED'], null, now);
     }
-    if (
-      counts.unhelpfulCount >= UNHELPFUL_MIN &&
-      counts.unhelpfulCount >= 2 * counts.visitorHelpfulCount
-    ) {
+    const params = await loadRatingParams(tx);
+    const sums = await reactionSums(tx, review.id, params);
+    if (sums.unhelpful >= UNHELPFUL_MIN_POWER && sums.unhelpful >= 2 * sums.helpful) {
       await changeTrustTemp(
         tx,
         review.userId,
@@ -238,8 +244,8 @@ export async function reactToReview(
         now,
       );
     }
-    await refreshReviewWeight(tx, review.id);
-    await refreshRestaurantStat(tx, review.restaurantId, now);
+    await refreshReviewWeight(tx, review.id, params);
+    await refreshRestaurantStat(tx, review.restaurantId, now, params);
     return counts;
   });
   return { reviewId: review.id, myReaction: body.type, helpfulCount: counts.helpfulCount };

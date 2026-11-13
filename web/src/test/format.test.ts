@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { agoGroup, formatAgo, noRatingText } from '../lib/format';
+import { scoreBand, tasteCriterion } from '../lib/taste';
 
 describe('알림 시각 (formatAgo · agoGroup)', () => {
   // KST 11월 6일 00:30 = UTC 11월 5일 15:30
@@ -26,5 +27,15 @@ describe('별점이 없을 때 문구 (noRatingText)', () => {
     expect(noRatingText(3)).toBe('리뷰 5개부터 별점이 보여요 (지금 3개)');
     expect(noRatingText(0, true)).toBe('아직 별점 없음');
     expect(noRatingText(4, true)).toBe('별점은 리뷰 5개부터');
+  });
+});
+
+describe('가게 맛 별점의 점수대 (scoreBand)', () => {
+  it('맛 기준표와 같은 0.5점 구간으로 보여 준다 (3.6 → 3.5점대)', () => {
+    expect(scoreBand(3.6)).toBe('3.5점대');
+    expect(tasteCriterion(3.6).text).toBe('근처에 있다면 다시 먹고 싶은 맛');
+    expect(scoreBand(4.4)).toBe('4.0점대');
+    expect(scoreBand(4.5)).toBe('4.5점대');
+    expect(scoreBand(3.0)).toBe('3.0점대');
   });
 });

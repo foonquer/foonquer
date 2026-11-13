@@ -3,8 +3,10 @@ import { kstStartOfDbDate, kstWeekStartAsDbDate } from '../../common/time';
 
 // 신뢰 온도 (ERD member.trust_temp, trust_temp_log): 1°~99°, 시작 50°.
 // 한 주(KST 월요일부터)에 오르는 양은 +7°까지, 75° 이상이면 오르는 양이 절반. 같은 원인(reason + ref)은 한 번만.
-// 변화량은 신뢰 별점 검증 보고서(2026-11-12, 시뮬레이션 + 설문)의 최종 규칙: 리뷰를 쓸 때 주로 오르고,
+// 변화량은 「신뢰 별점 계산 규칙 정리」(2026-11-13, 시뮬레이션 + 설문)의 최종 규칙: 리뷰를 쓸 때 주로 오르고,
 // 도움돼요는 리뷰의 절반이며 누른 사람의 온도에 비례한다 (성실 참여자가 6개월에 80°대가 되도록 맞춘 값).
+// 내려가는 쪽에는 주 상한이 없다 (가짜는 빨리 내려가고, 신뢰는 천천히 쌓이게).
+// 오르는 변화는 일어날 때 바로 반영하고(주 상한으로 묶는다), 합의 일치도 감점만 매주 rating 작업이 계산한다.
 
 export type TrustReason =
   | 'HELPFUL_VISITOR'
@@ -13,7 +15,8 @@ export type TrustReason =
   | 'REVIEW_DETAIL'
   | 'UNHELPFUL_MANY'
   | 'REPORT_CONFIRMED'
-  | 'FAKE_REVIEW';
+  | 'FAKE_REVIEW'
+  | 'CONSENSUS_GAP';
 
 export const TRUST_DELTA: Record<TrustReason, number> = {
   /** 도움돼요 받음 (방문자). 누른 사람 온도 ÷ 50 배 */
@@ -27,6 +30,8 @@ export const TRUST_DELTA: Record<TrustReason, number> = {
   UNHELPFUL_MANY: -0.5,
   REPORT_CONFIRMED: -3,
   FAKE_REVIEW: -5,
+  /** 합의 일치도 감점. 크기는 scale로 준다 (consensus.ts consensusPenaltyOf × 지난주 새 리뷰 수) */
+  CONSENSUS_GAP: -1,
 };
 
 const WEEKLY_RISE_LIMIT = 7;

@@ -119,33 +119,122 @@ describe('주기 작업', () => {
     ]);
   });
 
-  it('rating: 6개월 지난 리뷰는 시간 감쇠로 덜 반영한다', async () => {
-    const season = await createActiveSeason(3);
+  /** 리뷰 하나 (리뷰마다 다른 회원이 인증한 방문) */
+  async function writeReview(
+    restaurantId: bigint,
+    overallScore: number,
+    regDate = new Date(),
+    userId?: bigint,
+  ) {
+    const season =
+      (await prisma.season.findFirst({ where: { status: 'A' } })) ?? (await createActiveSeason(3));
+    const writer = userId ?? (await createMember()).id;
+    const visit = await createVisit(writer, restaurantId, { seasonId: season.id });
+    return prisma.review.create({
+      data: { visitId: visit.id, userId: writer, restaurantId, overallScore, regDate },
+    });
+  }
+
+  it('rating: 최근 6개월 평균이 그 전과 확실히 달라진 가게만 옛 리뷰를 덜 반영한다', async () => {
     const shop = await createRestaurant();
-    const a = await createMember();
-    const b = await createMember();
-    const v1 = await createVisit(a.id, shop.id, { seasonId: season.id });
-    const v2 = await createVisit(b.id, shop.id, { seasonId: season.id });
-    await prisma.review.create({
-      data: {
-        visitId: v1.id,
-        userId: a.id,
-        restaurantId: shop.id,
-        overallScore: 1,
-        regDate: addDays(new Date(), -400),
-      },
-    });
-    await prisma.review.create({
-      data: { visitId: v2.id, userId: b.id, restaurantId: shop.id, overallScore: 5 },
-    });
-    expect(await runRatingJob()).toMatchObject({ restaurants: 1, failed: 0 });
+    const old = addDays(new Date(), -400);
+    for (const score of [1, 1.5, 1, 1.5, 1]) await writeReview(shop.id, score, old);
+    for (const score of [5, 4.5, 5, 4.5, 5]) await writeReview(shop.id, score);
+    expect(await runRatingJob()).toMatchObject({ restaurants: 1, reviewCount: 10, failed: 0 });
     const stat = await prisma.restaurantStat.findUniqueOrThrow({
       where: { restaurantId: shop.id },
     });
-    // w1 = 1 × 0.49(13개월 → 0.7²), w2 = 1 → R = (5×3.8 + 0.49×1 + 5) / (5 + 1.49) ≈ 3.8
-    expect(stat.weightSum.toNumber()).toBeCloseTo(1.49, 2);
+    // 옛 평균 1.2 → 최근 4.8 (차이 3.6, 강도 2): 1년 넘은 리뷰 d = max(0.3, 0.7^(2 × 2)) = 0.3
+    // Σw = 5 × 0.3 + 5 = 6.5, Σwr = 0.3 × 6 + 24 = 25.8, m = 3.5 (다른 가게 리뷰 없음)
+    // R = (5 × 3.5 + 25.8) ÷ (5 + 6.5) ≈ 3.8 (감쇠가 없으면 3.2)
+    expect(stat.weightSum.toNumber()).toBe(6.5);
     expect(stat.displayScore?.toNumber()).toBe(3.8);
-    expect(stat.scoreSum.toNumber()).toBe(6);
+    expect(stat.scoreSum.toNumber()).toBe(30);
+  });
+
+  it('rating: 리뷰가 적어 변화를 판정할 수 없으면 옛 리뷰도 그대로 반영한다', async () => {
+    const shop = await createRestaurant();
+    await writeReview(shop.id, 1, addDays(new Date(), -400));
+    await writeReview(shop.id, 5);
+    await runRatingJob();
+    const stat = await prisma.restaurantStat.findUniqueOrThrow({
+      where: { restaurantId: shop.id },
+    });
+    // R = (5 × 3.5 + 1 + 5) ÷ (5 + 2) ≈ 3.4
+    expect(stat.weightSum.toNumber()).toBe(2);
+    expect(stat.displayScore?.toNumber()).toBe(3.4);
+  });
+
+  it('rating: 동네 평균 m은 같은 동·구의 다른 가게 리뷰로 정한다', async () => {
+    const shop = await createRestaurant();
+    const neighbor = await createRestaurant();
+    for (let i = 0; i < 10; i += 1) await writeReview(neighbor.id, 4.5);
+    await writeReview(shop.id, 4);
+    await runRatingJob();
+    const stat = await prisma.restaurantStat.findUniqueOrThrow({
+      where: { restaurantId: shop.id },
+    });
+    // 서울·구·동 모두 옆 가게 10개(평균 4.5)뿐: m_서울 = (45 + 30 × 3.5) ÷ 40 = 3.75,
+    // m_구 = (45 + 30 × 3.75) ÷ 40 = 3.9375, m_동 = (45 + 30 × 3.9375) ÷ 40 ≈ 4.08
+    // R = (5 × 4.08 + 4) ÷ 6 ≈ 4.1
+    expect(stat.displayScore?.toNumber()).toBe(4.1);
+  });
+
+  it('rating: 지난주 새 리뷰를 쓴 사람 중 리뷰 10개 이상이고 어긋남이 보통의 2배를 넘으면 온도를 깎는다 (주 1번)', async () => {
+    const now = new Date('2026-11-13T03:00:00Z'); // 금요일 12시 (KST), 지난주 = 11/2(월)~11/8(일)
+    const before = new Date('2026-10-01T03:00:00Z');
+    const lastWeek = new Date('2026-11-05T03:00:00Z');
+    const shops = [];
+    for (let i = 0; i < 10; i += 1) {
+      const shop = await createRestaurant();
+      await prisma.restaurantStat.create({ data: { restaurantId: shop.id, displayScore: 4 } });
+      shops.push(shop);
+    }
+    // 가짜: 신뢰 별점 4점인 가게 10곳에 1점 (e = 3), 그중 하나를 지난주에 썼다
+    const fake = await createMember();
+    let lastWeekReviewId = 0n;
+    for (const [i, shop] of shops.entries()) {
+      const review = await writeReview(shop.id, 1, i === 0 ? lastWeek : before, fake.id);
+      if (i === 0) lastWeekReviewId = review.id;
+    }
+    // 보통 사람 4명: 2곳에 4.5점 (e = 0.5) → ē = (3 + 0.5 × 4) ÷ 5 = 1
+    const honest = [];
+    for (let i = 0; i < 4; i += 1) {
+      const member = await createMember();
+      for (const shop of shops.slice(0, 2)) await writeReview(shop.id, 4.5, before, member.id);
+      honest.push(member);
+    }
+    const idle = await createMember({ consistencyWeight: 0.8 }); // 공개 리뷰가 없어진 사람
+
+    expect(await runRatingJob(now)).toMatchObject({ reviewers: 5, penalized: 1, failed: 0 });
+    // 감점 = 32 × 10 ÷ 13 × (3 − 2 × 1) ÷ 1 × 새 리뷰 1개 ≈ 24.62°
+    const after = await prisma.member.findUniqueOrThrow({ where: { id: fake.id } });
+    expect(after.trustTemp.toNumber()).toBe(25.38);
+    // 일관성 가중치: 가짜 clamp(1 + 0.3 × (1 − 3) ÷ 1) = 0.7, 보통 사람 1 + 0.3 × 0.5 = 1.15
+    expect(after.consistencyWeight.toNumber()).toBe(0.7);
+    const members = await prisma.member.findMany({
+      where: { id: { in: [...honest.map((m) => m.id), idle.id] } },
+      orderBy: { id: 'asc' },
+    });
+    expect(members.map((m) => [m.trustTemp.toNumber(), m.consistencyWeight.toNumber()])).toEqual([
+      [50, 1.15],
+      [50, 1.15],
+      [50, 1.15],
+      [50, 1.15],
+      [50, 1],
+    ]);
+    // 가짜 리뷰 가중치 = clamp(1 + (25.38 − 50) ÷ 50) × 0.7 ≈ 0.355
+    const weight = await prisma.review.findUniqueOrThrow({ where: { id: lastWeekReviewId } });
+    expect(weight.scoreWeight.toNumber()).toBe(0.355);
+
+    // 같은 주에 다시 돌아도 한 번만 깎는다
+    await runRatingJob(addDays(now, 1));
+    expect(
+      await prisma.trustTempLog.findMany({
+        where: { userId: fake.id, reason: 'CONSENSUS_GAP' },
+        select: { refId: true, appliedDelta: true },
+      }),
+    ).toEqual([{ refId: lastWeekReviewId, appliedDelta: expect.anything() }]);
   });
 
   it('cleanup: 사진 삭제가 끝나지 않은 탈퇴 회원(files_purged_at 없음)의 폴더를 다 지울 때까지 다시 지운다', async () => {
