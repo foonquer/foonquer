@@ -42,7 +42,13 @@ const aspects = z
     error: 'INVALID_ASPECT',
   });
 
-const content = z.string().trim().max(300, { error: 'REVIEW_CONTENT_TOO_LONG' });
+/** 세부 리뷰 최소 글자 수 (앞뒤 공백 빼고, 2026-11-16 팀 결정) */
+export const REVIEW_CONTENT_MIN = 20;
+const content = z
+  .string({ error: 'REVIEW_CONTENT_TOO_SHORT' })
+  .trim()
+  .min(REVIEW_CONTENT_MIN, { error: 'REVIEW_CONTENT_TOO_SHORT' })
+  .max(300, { error: 'REVIEW_CONTENT_TOO_LONG' });
 
 const IMAGE_KEY_ERROR = { error: 'INVALID_IMAGE_KEY' } as const;
 const imageKeys = z
@@ -64,16 +70,16 @@ export const restaurantReviewParams = z.object({
 export const ratingBody = z.object({ overallScore });
 export type RatingBody = z.infer<typeof ratingBody>;
 
-/** REVIEW-02 세부평가 (모두 선택, 하나는 있어야 한다) */
+/** REVIEW-02 세부평가 — 세부 리뷰(20~300자)는 꼭, 세부 별점·좋았던/아쉬웠던 점·사진은 선택 */
 export const reviewDetailBody = z.object({
   detailScores: detailScores.optional(),
   aspects: aspects.optional(),
-  content: content.optional(),
+  content,
   imageKeys: imageKeys.optional(),
 });
 export type ReviewDetailBody = z.infer<typeof reviewDetailBody>;
 
-/** REVIEW-06 수정 — 보낸 항목만 바꾼다. detailScores·content는 null이면 지운다 */
+/** REVIEW-06 수정 — 보낸 항목만 바꾼다. detailScores·content는 null이면 지운다 (글을 보내면 20~300자) */
 export const reviewUpdateBody = z.object({
   overallScore: overallScore.optional(),
   detailScores: detailScores.nullable().optional(),

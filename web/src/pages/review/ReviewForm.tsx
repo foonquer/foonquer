@@ -2,9 +2,15 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { IMAGE_ACCEPT } from '../../api/uploads';
 import { BottomSheet } from '../../components/BottomSheet';
 import { Button } from '../../components/Button';
-import { StarInput } from '../../components/StarRating';
+import { StarInput, Stars } from '../../components/StarRating';
 import styles from './Review.module.css';
-import { CONTENT_MAX, DETAIL_ITEMS, PHOTO_MAX, type ReviewFormValue } from './reviewValue';
+import {
+  CONTENT_MAX,
+  CONTENT_MIN,
+  DETAIL_ITEMS,
+  PHOTO_MAX,
+  type ReviewFormValue,
+} from './reviewValue';
 
 type Props = {
   value: ReviewFormValue;
@@ -18,6 +24,7 @@ export function ReviewForm({ value, onChange, aspectOptions }: Props) {
   const contentId = useId();
   const fileInput = useRef<HTMLInputElement>(null);
   const set = (patch: Partial<ReviewFormValue>) => onChange({ ...value, ...patch });
+  const length = value.content.trim().length;
 
   // 화면을 떠나면 미리 보기 주소를 놓아 준다
   const photosRef = useRef(value.photos);
@@ -117,12 +124,12 @@ export function ReviewForm({ value, onChange, aspectOptions }: Props) {
 
       <section className={styles.card} aria-label="세부 리뷰">
         <label htmlFor={contentId} className={styles.cardTitle}>
-          세부 리뷰 (선택)
+          세부 리뷰
         </label>
         <textarea
           id={contentId}
           className={styles.textarea}
-          placeholder="메뉴, 분위기, 추천 포인트를 자유롭게 적어 주세요"
+          placeholder={`메뉴, 분위기, 추천 포인트를 ${CONTENT_MIN}자 이상 적어 주세요`}
           maxLength={CONTENT_MAX}
           value={value.content}
           onChange={(e) => set({ content: e.target.value })}
@@ -166,8 +173,12 @@ export function ReviewForm({ value, onChange, aspectOptions }: Props) {
             }}
           />
         </div>
-        <p className={styles.contentFoot}>
-          <span>비워 두어도 포인트는 적립돼요</span>
+        <p className={styles.contentFoot} data-short={length < CONTENT_MIN}>
+          <span>
+            {length < CONTENT_MIN
+              ? `${CONTENT_MIN}자 이상 써 주세요 · ${CONTENT_MIN - length}자 더`
+              : '사진은 선택이에요'}
+          </span>
           <span>
             {value.content.length} / {CONTENT_MAX}
           </span>
@@ -221,9 +232,7 @@ function DetailCriteriaSheet({ open, onClose }: { open: boolean; onClose: () => 
         {DETAIL_CRITERIA.map((c) => (
           <li key={c.score}>
             <p className={styles.detailCriteriaHead}>
-              <span className={styles.star}>{'★'.repeat(c.score)}</span>
-              <span className={styles.emptyStar}>{'★'.repeat(5 - c.score)}</span> {c.score}점 ·{' '}
-              {c.title}
+              <Stars value={c.score} size={15} /> {c.score}점 · {c.title}
             </p>
             <p>{c.text}</p>
             <p className={styles.detailCriteriaExample}>예) {c.example}</p>

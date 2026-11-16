@@ -4,6 +4,8 @@ import type { DetailScores } from '../../api/reviews';
 import { uploadImage } from '../../api/uploads';
 
 export const CONTENT_MAX = 300;
+/** 세부 리뷰 최소 글자 수 (서버 REVIEW-02와 같다) */
+export const CONTENT_MIN = 20;
 export const PHOTO_MAX = 5;
 
 export type Photo = { key: string | null; url: string; file?: File };
@@ -84,6 +86,27 @@ export function detailScoresOf(value: ReviewFormValue): DetailScores | null | 'P
   if (picked === 0) return null;
   if (picked < DETAIL_ITEMS.length) return 'PARTIAL';
   return value.scores as DetailScores;
+}
+
+/** 세부평가를 하나도 안 남겼는지 (수정 화면에서 다 비우면 맛 별점만 고친다) */
+export function isEmptyForm(value: ReviewFormValue) {
+  return (
+    Object.keys(value.scores).length === 0 &&
+    Object.keys(value.aspects).length === 0 &&
+    !value.content.trim() &&
+    value.photos.length === 0
+  );
+}
+
+/**
+ * 세부평가를 남길 수 없는 이유 (없으면 null). 세부 리뷰 20자 이상만 꼭 써야 하고,
+ * 세부 별점·좋았던 점·아쉬웠던 점·사진은 선택 (세부 별점은 고르면 네 항목 모두)
+ */
+export function missingOf(value: ReviewFormValue): string | null {
+  if (detailScoresOf(value) === 'PARTIAL') return '세부 별점은 네 항목을 모두 골라 주세요';
+  const length = value.content.trim().length;
+  if (length < CONTENT_MIN) return `세부 리뷰를 ${CONTENT_MIN}자 이상 써 주세요 (지금 ${length}자)`;
+  return null;
 }
 
 export function aspectsOf(value: ReviewFormValue) {

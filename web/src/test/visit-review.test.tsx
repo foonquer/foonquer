@@ -1003,10 +1003,18 @@ describe('별점 → 정복 → 세부평가 → 적립', () => {
     expect(good.getByRole('button', { name: '맛' })).toHaveAttribute('aria-pressed', 'true');
     expect(good.getByRole('button', { name: '대기시간' })).toHaveAttribute('aria-pressed', 'false');
     expect(bad.getByRole('button', { name: '대기시간' })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.change(screen.getByLabelText('세부 리뷰 (선택)'), {
+    // 세부 리뷰는 20자 이상 꼭 써야 한다
+    fireEvent.change(screen.getByRole('textbox', { name: '세부 리뷰' }), {
       target: { value: '국물이 진하고 양이 넉넉했어요.' },
     });
     expect(screen.getByText('17 / 300')).toBeInTheDocument();
+    expect(screen.getByText('세부 리뷰를 20자 이상 써 주세요 (지금 17자)')).toBeInTheDocument();
+    expect(screen.getByText('20자 이상 써 주세요 · 3자 더')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '등록하고 포인트 적립' })).toBeDisabled();
+    fireEvent.change(screen.getByRole('textbox', { name: '세부 리뷰' }), {
+      target: { value: '국물이 진하고 양이 넉넉했어요. 또 올게요' },
+    });
+    expect(screen.getByText('사진은 선택이에요')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '등록하고 포인트 적립' }));
 
     expect(await screen.findByText('먹포인트 +50P 받았어요!')).toBeInTheDocument();
@@ -1017,7 +1025,7 @@ describe('별점 → 정복 → 세부평가 → 적립', () => {
         { aspectId: 1, polarity: 'G' },
         { aspectId: 7, polarity: 'B' },
       ],
-      content: '국물이 진하고 양이 넉넉했어요.',
+      content: '국물이 진하고 양이 넉넉했어요. 또 올게요',
     });
     expect(await screen.findByText('1,280P → 1,330P')).toBeInTheDocument();
   });
@@ -1098,13 +1106,19 @@ describe('리뷰', () => {
         name: '3.5점',
       }),
     );
+    // 예전 리뷰라 글이 20자가 안 되면 늘려야 고칠 수 있다
+    expect(screen.getByText('세부 리뷰를 20자 이상 써 주세요 (지금 4자)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '수정 완료' })).toBeDisabled();
+    fireEvent.change(screen.getByRole('textbox', { name: '세부 리뷰' }), {
+      target: { value: '맛있어요. 다시 가도 국물이 진하고 좋았어요' },
+    });
     fireEvent.click(screen.getByRole('button', { name: '수정 완료' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/reviews/50'));
     expect(server.calls('PATCH /reviews/:id')[0].body).toEqual({
       overallScore: 3.5,
       detailScores: { cleanliness: 4, portion: 4, service: 5, price: 4 },
       aspects: [],
-      content: '맛있어요',
+      content: '맛있어요. 다시 가도 국물이 진하고 좋았어요',
     });
 
     await router.navigate('/reviews/50/edit');

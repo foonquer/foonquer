@@ -21,14 +21,40 @@
 .star {
   display: block;
   flex-shrink: 0;
+  overflow: visible;
 }
 
+/* 빈 별: 연한 회녹색, 채운 별: 금빛 (그러데이션은 별마다 svg 안에) + 살짝 진한 테두리 */
 .empty {
-  fill: #dfe3da;
+  fill: #e3e8df;
 }
 
 .full {
-  fill: var(--mk-star);
+  stroke: #e7952a;
+  stroke-width: 0.6;
+  stroke-linejoin: round;
+}
+
+.star[data-pop='true'] {
+  animation: star-pop 0.34s cubic-bezier(0.3, 1.6, 0.5, 1) var(--delay) both;
+}
+
+@keyframes star-pop {
+  0% {
+    transform: scale(0.7);
+  }
+  55% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .star[data-pop='true'] {
+    animation: none;
+  }
 }
 
 .cell {
