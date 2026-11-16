@@ -9,6 +9,7 @@ import {
   weightSummary,
 } from '../lib/taste';
 import styles from './TasteWeightsForm.module.css';
+import { StarIcon } from './StarRating';
 
 type Props = { value: TasteWeights; onChange: (value: TasteWeights) => void };
 
@@ -75,7 +76,7 @@ export function TasteWeightsForm({ value, onChange }: Props) {
         </div>
         <p className={styles.summary}>{weightSummary(value)}</p>
         <p className={styles.example}>
-          예) 새맛집 — 맛 별점 ★ {formatScore(sample.taste)} → 내 종합 ★{' '}
+          예) 새맛집 — 맛 별점 <StarIcon /> {formatScore(sample.taste)} → 내 종합 <StarIcon />{' '}
           {formatScore(sample.myOverall)}
         </p>
       </section>

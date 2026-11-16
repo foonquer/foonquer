@@ -5,6 +5,29 @@ import styles from './StarRating.module.css';
 const STAR =
   'M11.09 3.49Q12.00 1.60 12.91 3.49L14.61 7.06Q15.17 8.23 16.46 8.40L20.38 8.92Q22.46 9.20 20.94 10.65L18.08 13.37Q17.14 14.27 17.37 15.55L18.09 19.43Q18.47 21.50 16.62 20.50L13.14 18.62Q12.00 18.00 10.86 18.62L7.38 20.50Q5.53 21.50 5.91 19.43L6.63 15.55Q6.86 14.27 5.92 13.37L3.06 10.65Q1.54 9.20 3.62 8.92L7.54 8.40Q8.83 8.23 9.39 7.06Z';
 
+/** 채운 별의 금빛 (위가 밝다) */
+function GoldGradient({ id }: { id: string }) {
+  return (
+    <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stopColor="#ffd96e" />
+      <stop offset="1" stopColor="#f2a234" />
+    </linearGradient>
+  );
+}
+
+/** 글자 사이에 넣는 작은 별 하나 (맛 ★ 4.5 자리). 글자 크기를 따라간다 */
+export function StarIcon() {
+  const id = useId();
+  return (
+    <svg viewBox="0 0 24 24" className={styles.icon} aria-hidden="true">
+      <defs>
+        <GoldGradient id={`${id}-g`} />
+      </defs>
+      <path d={STAR} fill={`url(#${id}-g)`} className={styles.full} />
+    </svg>
+  );
+}
+
 /**
  * 별 하나 (fill: 0 ~ 1). 채운 부분은 위가 밝은 금빛, 왼쪽 위에 작은 반짝임.
  * pop이면 채워질 때 한 번 통통 튄다 (delay: 앞 별부터 차례로)
@@ -35,10 +58,7 @@ function Star({
       {fill > 0 && (
         <>
           <defs>
-            <linearGradient id={`${id}-g`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#ffd96e" />
-              <stop offset="1" stopColor="#f2a234" />
-            </linearGradient>
+            <GoldGradient id={`${id}-g`} />
             <clipPath id={`${id}-c`}>
               <rect x="0" y="0" width={24 * fill} height="24" />
             </clipPath>
@@ -61,7 +81,7 @@ function Star({
   );
 }
 
-/** 보기만 하는 별 5개 (맛 ★ 4.5 등) */
+/** 보기만 하는 별 5개 (가게 리뷰 목록·세부 별점 기준 등) */
 export function Stars({ value, size = 16 }: { value: number; size?: number }) {
   return (
     <span className={styles.row} role="img" aria-label={`5점 만점에 ${value}점`}>

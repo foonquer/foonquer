@@ -16,6 +16,7 @@ import {
   WHO_OPTIONS,
 } from '../../lib/situation';
 import styles from './Situation.module.css';
+import { StarIcon } from '../../components/StarRating';
 
 /** 상황 맞춤 결과에서 상세로 넘길 때 router state (⑦ 이유 카드) */
 export type SituationContext = { title: string; fitScore: number; reasons: FitReason[] };
@@ -251,7 +252,14 @@ export function FitSheet({
         </ul>
         <div className={styles.fitNote}>
           <strong>
-            {score ? `신뢰 별점(★ ${score} 맛)은 바뀌지 않아요.` : '신뢰 별점은 바뀌지 않아요.'}
+            {score ? (
+              <>
+                신뢰 별점(
+                <StarIcon /> {score} 맛)은 바뀌지 않아요.
+              </>
+            ) : (
+              '신뢰 별점은 바뀌지 않아요.'
+            )}
           </strong>
           <p>
             같은 별점대 안에서 지금 상황에 잘 맞는 순서로 보여 드려요. 조건마다 맞음 · 부분 · 안

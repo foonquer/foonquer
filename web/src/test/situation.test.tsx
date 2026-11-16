@@ -168,7 +168,7 @@ describe('상황 직접 입력 추천 /recommendations/situation', () => {
     expect(within(sheet).getByText('가양 한상 · 상황 적합 92%')).toBeInTheDocument();
     expect(within(sheet).getByText('주차 어렵다는 리뷰 3건')).toBeInTheDocument();
     expect(within(sheet).getByRole('img', { name: '안 맞음' })).toBeInTheDocument();
-    expect(within(sheet).getByText('신뢰 별점(★ 4.6 맛)은 바뀌지 않아요.')).toBeInTheDocument();
+    expect(within(sheet).getByText('신뢰 별점( 4.6 맛)은 바뀌지 않아요.')).toBeInTheDocument();
   });
 
   it('예시 칩을 누르면 그 문장으로 바로 조건을 읽는다', async () => {

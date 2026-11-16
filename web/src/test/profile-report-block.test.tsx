@@ -245,7 +245,7 @@ describe('탐방러 프로필 (PROFILE-01·02, REVIEW-10)', () => {
       'aria-selected',
       'true',
     );
-    expect(row).toHaveTextContent('맛 ★ 4.8');
+    expect(row).toHaveTextContent('맛 4.8');
     expect(row).toHaveTextContent('9.16 방문');
     expect(row).toHaveAttribute('href', '/reviews/60');
 

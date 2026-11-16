@@ -411,10 +411,6 @@
   color: var(--mk-muted);
 }
 
-.star {
-  color: var(--mk-star);
-}
-
 .myOverall {
   font-weight: 700;
   color: var(--mk-star);

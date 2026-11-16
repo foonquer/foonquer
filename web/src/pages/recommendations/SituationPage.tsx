@@ -38,6 +38,7 @@ import { useAsync } from '../../lib/useAsync';
 import { useMyCoords } from '../../lib/useMyCoords';
 import { ConditionSheet, FitSheet, type SituationContext } from './SituationParts';
 import styles from './Situation.module.css';
+import { StarIcon } from '../../components/StarRating';
 
 type Step = 'input' | 'reading' | 'conditions' | 'notFound' | 'result';
 
@@ -575,7 +576,7 @@ function ResultCard({
         </button>
       </div>
       <p className={styles.resultMeta}>
-        <span className={styles.star}>★</span> {score ? `${score} 맛` : '아직 별점 없음'}
+        <StarIcon /> {score ? `${score} 맛` : '아직 별점 없음'}
         {myOverall && (
           <>
             {' · '}

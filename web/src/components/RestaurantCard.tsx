@@ -4,6 +4,7 @@ import { formatDistance, formatScore, joinDot, noRatingText } from '../lib/forma
 import { ConquestBadge } from './ConquestBadge';
 import { FoodImage } from './FoodImage';
 import styles from './RestaurantCard.module.css';
+import { StarIcon } from './StarRating';
 
 type Props = {
   item: RestaurantCardItem;
@@ -16,11 +17,22 @@ export function RestaurantCard({ item, note }: Props) {
   const score = formatScore(item.rating.score);
   const myOverall = formatScore(item.myOverallScore);
   // 피그마 3-2: "★ 4.6 맛 · 내 종합 4.4 · 재방문 58%"
-  const scoreLine = joinDot([
-    score ? `★ ${score} 맛` : noRatingText(item.rating.reviewCount, true),
+  const rest = joinDot([
     myOverall ? `내 종합 ${myOverall}` : null,
     item.revisitRate !== null ? `재방문 ${item.revisitRate}%` : null,
   ]);
+  const scoreLine = (
+    <>
+      {score ? (
+        <>
+          <StarIcon /> {score} 맛
+        </>
+      ) : (
+        noRatingText(item.rating.reviewCount, true)
+      )}
+      {rest && ` · ${rest}`}
+    </>
+  );
 
   return (
     <Link to={`/restaurants/${item.restaurantId}`} className={styles.card}>

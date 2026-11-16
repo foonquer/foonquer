@@ -59,10 +59,6 @@
   color: var(--mk-ink);
 }
 
-.star {
-  color: var(--mk-star);
-}
-
 .meta {
   margin-top: 6px;
   font-size: 12px;

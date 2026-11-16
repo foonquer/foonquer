@@ -13,6 +13,7 @@ import { useAsync } from '../../lib/useAsync';
 import { dDay } from '../../lib/quest';
 import { CheckIcon, GiftIcon, RefreshIcon, SparkleIcon } from './QuestIcons';
 import styles from './Quest.module.css';
+import { StarIcon } from '../../components/StarRating';
 
 /** 상세 제목: "…새 국밥집" → "…새 국밥집 정복하기", "…정복" → "…정복하기" */
 function detailTitle(q: QuestDetail) {
@@ -139,9 +140,13 @@ function Detail({ quest }: { quest: QuestDetail }) {
                 </span>
               </p>
               <p className={styles.placeScore}>
-                {joinDot([
-                  r.tasteScore !== null ? `★ ${formatScore(r.tasteScore)} 맛` : '아직 별점 없음',
-                ])}
+                {r.tasteScore !== null ? (
+                  <>
+                    <StarIcon /> {formatScore(r.tasteScore)} 맛
+                  </>
+                ) : (
+                  '아직 별점 없음'
+                )}
                 {r.myOverallScore !== null && <em> · 내 종합 {formatScore(r.myOverallScore)}</em>}
               </p>
               <p className={styles.placeMeta}>

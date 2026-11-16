@@ -18,6 +18,14 @@
   outline-offset: 4px;
 }
 
+/* 글자 사이 작은 별: 글자 크기에 맞춰 줄 가운데에 */
+.icon {
+  display: inline-block;
+  width: 1.1em;
+  height: 1.1em;
+  vertical-align: -0.18em;
+}
+
 .star {
   display: block;
   flex-shrink: 0;

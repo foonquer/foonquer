@@ -24,6 +24,7 @@ import { useAsync } from '../../lib/useAsync';
 import { usePaged } from '../../lib/usePaged';
 import { wearingOf } from '../../lib/wearing';
 import styles from './Explorer.module.css';
+import { StarIcon } from '../../components/StarRating';
 
 const TABS = ['pick', 'visited', 'reviews'] as const;
 type Tab = (typeof TABS)[number];
@@ -357,7 +358,7 @@ function VisitedTab({ p }: { p: MemberProfile }) {
               <span className={styles.rowRight}>
                 {r.overallScore !== null && (
                   <strong>
-                    맛 <span className={styles.star}>★</span> {formatScore(r.overallScore)}
+                    맛 <StarIcon /> {formatScore(r.overallScore)}
                   </strong>
                 )}
                 <small>{formatMonthDay(r.conqueredAt)} 방문</small>

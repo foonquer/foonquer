@@ -43,10 +43,6 @@
   color: var(--mk-forest);
 }
 
-.star {
-  color: var(--mk-star);
-}
-
 .gap {
   display: inline-block;
   width: 12px;

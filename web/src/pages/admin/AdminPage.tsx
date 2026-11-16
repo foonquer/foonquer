@@ -26,6 +26,7 @@ import { listError, moreError } from './AdminCommon';
 import { Faqs, Notices, Terms } from './AdminContent';
 import { Members } from './AdminMembers';
 import styles from './Admin.module.css';
+import { StarIcon } from '../../components/StarRating';
 
 const ANSWER_MAX = 1000;
 
@@ -260,12 +261,9 @@ function ReportCard({
       {r.review && (
         <Link to={`/reviews/${r.review.reviewId}`} className={styles.target}>
           <span className={styles.targetMeta}>
-            {joinDot([
-              r.review.restaurant.name,
-              r.review.author.nickname ?? '탐험가',
-              `맛 ★ ${formatScore(r.review.overallScore)}`,
-              REVIEW_STATUS[r.review.status],
-            ])}
+            {joinDot([r.review.restaurant.name, r.review.author.nickname ?? '탐험가'])} · 맛{' '}
+            <StarIcon />{' '}
+            {joinDot([formatScore(r.review.overallScore), REVIEW_STATUS[r.review.status]])}
           </span>
           {r.review.content && <span className={styles.targetText}>{r.review.content}</span>}
         </Link>

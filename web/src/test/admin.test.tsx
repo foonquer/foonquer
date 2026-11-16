@@ -73,7 +73,7 @@ describe('운영 관리', () => {
 
     const card = await screen.findByRole('article', { name: '신고 11' });
     expect(card).toHaveTextContent('뒷광고 · 리뷰 이벤트');
-    expect(card).toHaveTextContent('새맛집 · 광고왕 · 맛 ★ 5.0 · 보이는 중');
+    expect(card).toHaveTextContent('새맛집 · 광고왕 · 맛 5.0 · 보이는 중');
     expect(card).toHaveTextContent('같은 대상 신고 2건');
     expect(within(card).getByRole('link', { name: /새맛집/ })).toHaveAttribute(
       'href',

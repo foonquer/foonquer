@@ -17,6 +17,7 @@ import { useAsync } from '../../lib/useAsync';
 import { AwardIcon, GearIcon, SplitIcon, UtensilsIcon } from '../quest/QuestIcons';
 import { Avatars } from './CrewParts';
 import styles from './Crew.module.css';
+import { StarIcon } from '../../components/StarRating';
 
 /** 정복 목록은 처음에 이만큼만 (나머지는 "모두 보기") */
 const PREVIEW = 2;
@@ -172,7 +173,9 @@ export function CrewSpacePage() {
                     </span>
                     <Avatars people={c.members} meId={meId} />
                     {c.tasteScore !== null && (
-                      <span className={styles.score}>★ {formatScore(c.tasteScore)} 맛</span>
+                      <span className={styles.score}>
+                        <StarIcon /> {formatScore(c.tasteScore)} 맛
+                      </span>
                     )}
                   </Link>
                 </li>

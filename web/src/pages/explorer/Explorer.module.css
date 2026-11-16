@@ -376,10 +376,6 @@ button.row {
   color: var(--mk-muted);
 }
 
-.star {
-  color: var(--mk-star);
-}
-
 .reviews {
   display: flex;
   flex-direction: column;

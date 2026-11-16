@@ -638,7 +638,7 @@ describe('음식점 상세 (REST-01)', () => {
     // 영업시간을 모르면 줄을 숨긴다
     expect(screen.queryByText(/영업시간/)).not.toBeInTheDocument();
     expect(screen.getByText('현지인 방문 72% · 재방문 38%')).toBeInTheDocument();
-    expect(screen.getByText('내 평가 ★ 4.8')).toBeInTheDocument();
+    expect(screen.getByText('내 평가 4.8')).toBeInTheDocument();
     expect(screen.getByText('81%')).toBeInTheDocument();
     expect(screen.getByText('–')).toBeInTheDocument(); // 양 평가 없음
     expect(screen.getByText('내 종합').previousSibling).toHaveTextContent('4.3');

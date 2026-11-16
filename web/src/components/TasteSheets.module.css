@@ -15,10 +15,6 @@
   color: var(--mk-ink);
 }
 
-.star {
-  color: var(--mk-star);
-}
-
 .note {
   margin-top: 4px;
   font-size: 12px;

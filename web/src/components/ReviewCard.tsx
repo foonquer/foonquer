@@ -6,6 +6,7 @@ import { formatMonthDay, formatScore, joinDot } from '../lib/format';
 import { MukkaebiAvatar } from './Mukkaebi';
 import { useToast } from './Toast';
 import styles from './ReviewCard.module.css';
+import { StarIcon } from './StarRating';
 
 const DETAIL_LABELS = [
   ['cleanliness', '청결'],
@@ -86,7 +87,7 @@ export function ReviewCard({ review: r, showRestaurant, onChange }: Props) {
 
       <p className={styles.scores}>
         <span className={styles.taste}>
-          맛 <span className={styles.star}>★</span> {formatScore(r.overallScore)}
+          맛 <StarIcon /> {formatScore(r.overallScore)}
         </span>
         {details && <span className={styles.details}>{details}</span>}
       </p>
