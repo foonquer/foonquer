@@ -26,11 +26,35 @@
   color: var(--mk-muted);
 }
 
+/* 세부 별점 한 항목: 이름·별, 아래에 점수 설명 */
+.scoreItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scoreItem + .scoreItem {
+  padding-top: 8px;
+  border-top: 1px solid var(--mk-divider);
+}
+
 .scoreRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   min-height: 36px;
+}
+
+.scoreLine {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--mk-forest);
+}
+
+.scoreLine[data-empty='true'] {
+  font-weight: 500;
+  color: var(--mk-subtle);
 }
 
 .scoreLabel {
@@ -53,6 +77,27 @@
   font-weight: 700;
   color: var(--mk-forest);
   text-decoration: underline;
+}
+
+/* 좋았던 점 줄 · 아쉬웠던 점 줄 */
+.aspectGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.aspectGroup + .aspectGroup {
+  margin-top: 6px;
+}
+
+.aspectTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.aspectTitle[data-polarity='B'] {
+  color: var(--mk-coral-text);
 }
 
 .aspects {
@@ -108,6 +153,11 @@
 
 .contentFoot span:last-child {
   color: var(--mk-muted);
+}
+
+/* 아직 20자가 안 되면 안내를 주황으로 */
+.contentFoot[data-short='true'] span:first-child {
+  color: var(--mk-coral-text);
 }
 
 .photos {
@@ -193,16 +243,11 @@
 }
 
 .detailCriteriaHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
   font-weight: 700;
-}
-
-.star {
-  color: var(--mk-star);
-}
-
-.emptyStar {
-  color: #dfe3da;
 }
 
 .detailCriteriaExample {

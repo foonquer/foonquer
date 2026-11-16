@@ -1,0 +1,308 @@
+/* 먹깨비 따라가기: 화면 전체가 동네 지도. 하늘 → 언덕 → 풀밭 */
+.journey {
+  position: relative;
+  height: 100dvh;
+  min-height: 560px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #d6ecfb 0%, #e9f5f5 20%, #e3f0da 36%, #d4e8c6 100%);
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+/* 길: 가장자리 · 바탕 · 가운데 점선 · 지나온 길(초록) */
+.roadEdge,
+.road,
+.roadLine,
+.trail {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.roadEdge {
+  stroke: #d8ccae;
+  stroke-width: 32;
+}
+
+.road {
+  stroke: #f7f0e1;
+  stroke-width: 26;
+}
+
+.roadLine {
+  stroke: #ffffff;
+  stroke-width: 3;
+  stroke-dasharray: 9 11;
+}
+
+.trail {
+  stroke: var(--mk-green);
+  stroke-width: 7;
+  opacity: 0.85;
+}
+
+.originText {
+  font-size: 12px;
+  font-weight: 700;
+  fill: var(--mk-forest);
+}
+
+.originCaption {
+  font-size: 10px;
+  font-weight: 700;
+  fill: #5d7a64;
+}
+
+.signText {
+  font-size: 13px;
+  font-weight: 700;
+  fill: #ffffff;
+}
+
+/* 도착하면 가게가 한 번 통통 튄다 */
+.shop {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+.journey[data-arrived='true'] .shop {
+  animation: shop-pop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) 1;
+}
+
+@keyframes shop-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.08, 0.94);
+  }
+  70% {
+    transform: scale(0.97, 1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.cloud {
+  position: absolute;
+  width: 92px;
+  height: 30px;
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.9);
+  animation: drift 26s ease-in-out infinite alternate;
+}
+
+.cloud::before {
+  content: '';
+  position: absolute;
+  top: -16px;
+  left: 18px;
+  width: 44px;
+  height: 36px;
+  border-radius: 50%;
+  background: inherit;
+}
+
+.cloud[data-size='s'] {
+  transform: scale(0.7);
+  animation-duration: 32s;
+  animation-direction: alternate-reverse;
+}
+
+@keyframes drift {
+  to {
+    translate: 46px 0;
+  }
+}
+
+/* 걷는 먹깨비: 바깥 상자가 길 위의 점(발 위치), 안쪽이 방향(좌우)과 통통 걸음 */
+.walker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  will-change: transform;
+}
+
+.shadow {
+  position: absolute;
+  left: -20px;
+  top: -5px;
+  width: 40px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(47, 93, 61, 0.22);
+}
+
+.facing {
+  position: absolute;
+  left: -29px;
+  bottom: -2px;
+  width: 58px;
+}
+
+.bob {
+  animation: bob 0.34s ease-in-out infinite alternate;
+}
+
+.journey[data-arrived='true'] .bob {
+  animation: hop 0.7s ease-out 1;
+}
+
+@keyframes bob {
+  from {
+    transform: translateY(0) rotate(-3deg);
+  }
+  to {
+    transform: translateY(-6px) rotate(3deg);
+  }
+}
+
+@keyframes hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-22px);
+  }
+  60% {
+    transform: translateY(0);
+  }
+  78% {
+    transform: translateY(-7px);
+  }
+}
+
+/* 도착 반짝이: 가게 위에서 사방으로 퍼진다 */
+.sparkles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+}
+
+.sparkles span {
+  position: absolute;
+  left: -5px;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--mk-gold);
+  opacity: 0;
+  transform: rotate(var(--turn)) translateY(0) rotate(45deg);
+  animation: sparkle 0.9s ease-out 0.15s 1;
+}
+
+.sparkles span:nth-child(even) {
+  width: 8px;
+  height: 8px;
+  background: var(--mk-coral);
+}
+
+@keyframes sparkle {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--turn)) translateY(0) rotate(45deg) scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--turn)) translateY(-78px) rotate(45deg) scale(1);
+  }
+}
+
+/* 위: 뒤로 가기와 제목 (지도 위에 얹는다) */
+.top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding-top: var(--mk-safe-top);
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 var(--mk-side);
+  text-align: center;
+}
+
+.chip {
+  padding: 5px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.title {
+  margin-top: 10px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--mk-ink);
+  word-break: keep-all;
+}
+
+.subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #4d6b55;
+}
+
+/* 도착하면 아래에서 올라오는 카드: 인증한 가게와 버튼 */
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 22px var(--mk-side) calc(28px + var(--mk-safe-bottom));
+  border-radius: 26px 26px 0 0;
+  background: var(--mk-white);
+  box-shadow: 0 -10px 30px rgba(47, 93, 61, 0.14);
+  animation: sheet-up 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) 1;
+}
+
+.sheet > button {
+  margin-top: 20px;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cloud,
+  .bob,
+  .journey[data-arrived='true'] .bob,
+  .journey[data-arrived='true'] .shop,
+  .sheet {
+    animation: none;
+  }
+
+  .sparkles {
+    display: none;
+  }
+}

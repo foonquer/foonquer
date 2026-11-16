@@ -282,6 +282,18 @@
   background: var(--mk-white);
 }
 
+/* 찍은 영수증은 세로로 길어서 자르지 않고 전체를 보여 준다 */
+.preview[data-kind='receipt'] {
+  max-height: 58dvh;
+  object-fit: contain;
+  background: var(--mk-ink);
+}
+
+/* 영수증 촬영: 카메라 칸이 남은 높이를 채운다 */
+.content[data-fill='true'] {
+  flex: 1;
+}
+
 .caption {
   font-size: 11px;
   text-align: center;
@@ -342,14 +354,14 @@
   color: var(--mk-forest);
 }
 
-/* 영수증 */
+/* 영수증: 세로로 긴 칸 (남은 높이를 채운다) 안에 영수증 모양 안내선 */
 .frame {
+  position: relative;
   display: flex;
-  flex-direction: column;
+  flex: 1;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  height: 360px;
+  min-height: 380px;
   border: 2px solid var(--mk-green);
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.6);
@@ -357,16 +369,41 @@
   color: var(--mk-muted);
 }
 
-.frame img {
-  width: 92px;
+/* 칸 높이가 flex로 정해져 %가 안 먹으니 위·아래·좌·우로 붙인다 */
+.receiptGuide {
+  position: absolute;
+  inset: 7% 18%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 2px dashed var(--mk-green-soft);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.receiptGuide img {
+  width: 72px;
   opacity: 0.6;
 }
 
-/* 화면 안 카메라: 영상을 네모에 꽉 채우고 안내 글은 아래에 얹는다 */
+.receiptGuide > span {
+  padding: 0 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* 화면 안 카메라: 영상을 네모에 꽉 채우고, 영수증 안내선 바깥은 어둡게, 안내 글은 아래에 얹는다 */
 .frame[data-live='true'] {
-  position: relative;
   overflow: hidden;
   background: var(--mk-ink);
+}
+
+.frame[data-live='true'] .receiptGuide {
+  inset: 6% 18% 16%;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.32);
 }
 
 .video {
@@ -616,62 +653,4 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--mk-green);
-}
-
-/* 먹깨비 따라가기 */
-.road {
-  position: relative;
-  height: 220px;
-  border-radius: 22px;
-  background: #e6eee1;
-  overflow: hidden;
-}
-
-.road::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 12%;
-  right: 12%;
-  border-top: 3px dashed var(--mk-green-soft);
-}
-
-.walker {
-  position: absolute;
-  top: 50%;
-  left: 8%;
-  width: 64px;
-  transform: translate(0, -60%);
-  animation: walk 2.4s ease-in-out forwards;
-}
-
-.walker[data-arrived='true'] {
-  left: calc(92% - 64px);
-  animation: none;
-}
-
-@keyframes walk {
-  to {
-    left: calc(92% - 64px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .walker {
-    left: calc(92% - 64px);
-    animation: none;
-  }
-}
-
-.goal {
-  position: absolute;
-  top: 50%;
-  right: 6%;
-  padding: 4px 8px;
-  border-radius: 10px;
-  background: var(--mk-white);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--mk-forest);
-  transform: translateY(30px);
 }

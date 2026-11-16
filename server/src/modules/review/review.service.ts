@@ -285,10 +285,6 @@ export async function addReviewDetail(
   body: ReviewDetailBody,
   now = new Date(),
 ) {
-  const hasContent = Boolean(body.content?.trim());
-  if (!body.detailScores && !body.aspects?.length && !hasContent && !body.imageKeys?.length) {
-    throw new AppError(ReviewError.REVIEW_DETAIL_EMPTY);
-  }
   const visit = await prisma.visit.findUnique({
     where: { id: BigInt(visitId) },
     include: {

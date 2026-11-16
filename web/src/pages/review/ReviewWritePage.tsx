@@ -16,6 +16,7 @@ import {
   aspectsOf,
   detailScoresOf,
   EMPTY_FORM,
+  missingOf,
   photoKeysOf,
   type ReviewFormValue,
   type RewardState,
@@ -75,26 +76,26 @@ function WriteForm({
   const toast = useToast();
   const [value, setValue] = useState<ReviewFormValue>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  // 세부 리뷰 20자는 꼭 써야 한다 (세부 별점·좋았던 점·아쉬웠던 점·사진은 선택)
+  const missing = missingOf(value);
   const scores = detailScoresOf(value);
   const content = value.content.trim();
-  const empty =
-    scores === null && !content && value.photos.length === 0 && aspectsOf(value).length === 0;
 
   const submit = async () => {
-    if (scores === 'PARTIAL' || empty) return;
+    if (missing) return;
     setSaving(true);
     try {
       const imageKeys = await photoKeysOf(value.photos);
       const result = await addReviewDetail(visitId, {
-        detailScores: scores ?? undefined,
+        detailScores: scores === null || scores === 'PARTIAL' ? undefined : scores,
         aspects: aspectsOf(value),
-        content: content || undefined,
+        content,
         imageKeys: imageKeys.length > 0 ? imageKeys : undefined,
       });
       const state: RewardState = {
         restaurantName: review.restaurant.name,
         point: result.rewards.point,
-        parts: { scores: scores !== null, content: Boolean(content), photos: imageKeys.length > 0 },
+        parts: { scores: scores !== null, content: true, photos: imageKeys.length > 0 },
       };
       navigate(`/visits/${visitId}/reward`, { replace: true, state });
     } catch (err) {
@@ -107,10 +108,8 @@ function WriteForm({
     <Screen
       footer={
         <>
-          {scores === 'PARTIAL' && (
-            <p className={styles.hint}>세부 별점은 네 항목을 모두 골라 주세요</p>
-          )}
-          <Button onClick={submit} disabled={empty || scores === 'PARTIAL' || saving}>
+          {missing && <p className={styles.hint}>{missing}</p>}
+          <Button onClick={submit} disabled={Boolean(missing) || saving}>
             등록하고 포인트 적립
           </Button>
         </>

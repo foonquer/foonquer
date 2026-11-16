@@ -139,7 +139,7 @@ export function ReceiptPage() {
         <div className={styles.content}>
           <h2 className={styles.title}>글자가 잘 보이나요?</h2>
           <p className={styles.description}>가게명과 날짜, 금액을 확인해 주세요.</p>
-          <img src={photo.url} alt="찍은 영수증" className={styles.preview} />
+          <img src={photo.url} alt="찍은 영수증" className={styles.preview} data-kind="receipt" />
           <p className={styles.caption}>인증에는 방문 확인에 필요한 정보만 사용해요.</p>
         </div>
       </Screen>
@@ -238,15 +238,17 @@ export function ReceiptPage() {
       }
     >
       <AppHeader title="영수증 인증" />
-      <div className={styles.content}>
+      <div className={styles.content} data-fill="true">
         <h2 className={styles.title}>영수증을 네모 안에 맞춰주세요</h2>
         <p className={styles.description}>
           {'가게명·방문 날짜·결제 금액이\n선명하게 보이도록 찍어주세요'}
         </p>
         {cam === 'none' ? (
           <div className={styles.frame} aria-hidden="true">
-            <img src={receiptIcon} alt="" />
-            <span>빛 반사 없이 영수증 전체를 담아주세요</span>
+            <span className={styles.receiptGuide}>
+              <img src={receiptIcon} alt="" />
+              <span>빛 반사 없이 영수증 전체를 담아주세요</span>
+            </span>
           </div>
         ) : (
           <div className={styles.frame} data-live="true">
@@ -258,6 +260,7 @@ export function ReceiptPage() {
               playsInline
               aria-label="카메라 화면"
             />
+            <span className={styles.receiptGuide} aria-hidden="true" />
             <span className={styles.frameHint}>빛 반사 없이 영수증 전체를 담아주세요</span>
           </div>
         )}

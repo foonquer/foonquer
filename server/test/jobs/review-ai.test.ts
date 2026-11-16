@@ -277,7 +277,9 @@ describe('review-ai 주기 작업 (Gemini 리뷰 분석)', () => {
         .set('Authorization', bearer(review.userId))
         .send(body);
 
-    expect((await patch({ content: '내 돈 내고 먹었어요' })).status).toBe(200);
+    expect(
+      (await patch({ content: '내 돈 내고 먹었어요. 국물이 진해서 또 오고 싶어요.' })).status,
+    ).toBe(200);
     const saved = await prisma.review.findUniqueOrThrow({ where: { id: review.id } });
     expect(saved).toMatchObject({ aiCheckedAt: null, adSuspected: false, aiResult: null });
 
@@ -304,8 +306,9 @@ describe('review-ai 주기 작업 (Gemini 리뷰 분석)', () => {
       (await prisma.review.findUniqueOrThrow({ where: { id: review.id } })).aiCheckedAt,
     ).toEqual(now);
 
-    // 글을 비우면 null로 두고 분석 대상에서 뺀다
-    expect((await patch({ content: '   ' })).status).toBe(200);
+    // 글을 지우면(null) 분석 대상에서 뺀다. 공백만 보내면 20자가 안 돼 400
+    expect((await patch({ content: '   ' })).body.code).toBe('REVIEW_CONTENT_TOO_SHORT');
+    expect((await patch({ content: null })).status).toBe(200);
     expect(await prisma.review.findUniqueOrThrow({ where: { id: review.id } })).toMatchObject({
       content: null,
       aiResult: null,

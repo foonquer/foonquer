@@ -4,6 +4,8 @@ import type { DetailScores } from '../../api/reviews';
 import { uploadImage } from '../../api/uploads';
 
 export const CONTENT_MAX = 300;
+/** 세부 리뷰 최소 글자 수 (서버 REVIEW-02와 같다) */
+export const CONTENT_MIN = 20;
 export const PHOTO_MAX = 5;
 
 export type Photo = { key: string | null; url: string; file?: File };
@@ -18,11 +20,64 @@ export type ReviewFormValue = {
 
 export const EMPTY_FORM: ReviewFormValue = { scores: {}, aspects: {}, content: '', photos: [] };
 
-export const DETAIL_ITEMS: { key: keyof DetailScores; label: string }[] = [
-  { key: 'cleanliness', label: '청결' },
-  { key: 'portion', label: '양' },
-  { key: 'service', label: '서비스' },
-  { key: 'price', label: '가격 만족도' },
+/**
+ * 세부 별점 4항목. texts는 1~5점에 맞춘 설명 (세부 별점 기준: 3점 = 기대한 만큼),
+ * hint는 고르기 전에 보여 주는 무엇을 보는지
+ */
+export const DETAIL_ITEMS: {
+  key: keyof DetailScores;
+  label: string;
+  hint: string;
+  texts: [string, string, string, string, string];
+}[] = [
+  {
+    key: 'cleanliness',
+    label: '청결',
+    hint: '매장·식기·화장실은 깨끗했나요?',
+    texts: [
+      '위생이 걱정될 만큼 지저분했어요',
+      '테이블이나 식기에 아쉬운 데가 있었어요',
+      '눈에 거슬리는 곳 없이 무난했어요',
+      '전체적으로 깔끔해서 기분 좋았어요',
+      '식기부터 화장실까지 반짝반짝했어요',
+    ],
+  },
+  {
+    key: 'portion',
+    label: '양',
+    hint: '값에 비해 든든했나요?',
+    texts: [
+      '한 끼를 더 먹어야 할 만큼 적었어요',
+      '다 먹고도 조금 허전했어요',
+      '딱 한 끼 든든하게 먹을 만큼이에요',
+      '배부르게 먹고도 조금 남았어요',
+      '둘이 나눠 먹어도 될 만큼 푸짐했어요',
+    ],
+  },
+  {
+    key: 'service',
+    label: '서비스',
+    hint: '응대는 친절하고 빨랐나요?',
+    texts: [
+      '불친절해서 기분이 상했어요',
+      '응대가 무심하거나 오래 기다렸어요',
+      '필요한 건 무난하게 챙겨 줬어요',
+      '친절하고 빠르게 챙겨 줬어요',
+      '말하기 전에 먼저 챙겨 줘서 감동했어요',
+    ],
+  },
+  {
+    key: 'price',
+    label: '가격 만족도',
+    hint: '낸 돈만큼 만족했나요?',
+    texts: [
+      '이 값이면 다시는 안 사 먹을 것 같아요',
+      '값에 비해 조금 아쉬웠어요',
+      '딱 낸 만큼이에요',
+      '낸 돈보다 더 얻은 느낌이에요',
+      '이 값에 이 정도면 남는 장사예요',
+    ],
+  },
 ];
 
 /** 네 항목을 모두 골랐으면 세부 별점, 하나도 안 골랐으면 null, 일부만이면 'PARTIAL' */
@@ -31,6 +86,27 @@ export function detailScoresOf(value: ReviewFormValue): DetailScores | null | 'P
   if (picked === 0) return null;
   if (picked < DETAIL_ITEMS.length) return 'PARTIAL';
   return value.scores as DetailScores;
+}
+
+/** 세부평가를 하나도 안 남겼는지 (수정 화면에서 다 비우면 맛 별점만 고친다) */
+export function isEmptyForm(value: ReviewFormValue) {
+  return (
+    Object.keys(value.scores).length === 0 &&
+    Object.keys(value.aspects).length === 0 &&
+    !value.content.trim() &&
+    value.photos.length === 0
+  );
+}
+
+/**
+ * 세부평가를 남길 수 없는 이유 (없으면 null). 세부 리뷰 20자 이상만 꼭 써야 하고,
+ * 세부 별점·좋았던 점·아쉬웠던 점·사진은 선택 (세부 별점은 고르면 네 항목 모두)
+ */
+export function missingOf(value: ReviewFormValue): string | null {
+  if (detailScoresOf(value) === 'PARTIAL') return '세부 별점은 네 항목을 모두 골라 주세요';
+  const length = value.content.trim().length;
+  if (length < CONTENT_MIN) return `세부 리뷰를 ${CONTENT_MIN}자 이상 써 주세요 (지금 ${length}자)`;
+  return null;
 }
 
 export function aspectsOf(value: ReviewFormValue) {

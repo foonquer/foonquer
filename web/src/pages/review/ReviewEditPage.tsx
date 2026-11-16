@@ -22,6 +22,8 @@ import { ReviewForm } from './ReviewForm';
 import {
   aspectsOf,
   detailScoresOf,
+  isEmptyForm,
+  missingOf,
   keyFromImageUrl,
   photoKeysOf,
   type ReviewFormValue,
@@ -89,16 +91,18 @@ function EditForm({
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const scores = detailScoresOf(value);
+  // 세부평가는 다 비우거나(맛 별점만 고침) 세부평가 남기기와 같은 것을 모두 채워야 한다
+  const missing = isEmptyForm(value) ? null : missingOf(value);
   const hasDetail = Boolean(review.detailScores || review.content || review.imageCount > 0);
   const back = () => navigate(`/reviews/${review.reviewId}`, { replace: true });
 
   const submit = async () => {
-    if (scores === 'PARTIAL') return;
+    if (missing) return;
     setSaving(true);
     try {
       const result = await updateReview(review.reviewId, {
         overallScore: taste !== review.overallScore ? taste : undefined,
-        detailScores: scores,
+        detailScores: scores === 'PARTIAL' ? null : scores,
         aspects: aspectsOf(value),
         content: value.content.trim() || null,
         imageKeys: photosChanged ? await photoKeysOf(value.photos) : undefined,
@@ -134,10 +138,8 @@ function EditForm({
     <Screen
       footer={
         <>
-          {scores === 'PARTIAL' && (
-            <p className={styles.hint}>세부 별점은 네 항목을 모두 골라 주세요</p>
-          )}
-          <Button onClick={submit} disabled={saving || scores === 'PARTIAL'}>
+          {missing && <p className={styles.hint}>{missing}</p>}
+          <Button onClick={submit} disabled={saving || Boolean(missing)}>
             수정 완료
           </Button>
         </>

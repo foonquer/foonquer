@@ -261,7 +261,7 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
       .send({
         detailScores: { cleanliness: 4, portion: 5, service: 4, price: 3 },
         aspects: [{ aspectId: taste.id, polarity: 'G' }],
-        content: '제육 정식 추천해요.',
+        content: '제육 정식이 든든하고 반찬도 맛있어서 추천해요.',
         imageKeys: [key],
       });
     expect(res.status).toBe(201);
@@ -273,7 +273,7 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
     expect(res.body.data.review).toMatchObject({
       detailScores: { cleanliness: 4, price: 3 },
       aspects: [{ name: '맛', polarity: 'G' }],
-      content: '제육 정식 추천해요.',
+      content: '제육 정식이 든든하고 반찬도 맛있어서 추천해요.',
       imageCount: 1,
       isMine: true,
     });
@@ -281,7 +281,7 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
     const twice = await request(app)
       .post(`/api/v1/visits/${visit.id}/review`)
       .set('Authorization', bearer(me.id))
-      .send({ content: '또' });
+      .send({ content: '또 왔어요. 이번에도 맛있게 잘 먹고 갑니다!' });
     expect(twice.body.code).toBe('REVIEW_DETAIL_EXISTS');
 
     const stat = await prisma.restaurantStat.findUniqueOrThrow({
@@ -299,7 +299,7 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
     expect(aspectStat.goodCount).toBe(1);
   });
 
-  it('세부 별점은 네 개 모두 있어야 하고, 아무것도 없으면 400', async () => {
+  it('세부 리뷰는 20자 이상 꼭, 세부 별점은 고르면 네 개 모두', async () => {
     const season = await createActiveSeason(3);
     const me = await createMember();
     const visit = await ratedReview(me.id, (await createRestaurant()).id, season.id);
@@ -308,20 +308,34 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
         .post(`/api/v1/visits/${visit.id}/review`)
         .set('Authorization', bearer(me.id))
         .send(body);
-    expect((await post({ detailScores: { cleanliness: 5 } })).body.code).toBe(
+    const text = '국물이 진하고 면이 쫄깃해서 또 오고 싶어요.';
+    expect((await post({ detailScores: { cleanliness: 5 }, content: text })).body.code).toBe(
       'INVALID_DETAIL_SCORES',
     );
-    expect((await post({})).body.code).toBe('REVIEW_DETAIL_EMPTY');
+    // 세부 별점·사진만으로는 남길 수 없다. 앞뒤 공백은 빼고 센다
+    expect((await post({})).body.code).toBe('REVIEW_CONTENT_TOO_SHORT');
+    expect(
+      (await post({ detailScores: { cleanliness: 5, portion: 5, service: 5, price: 5 } })).body
+        .code,
+    ).toBe('REVIEW_CONTENT_TOO_SHORT');
+    expect((await post({ content: `  ${'가'.repeat(19)}  ` })).body.code).toBe(
+      'REVIEW_CONTENT_TOO_SHORT',
+    );
     expect((await post({ content: 'a'.repeat(301) })).body.code).toBe('REVIEW_CONTENT_TOO_LONG');
     const key = `review/${me.id}/a.jpg`;
     for (const imageKeys of [[''], [key, key]]) {
-      const res = await post({ content: '사진', imageKeys });
+      const res = await post({ content: text, imageKeys });
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('INVALID_IMAGE_KEY');
     }
-    expect((await post({ content: '사진', imageKeys: Array(6).fill(key) })).body.code).toBe(
+    expect((await post({ content: text, imageKeys: Array(6).fill(key) })).body.code).toBe(
       'TOO_MANY_IMAGES',
     );
+
+    // 글만 써도 된다 (세부 별점·좋았던/아쉬웠던 점·사진은 선택): 글 +30
+    const ok = await post({ content: '가'.repeat(20) });
+    expect(ok.status).toBe(201);
+    expect(ok.body.data.rewards.point).toBe(30);
   });
 
   it('음식점 리뷰 목록: 차단한 사람 제외, 작성자 신뢰 온도·칭호·로컬 표시, 별로예요 수는 없다', async () => {
@@ -393,16 +407,26 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
     await request(app)
       .post(`/api/v1/visits/${visit.id}/review`)
       .set('Authorization', bearer(me.id))
-      .send({ content: '처음 글', imageKeys: [oldKey] });
+      .send({ content: '처음 글: 칼국수 국물이 시원하고 면이 쫄깃해요.', imageKeys: [oldKey] });
+
+    const short = await request(app)
+      .patch(`/api/v1/reviews/${review.id}`)
+      .set('Authorization', bearer(me.id))
+      .send({ content: '고친 글' });
+    expect(short.body.code).toBe('REVIEW_CONTENT_TOO_SHORT');
 
     const patched = await request(app)
       .patch(`/api/v1/reviews/${review.id}`)
       .set('Authorization', bearer(me.id))
-      .send({ overallScore: 4.5, content: '고친 글', imageKeys: [] });
+      .send({
+        overallScore: 4.5,
+        content: '고친 글: 다시 가 보니 면이 더 쫄깃했어요.',
+        imageKeys: [],
+      });
     expect(patched.status).toBe(200);
     expect(patched.body.data.review).toMatchObject({
       overallScore: 4.5,
-      content: '고친 글',
+      content: '고친 글: 다시 가 보니 면이 더 쫄깃했어요.',
       imageCount: 0,
     });
     expect(storage.deleteObjectQuietly).toHaveBeenCalledWith(oldKey);
