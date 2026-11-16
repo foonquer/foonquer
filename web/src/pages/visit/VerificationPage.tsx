@@ -7,7 +7,6 @@ import {
   type ReceiptCandidate,
   type Verification,
 } from '../../api/visits';
-import mukkaebi from '../../assets/illust/mukkaebi.svg';
 import { AppHeader } from '../../components/AppHeader';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
@@ -97,7 +96,8 @@ export function VerificationPage() {
     case 'RESTAURANT_CHECK':
       return <PickRestaurant v={data} onDone={reload} />;
     case 'VERIFIED':
-      return <Verified v={data} />;
+      // 인증을 마치면 먹깨비가 가게까지 걸어가는 화면으로 (현장 인증과 같다)
+      return <Navigate to={`/visits/${visitId}/follow`} replace />;
     case 'FAILED':
       return <Failed v={data} />;
     case 'CONQUERED':
@@ -231,49 +231,6 @@ function ReceiptInfo({ v }: { v: Verification }) {
         금액 <strong>{formatWon(v.receipt.totalAmount) ?? '–'}</strong>
       </p>
     </section>
-  );
-}
-
-function Verified({ v }: { v: Verification }) {
-  const navigate = useNavigate();
-  const receipt = v.method === 'RECEIPT';
-  return (
-    <Screen
-      footer={
-        <Button onClick={() => navigate(`/visits/${v.verificationId}/rating`, { replace: true })}>
-          별점 남기러 가기
-        </Button>
-      }
-    >
-      <AppHeader title="방문 인증" />
-      <div className={flow.content}>
-        <div className={flow.center}>
-          <img src={mukkaebi} alt="" className={flow.mukkaebi} />
-          <h2 className={flow.title}>방문 인증이 완료됐어요!</h2>
-          <p className={flow.subtitle}>이제 별점을 남기면 정복 준비가 끝나요.</p>
-        </div>
-        <section className={flow.card} aria-label="인증한 가게">
-          <p className={flow.cardName}>{v.restaurant?.name}</p>
-          <p className={flow.cardMeta}>{v.restaurant?.categoryName}</p>
-          <div className={flow.rows}>
-            <p className={flow.row}>
-              <span>방문 날짜</span>
-              <strong>{formatDate(v.receipt?.paidAt ?? v.verifiedAt)}</strong>
-            </p>
-            {receipt && v.receipt?.totalAmount != null && (
-              <p className={flow.row}>
-                <span>결제 금액</span>
-                <strong>{formatWon(v.receipt.totalAmount)}</strong>
-              </p>
-            )}
-          </div>
-        </section>
-        <section className={flow.tip}>
-          <p className={flow.tipTitle}>1단계 완료 · {receipt ? '영수증 인증' : '현장 인증'}</p>
-          <p className={flow.tipText}>별점까지 등록해야 정복이 완료돼요.</p>
-        </section>
-      </div>
-    </Screen>
   );
 }
 

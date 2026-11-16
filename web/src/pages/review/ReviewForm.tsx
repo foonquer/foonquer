@@ -26,12 +26,11 @@ export function ReviewForm({ value, onChange, aspectOptions }: Props) {
   }, [value.photos]);
   useEffect(() => () => photosRef.current.forEach((p) => p.file && URL.revokeObjectURL(p.url)), []);
 
-  /** 한 번 누르면 좋았던 점, 두 번 누르면 아쉬웠던 점, 세 번이면 없앤다 */
-  const cycleAspect = (aspectId: number) => {
+  /** 좋았던 점·아쉬웠던 점 줄에서 누르면 고르고, 다시 누르면 뺀다. 한 항목은 둘 중 하나만 (다른 줄에서 누르면 옮긴다) */
+  const toggleAspect = (aspectId: number, polarity: 'G' | 'B') => {
     const next = { ...value.aspects };
-    if (!next[aspectId]) next[aspectId] = 'G';
-    else if (next[aspectId] === 'G') next[aspectId] = 'B';
-    else delete next[aspectId];
+    if (next[aspectId] === polarity) delete next[aspectId];
+    else next[aspectId] = polarity;
     set({ aspects: next });
   };
 
@@ -53,17 +52,25 @@ export function ReviewForm({ value, onChange, aspectOptions }: Props) {
   return (
     <>
       <section className={styles.card} aria-label="세부 별점">
-        {DETAIL_ITEMS.map((item) => (
-          <div key={item.key} className={styles.scoreRow}>
-            <span className={styles.scoreLabel}>{item.label}</span>
-            <StarInput
-              label={`${item.label} 별점`}
-              value={value.scores[item.key] ?? null}
-              onChange={(v) => set({ scores: { ...value.scores, [item.key]: v } })}
-              size={26}
-            />
-          </div>
-        ))}
+        {DETAIL_ITEMS.map((item) => {
+          const score = value.scores[item.key];
+          return (
+            <div key={item.key} className={styles.scoreItem}>
+              <div className={styles.scoreRow}>
+                <span className={styles.scoreLabel}>{item.label}</span>
+                <StarInput
+                  label={`${item.label} 별점`}
+                  value={score ?? null}
+                  onChange={(v) => set({ scores: { ...value.scores, [item.key]: v } })}
+                  size={26}
+                />
+              </div>
+              <p className={styles.scoreLine} data-empty={score === undefined} aria-live="polite">
+                {score === undefined ? item.hint : item.texts[score - 1]}
+              </p>
+            </div>
+          );
+        })}
       </section>
       <p className={styles.scoreNote}>
         맛은 앞에서 남겼어요 · 3점 = 기대한 만큼
@@ -75,27 +82,36 @@ export function ReviewForm({ value, onChange, aspectOptions }: Props) {
       {aspectOptions.length > 0 && (
         <section className={styles.card} aria-label="좋았던 점 · 아쉬웠던 점">
           <h3 className={styles.cardTitle}>좋았던 점 · 아쉬웠던 점 (선택)</h3>
-          <p className={styles.cardHint}>
-            한 번 누르면 좋았던 점, 두 번 누르면 아쉬웠던 점으로 남아요
-          </p>
-          <div className={styles.aspects}>
-            {aspectOptions.map((a) => {
-              const polarity = value.aspects[a.aspectId];
-              return (
-                <button
-                  key={a.aspectId}
-                  type="button"
-                  className={styles.aspect}
-                  data-polarity={polarity ?? 'none'}
-                  aria-label={`${a.name} ${polarity === 'G' ? '좋음' : polarity === 'B' ? '아쉬움' : '고르지 않음'}`}
-                  onClick={() => cycleAspect(a.aspectId)}
-                >
-                  {a.name}
-                  {polarity === 'G' ? ' 좋음' : polarity === 'B' ? ' 아쉬움' : ''}
-                </button>
-              );
-            })}
-          </div>
+          <p className={styles.cardHint}>여러 개 골라도 돼요. 다시 누르면 빠져요</p>
+          {(
+            [
+              ['G', '좋았던 점'],
+              ['B', '아쉬웠던 점'],
+            ] as const
+          ).map(([polarity, title]) => (
+            <div key={polarity} className={styles.aspectGroup}>
+              <p className={styles.aspectTitle} data-polarity={polarity}>
+                {title}
+              </p>
+              <div className={styles.aspects} role="group" aria-label={title}>
+                {aspectOptions.map((a) => {
+                  const on = value.aspects[a.aspectId] === polarity;
+                  return (
+                    <button
+                      key={a.aspectId}
+                      type="button"
+                      className={styles.aspect}
+                      data-polarity={on ? polarity : 'none'}
+                      aria-pressed={on}
+                      onClick={() => toggleAspect(a.aspectId, polarity)}
+                    >
+                      {a.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </section>
       )}
 
