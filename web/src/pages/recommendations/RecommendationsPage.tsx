@@ -18,6 +18,7 @@ import { NearbyStores } from './NearbyStores';
 import { parseRecoType, RECO_EMPTY, RECO_OPTIONS, RECO_REASON } from './recoTypes';
 import styles from './Recommendations.module.css';
 import situationStyles from './Situation.module.css';
+import { StarIcon } from '../../components/StarRating';
 
 /** 카드로 넘겨 보는 추천 수 */
 const CAROUSEL_SIZE = 5;
@@ -184,8 +185,12 @@ function RecoCard({
       <span className={styles.reason}>{reason}</span>
       <span className={styles.name}>{item.name}</span>
       <span className={styles.meta}>
+        {score && (
+          <>
+            <StarIcon /> {score} ·{' '}
+          </>
+        )}
         {joinDot([
-          score ? `★ ${score}` : null,
           `인증 리뷰 ${item.rating.reviewCount}`,
           item.categoryName,
           formatDistance(item.distanceM),

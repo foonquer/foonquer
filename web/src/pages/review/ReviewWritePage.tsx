@@ -22,6 +22,7 @@ import {
   type RewardState,
 } from './reviewValue';
 import styles from './Review.module.css';
+import { StarIcon } from '../../components/StarRating';
 
 async function loadWrite(visitId: number) {
   const visit = await getVerification(visitId);
@@ -129,8 +130,8 @@ function WriteForm({
               [review.restaurant.dongName, review.restaurant.categoryName]
                 .filter(Boolean)
                 .join(' '),
-              `맛 ★ ${formatScore(review.overallScore)}`,
-            ])}
+            ])}{' '}
+            · 맛 <StarIcon /> {formatScore(review.overallScore)}
           </p>
         </div>
         <ReviewForm value={value} onChange={setValue} aspectOptions={aspects} />

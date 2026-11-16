@@ -44,6 +44,7 @@ function addressLine(r: {
 }
 import { ScoreStats } from './ScoreStats';
 import styles from './RestaurantDetailPage.module.css';
+import { StarIcon } from '../../components/StarRating';
 
 /** 음식점 상세 /restaurants/:restaurantId (REST-01) */
 export function RestaurantDetailPage() {
@@ -182,7 +183,7 @@ function Detail({
           <p className={styles.rating}>
             {score ? (
               <>
-                <span className={styles.star}>★</span> {score}
+                <StarIcon /> {score}
                 <span className={styles.tasteLabel}>맛 별점</span>
                 <span className={styles.gap} />
                 <span className={styles.reviewCount}>인증 평가 {r.rating.reviewCount}</span>
@@ -192,7 +193,9 @@ function Detail({
             )}
           </p>
           {r.my.conquestState === 'CONQUERED' && myScore && (
-            <p className={styles.myScore}>내 평가 ★ {myScore}</p>
+            <p className={styles.myScore}>
+              내 평가 <StarIcon /> {myScore}
+            </p>
           )}
         </div>
         {r.rating.score !== null && (

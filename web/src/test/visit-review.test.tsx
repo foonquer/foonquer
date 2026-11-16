@@ -977,7 +977,7 @@ describe('별점 → 정복 → 세부평가 → 적립', () => {
     fireEvent.click(screen.getByRole('button', { name: '세부평가 남기고 포인트 쌓기' }));
 
     expect(await screen.findByText('맛 말고 다른 점도 알려주세요')).toBeInTheDocument();
-    expect(screen.getByText('새맛집 · 가양동 한식 · 맛 ★ 4.5')).toBeInTheDocument();
+    expect(screen.getByText('새맛집 · 가양동 한식 · 맛 4.5')).toBeInTheDocument();
     // 세부 별점을 일부만 고르면 등록할 수 없다
     fireEvent.click(
       within(screen.getByRole('slider', { name: '청결 별점' })).getByRole('button', {
@@ -1162,7 +1162,7 @@ describe('내 취향 설정', () => {
     expect(
       screen.getByText('맛 30% · 청결 30% · 가격 20% · 양 10% · 서비스 10%'),
     ).toBeInTheDocument();
-    expect(screen.getByText('예) 새맛집 — 맛 별점 ★ 4.4 → 내 종합 ★ 4.3')).toBeInTheDocument();
+    expect(screen.getByText('예) 새맛집 — 맛 별점 4.4 → 내 종합 4.3')).toBeInTheDocument();
     fireEvent.click(save);
     await waitFor(() => expect(server.calls('PUT /users/me/taste-weights')).toHaveLength(1));
     expect(server.calls('PUT /users/me/taste-weights')[0].body).toEqual({

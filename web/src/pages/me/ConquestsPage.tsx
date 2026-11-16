@@ -12,6 +12,7 @@ import { formatScore, joinDot } from '../../lib/format';
 import { useAsync } from '../../lib/useAsync';
 import { usePaged } from '../../lib/usePaged';
 import styles from './MyRecords.module.css';
+import { StarIcon } from '../../components/StarRating';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -101,7 +102,7 @@ export function ConquestsPage() {
                       </span>
                       {r.overallScore !== null && (
                         <span className={styles.score}>
-                          맛 <span className={styles.star}>★</span> {formatScore(r.overallScore)}
+                          맛 <StarIcon /> {formatScore(r.overallScore)}
                         </span>
                       )}
                     </Link>

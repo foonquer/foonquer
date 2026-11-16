@@ -311,7 +311,7 @@ describe('모임 공간 (G5)', () => {
     expect(screen.getByText('2명 이상 같이 가면 완료 · 각자 +100P')).toBeInTheDocument();
     expect(screen.getByText('1/3 완료 · 각자 +80P')).toBeInTheDocument();
     expect(screen.getByText('10.28 · 2명 함께')).toBeInTheDocument();
-    expect(screen.getByText('★ 4.6 맛')).toBeInTheDocument();
+    expect(screen.getByText('4.6 맛')).toBeInTheDocument();
     // 목록은 2곳만, 나머지는 모두 보기 (지도에는 모두)
     const list = screen.getByRole('region', { name: '함께 정복한 곳' });
     expect(within(list).queryByText('등촌 국밥')).not.toBeInTheDocument();

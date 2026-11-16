@@ -662,9 +662,10 @@ describe('내 기록', () => {
     });
     renderRoute('/me/conquests');
     const september = await screen.findByRole('region', { name: '9월' });
-    expect(
-      within(september).getByRole('link', { name: /25.*금.*새맛집.*맛 ★ 4.4/ }),
-    ).toHaveAttribute('href', '/reviews/50');
+    expect(within(september).getByRole('link', { name: /25.*금.*새맛집.*맛 4.4/ })).toHaveAttribute(
+      'href',
+      '/reviews/50',
+    );
     expect(within(screen.getByRole('region', { name: '8월' })).getByRole('link')).toHaveAttribute(
       'href',
       '/restaurants/8',

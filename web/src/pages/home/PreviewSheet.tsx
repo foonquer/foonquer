@@ -14,6 +14,7 @@ import { euro } from '../../lib/korean';
 import { useAsync } from '../../lib/useAsync';
 import { businessText } from '../restaurant/business';
 import styles from './PreviewSheet.module.css';
+import { StarIcon } from '../../components/StarRating';
 
 type Props = {
   restaurantId: number | null;
@@ -74,7 +75,7 @@ function Preview({ p }: { p: RestaurantPreview }) {
           <p className={styles.rating}>
             {score ? (
               <>
-                <span className={styles.star}>★</span> {score} 맛
+                <StarIcon /> {score} 맛
                 {p.myOverallScore !== null && ` · 내 종합 ${formatScore(p.myOverallScore)}`} · 인증
                 평가 {p.rating.reviewCount}
               </>
@@ -140,7 +141,13 @@ function Summary({ p }: { p: RestaurantPreview }) {
     return (
       <div className={styles.summary}>
         <p className={styles.summaryTitle}>
-          {joinDot([`${formatDate(c.conqueredAt)} 정복`, myScore && `내 별점 ★ ${myScore}`])}
+          {formatDate(c.conqueredAt)} 정복
+          {myScore && (
+            <>
+              {' '}
+              · 내 별점 <StarIcon /> {myScore}
+            </>
+          )}
         </p>
         <p className={styles.summaryText}>
           {joinDot([

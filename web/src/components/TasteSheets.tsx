@@ -6,6 +6,7 @@ import { TASTE_CRITERIA, TASTE_CRITERIA_NOTE, TASTE_ITEMS, tasteCriterion } from
 import { BottomSheet } from './BottomSheet';
 import { Button } from './Button';
 import styles from './TasteSheets.module.css';
+import { StarIcon } from './StarRating';
 
 type CriteriaProps = {
   open: boolean;
@@ -66,7 +67,7 @@ export function MyOverallSheet({ open, onClose, tasteScore, myOverall }: Overall
         내 종합 별점{' '}
         {myOverall.score !== null && (
           <span className={styles.big}>
-            <span className={styles.star}>★</span> {formatScore(myOverall.score)}
+            <StarIcon /> {formatScore(myOverall.score)}
           </span>
         )}
       </h2>
@@ -108,7 +109,12 @@ export function MyOverallSheet({ open, onClose, tasteScore, myOverall }: Overall
           </p>
           <p className={styles.formulaNote}>
             같은 가게도 사람마다 내 종합 별점이 달라요. 맛 별점
-            {tasteScore !== null && `(★ ${formatScore(tasteScore)})`}은 모두에게 같아요.
+            {tasteScore !== null && (
+              <>
+                (<StarIcon /> {formatScore(tasteScore)})
+              </>
+            )}
+            은 모두에게 같아요.
           </p>
         </div>
       )}

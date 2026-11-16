@@ -66,10 +66,6 @@
   color: var(--mk-ink);
 }
 
-.star {
-  color: var(--mk-star);
-}
-
 .details {
   color: var(--mk-muted);
 }
