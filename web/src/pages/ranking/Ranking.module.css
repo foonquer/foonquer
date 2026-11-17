@@ -529,6 +529,10 @@
 }
 
 .profileMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
   font-size: 12px;
   color: var(--mk-muted);
   word-break: keep-all;

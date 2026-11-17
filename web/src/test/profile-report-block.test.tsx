@@ -10,7 +10,8 @@ const profile = (patch: Partial<MemberProfile> = {}): MemberProfile => ({
   nickname: '동네미식가',
   profileImageUrl: null,
   bio: '강서구 토박이 10년차, 국밥 · 칼국수 위주로 다녀요.',
-  trustTemp: 51,
+  trustTemp: null,
+  trustLevel: 'LEAF',
   title: '강서구 단골',
   homeRegion: '강서구 가양동',
   mukkaebi: {
@@ -98,7 +99,8 @@ const review = (patch: Partial<Review> = {}): Review => ({
     userId: 5,
     nickname: '동네미식가',
     profileImageUrl: null,
-    trustTemp: 51,
+    trustTemp: null,
+    trustLevel: 'LEAF',
     title: '강서구의 먹짱',
     isLocal: true,
   },
@@ -129,7 +131,10 @@ describe('탐방러 프로필 (PROFILE-01·02, REVIEW-10)', () => {
 
     const hero = await screen.findByRole('region', { name: '동네미식가의 프로필' });
     expect(hero).toHaveTextContent('강서구의 먹짱');
-    expect(hero).toHaveTextContent('강서구 가양동 · 신뢰 온도 51.0° · 시즌 3 강서구 1위');
+    expect(hero).toHaveTextContent('강서구 가양동 · 시즌 3 강서구 1위');
+    // 남의 프로필은 신뢰 온도 숫자 없이 리뷰어 단계만
+    expect(within(hero).getByRole('img', { name: '리뷰어 단계 잎새' })).toBeInTheDocument();
+    expect(hero).not.toHaveTextContent('°');
     expect(hero).toHaveTextContent('강서구 토박이 10년차');
     expect(hero).toHaveTextContent('LV.12');
     expect(hero).toHaveTextContent('1,840 / 2,000');
@@ -292,14 +297,19 @@ describe('탐방러 프로필 (PROFILE-01·02, REVIEW-10)', () => {
     expect(server.calls('DELETE /users/me/blocks/:id')).toHaveLength(1);
   });
 
-  it('내 프로필이면 신고·차단 대신 프로필 수정', async () => {
-    mockApi({ 'GET /users/:id/profile': ok(profile({ isMe: true })) });
+  it('내 프로필이면 신고·차단 대신 프로필 수정, 신뢰 온도 숫자도 보인다', async () => {
+    mockApi({
+      'GET /users/:id/profile': ok(profile({ isMe: true, trustTemp: 51, trustLevel: 'SPROUT' })),
+    });
     renderRoute('/users/5');
     expect(await screen.findByRole('link', { name: '프로필 수정' })).toHaveAttribute(
       'href',
       '/me/profile',
     );
     expect(screen.queryByRole('button', { name: '신고·차단' })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: '리뷰어 단계 새싹, 신뢰 온도 51.0도' }),
+    ).toHaveTextContent('새싹51.0°');
   });
 });
 

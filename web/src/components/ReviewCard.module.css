@@ -33,6 +33,9 @@
 }
 
 .authorMeta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   margin-top: 1px;
   font-size: 11px;
   color: var(--mk-muted);

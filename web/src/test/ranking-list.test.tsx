@@ -181,7 +181,8 @@ describe('랭킹/현황', () => {
         nickname: '동네미식가',
         profileImageUrl: null,
         bio: '칼국수 맛집만 찾아다녀요',
-        trustTemp: 62.3,
+        trustTemp: null,
+        trustLevel: 'LEAF',
         title: '강서구 미식가',
         homeRegion: '강서구 가양동',
         mukkaebi: {
@@ -240,10 +241,10 @@ describe('랭킹/현황', () => {
     const card = await screen.findByRole('region', { name: '강서구의 먹짱' });
     expect(card).toHaveTextContent('동네미식가');
     expect(card).toHaveTextContent('내 순위 8위 · 먹짱까지 11곳');
-    // 먹짱 프로필: 칭호·레벨·신뢰 온도·사는 동네·소개·누적 기록
-    await waitFor(() =>
-      expect(card).toHaveTextContent('강서구 미식가 · LV.7 · 신뢰 온도 62.3° · 강서구 가양동'),
-    );
+    // 먹짱 프로필: 칭호·레벨·사는 동네·리뷰어 단계(남의 온도 숫자는 없음)·소개·누적 기록
+    await waitFor(() => expect(card).toHaveTextContent('강서구 미식가 · LV.7 · 강서구 가양동'));
+    expect(within(card).getByRole('img', { name: '리뷰어 단계 잎새' })).toHaveTextContent('잎새');
+    expect(card).not.toHaveTextContent('°');
     expect(card).toHaveTextContent('칼국수 맛집만 찾아다녀요');
     expect(card).toHaveTextContent('누적 정복 40곳 · 받은 도움돼요 12 · PICK 3곳');
     expect(within(card).getByRole('link', { name: '프로필 보기 ›' })).toHaveAttribute(
@@ -609,6 +610,7 @@ describe('내 기록', () => {
         userId: 1,
         nickname: '동네미식가',
         trustTemp: 51,
+        trustLevel: 'SPROUT',
         picks: ['옛날손칼국수', '수정식당', '이가네떡볶이', '마포숯불갈비'].map((name, i) => ({
           order: i + 1,
           restaurantId: i + 1,
@@ -628,7 +630,8 @@ describe('내 기록', () => {
     const card = await screen.findByRole('img', { name: /시즌 3 강서구 먹짱 동네미식가 카드/ });
     const svg = decodeURIComponent((card as HTMLImageElement).src.split(',')[1]);
     expect(svg).toContain('SEASON 3 · HALL OF FAME');
-    expect(svg).toContain('정복 18곳 · 강서구 1위 · 신뢰 온도 51.0°');
+    // 공유 카드는 다른 사람이 보므로 온도 숫자 대신 리뷰어 단계
+    expect(svg).toContain('정복 18곳 · 강서구 1위 · 리뷰어 새싹');
     expect(svg).toContain('이가네떡볶이');
     expect(svg).not.toContain('마포숯불갈비'); // TOP 3까지만
     expect(svg).toContain('#272b5e'); // 기본 테마 밤하늘

@@ -1,0 +1,36 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  background: var(--mk-green-50);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  color: var(--mk-green);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* 씨앗·새싹은 연하게, 나무부터 진하게, 숲은 진초록에 금빛 별 */
+.badge[data-level='SEED'],
+.badge[data-level='SPROUT'] {
+  background: var(--mk-gray-button);
+  color: var(--mk-muted);
+}
+
+.badge[data-level='TREE'] {
+  background: var(--mk-green-100);
+  color: var(--mk-forest);
+}
+
+.badge[data-level^='FOREST'] {
+  background: var(--mk-forest);
+  color: var(--mk-gold-light);
+}
+
+.temp {
+  font-weight: 600;
+  opacity: 0.8;
+}

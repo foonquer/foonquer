@@ -9,6 +9,7 @@ import { prisma } from '../../lib/prisma';
 import { loadMukkaebi } from '../mukkaebi/mukkaebi-view';
 import { loadTitles, titleOf } from '../ranking/title';
 import { TIER_API, TIER_ORDER, type TierCode, tierTitle } from '../ranking/tier';
+import { trustViewOf } from '../review/trust-level';
 import { UserError } from '../user/user.errors';
 import {
   MAX_PICKS,
@@ -168,7 +169,8 @@ export async function getMemberProfile(viewerId: bigint, userId: number) {
     nickname: member.nickname,
     profileImageUrl: publicImageUrl(member.profileImageKey),
     bio: member.bio,
-    trustTemp: member.trustTemp.toNumber(),
+    // 신뢰 온도는 본인에게만, 다른 사람에게는 잎새 이상일 때 리뷰어 단계만
+    ...trustViewOf(member.trustTemp.toNumber(), member.id === viewerId),
     title: titleOf(titles, member.id),
     homeRegion: home ? `${home.sigungu.name} ${home.region.name}` : null,
     mukkaebi: {
