@@ -282,6 +282,7 @@ const rewardPolicies = [
     dailyLimit: null,
     description: '퀘스트 완료 (도전)',
   },
+  { reason: 'MAPAE_REPORT', point: 50, exp: 0, dailyLimit: null, description: '마패 제보 확정' },
 ];
 
 async function seedRewardPolicies(prisma: PrismaClient) {

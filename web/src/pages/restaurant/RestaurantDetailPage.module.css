@@ -159,7 +159,41 @@
 .mapaeSub {
   margin-top: 2px;
   font-size: 12px;
+  line-height: 1.45;
   color: #8c6b40;
+}
+
+.mapaeText {
+  min-width: 0;
+}
+
+.mapaeLink {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #73450f;
+}
+
+/* 리뷰 이벤트 제보 입구 (마패가 없는 가게) */
+.mapaeReport {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px dashed #e8b25c;
+  border-radius: 14px;
+  background: #fffaf0;
+  font-size: 12px;
+  color: #8c6b40;
+}
+
+.mapaeReport strong {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: #73450f;
 }
 
 .myScore {

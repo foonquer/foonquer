@@ -1,7 +1,7 @@
 import type { BucketKind } from '../../lib/storage';
 
 /**
- * UPLOAD-01 purpose별 key 폴더와 버킷 (명세서 "값 규칙": 리뷰 사진은 공개 URL, 영수증·현장·문의 사진은 signed URL).
+ * UPLOAD-01 purpose별 key 폴더와 버킷 (명세서 "값 규칙": 리뷰 사진은 공개 URL, 영수증·현장·문의·마패 제보 사진은 signed URL).
  * 프로필 사진은 USER-02(profile/ 폴더)를 그대로 쓴다.
  */
 export const UPLOAD_PURPOSES = {
@@ -9,6 +9,8 @@ export const UPLOAD_PURPOSES = {
   RECEIPT: { folder: 'receipt', bucket: 'private' },
   SITE_PHOTO: { folder: 'site', bucket: 'private' },
   INQUIRY: { folder: 'inquiry', bucket: 'private' },
+  /** 마패 제보: 가게의 리뷰 이벤트 안내문 사진 */
+  MAPAE: { folder: 'mapae', bucket: 'private' },
 } as const satisfies Record<string, { folder: string; bucket: BucketKind }>;
 
 export type UploadPurpose = keyof typeof UPLOAD_PURPOSES;

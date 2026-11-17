@@ -1,7 +1,7 @@
 // 운영 관리 API (ADMIN-01·02 신고, ADMIN-08·09 문의, ADMIN-10~18 공지·FAQ·약관·회원). 운영자(member.role = A)만 부를 수 있다
 
 import { api } from '../lib/api';
-import type { InquiryCategory, TermsType } from './support';
+import type { InquiryCategory, MapaeObjection, TermsType } from './support';
 import type { ReportReason } from './profile';
 import type { Page } from './reviews';
 
@@ -57,6 +57,10 @@ export type AdminInquiry = {
   content: string;
   imageUrl: string | null;
   refVisitId: number | null;
+  /** 사장님 마패 이의제기 (category MAPAE)면 대상 가게·관계·사유 */
+  mapaeObjection: MapaeObjection | null;
+  /** 이의제기한 가게에 지금 붙어 있는 마패 (해제하면 null) */
+  activeMapaeId: number | null;
   user: { userId: number; nickname: string | null };
   status: 'WAITING' | 'ANSWERED';
   answer: string | null;
@@ -76,6 +80,13 @@ export const answerInquiry = (inquiryId: number, answer: string) =>
   api.patch<{ inquiryId: number; status: 'ANSWERED'; answeredAt: string; notified: boolean }>(
     `/admin/inquiries/${inquiryId}/answer`,
     { answer },
+  );
+
+/** ADMIN-07 마패 해제 (사장님 이의제기를 확인했을 때) */
+export const releaseMapae = (mapaeId: number, releaseReason: string) =>
+  api.patch<{ mapaeId: number; status: 'RELEASED'; releasedAt: string | null }>(
+    `/admin/mapae/${mapaeId}/release`,
+    { releaseReason },
   );
 
 export type Visibility = 'VISIBLE' | 'HIDDEN';

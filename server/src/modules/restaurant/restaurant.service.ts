@@ -11,6 +11,7 @@ import { RestaurantError } from './restaurant.errors';
 import type { RestaurantLocationQuery } from './restaurant.schema';
 import { REVISIT_INTENT_MIN_SCORE } from './restaurant-stat-calc';
 import { coverImageUrlOf, detailStatsOf, myOverallOf, ratingOf } from './restaurant-stats';
+import { activeMapaeReportCount } from '../mapae/mapae.service';
 
 /** 숨김(H) 가게는 없는 것처럼 404. 폐업(C)은 기록 확인을 위해 보여 준다 */
 async function findVisibleRestaurant(restaurantId: bigint) {
@@ -192,6 +193,8 @@ export async function getRestaurantDetail(
     // 항목별 평균의 맛 자리에 보이는 "내 종합" + 계산 보기 시트 (피그마 3-2)
     myOverall: myOverallOf(r.restaurantStat, weights),
     hasMapae: r.hasMapae,
+    /** 지금 마패가 방문자 사진 제보로 붙었으면 그 제보자 수 (운영자가 붙였거나 마패가 없으면 0) */
+    mapaeReportCount: r.hasMapae ? await activeMapaeReportCount(r.id) : 0,
     stats: { ...detailStatsOf(r.restaurantStat), currentSeasonConquerorCount: conquerorCount },
     my: {
       conquestState: state.conquestState,

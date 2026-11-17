@@ -2,7 +2,7 @@
 
 import { api, ApiError } from '../lib/api';
 
-export type UploadPurpose = 'REVIEW' | 'RECEIPT' | 'SITE_PHOTO' | 'INQUIRY';
+export type UploadPurpose = 'REVIEW' | 'RECEIPT' | 'SITE_PHOTO' | 'INQUIRY' | 'MAPAE';
 
 type UploadUrl = {
   uploadUrl: string;

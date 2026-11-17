@@ -124,6 +124,8 @@ export type RestaurantDetail = {
   myOverall: MyOverall;
   /** 마패: 뒷광고·리뷰 이벤트가 확인된 가게 → "리뷰 이벤트를 하는 가게입니다" */
   hasMapae: boolean;
+  /** 마패가 방문자 사진 제보로 붙었으면 그 제보자 수 (운영자가 붙였으면 0). 옛 서버 응답에는 없을 수 있다 */
+  mapaeReportCount?: number;
   stats: {
     cleanliness: number | null;
     portion: number | null;

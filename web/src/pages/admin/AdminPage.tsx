@@ -4,6 +4,7 @@ import {
   type AdminInquiry,
   type AdminReport,
   answerInquiry,
+  releaseMapae,
   getInquiries,
   getReports,
   processReport,
@@ -11,7 +12,8 @@ import {
   type ReportStatus,
 } from '../../api/admin';
 import { REPORT_REASONS } from '../../api/profile';
-import { INQUIRY_CATEGORIES } from '../../api/support';
+import { OBJECTION_REASONS, OWNER_RELATIONS } from '../../api/mapae';
+import { inquiryCategoryLabel } from '../../api/support';
 import { AppHeader } from '../../components/AppHeader';
 import { Button } from '../../components/Button';
 import { FilterChips } from '../../components/Chips';
@@ -31,7 +33,6 @@ import { StarIcon } from '../../components/StarRating';
 const ANSWER_MAX = 1000;
 
 const REASON = Object.fromEntries(REPORT_REASONS.map((r) => [r.value, r.label]));
-const CATEGORY = Object.fromEntries(INQUIRY_CATEGORIES.map((c) => [c.value, c.label]));
 const REVIEW_STATUS = {
   VISIBLE: '보이는 중',
   HIDDEN: '블라인드',
@@ -358,6 +359,9 @@ function Inquiries() {
                     }));
                   }
                 }}
+                onReleased={() =>
+                  list.update((x) => x.inquiryId === i.inquiryId, { ...i, activeMapaeId: null })
+                }
               />
             </li>
           ))}
@@ -376,9 +380,11 @@ function Inquiries() {
 function InquiryCard({
   inquiry: i,
   onAnswered,
+  onReleased,
 }: {
   inquiry: AdminInquiry;
   onAnswered: (answer: string) => void;
+  onReleased: () => void;
 }) {
   const toast = useToast();
   const [answer, setAnswer] = useState(i.answer ?? '');
@@ -398,13 +404,45 @@ function InquiryCard({
       setBusy(false);
     }
   };
+  // 사장님 이의제기를 확인했으면 그 가게의 마패를 바로 해제한다 (ADMIN-07)
+  const release = async () => {
+    if (i.activeMapaeId === null || !i.mapaeObjection) return;
+    setBusy(true);
+    try {
+      const reason = OBJECTION_REASONS.find((o) => o.value === i.mapaeObjection?.reason)?.label;
+      await releaseMapae(
+        i.activeMapaeId,
+        `사장님 이의제기 #${i.inquiryId}: ${reason ?? ''}`.trim(),
+      );
+      toast({ message: '마패를 해제했어요', check: true });
+      onReleased();
+    } catch (err) {
+      toast(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
   const fieldId = `answer-${i.inquiryId}`;
   return (
     <article className={styles.card} aria-label={`문의 ${i.inquiryId}`}>
       <p className={styles.cardHead}>
-        <span className={styles.kind}>{CATEGORY[i.category] ?? i.category}</span>
+        <span className={styles.kind}>{inquiryCategoryLabel(i.category)}</span>
         <strong>{i.user.nickname ?? '탐험가'}</strong>
       </p>
+      {i.mapaeObjection && (
+        <p className={styles.meta}>
+          {joinDot([
+            i.mapaeObjection.restaurant?.name,
+            OWNER_RELATIONS.find((o) => o.value === i.mapaeObjection?.relation)?.label,
+            OBJECTION_REASONS.find((o) => o.value === i.mapaeObjection?.reason)?.label,
+          ])}
+        </p>
+      )}
+      {i.mapaeObjection && i.activeMapaeId !== null && (
+        <Button size="sm" variant="white" onClick={release} disabled={busy}>
+          가게 마패 해제하기
+        </Button>
+      )}
       <p className={styles.body}>{i.content}</p>
       {i.imageUrl && <img src={i.imageUrl} alt="문의에 붙인 사진" className={styles.photo} />}
       <p className={styles.meta}>

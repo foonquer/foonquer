@@ -295,6 +295,7 @@ describe('REST-01 GET /restaurants/{restaurantId}', () => {
         ],
       },
       hasMapae: false,
+      mapaeReportCount: 0,
       stats: {
         cleanliness: 4.3,
         portion: 4,

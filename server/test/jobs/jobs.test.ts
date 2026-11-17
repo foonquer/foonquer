@@ -251,8 +251,9 @@ describe('주기 작업', () => {
       where: { id: done.id },
       data: { status: 'D', deleteDate: longAgo, filesPurgedAt: longAgo },
     });
-    // failing의 첫 폴더 삭제만 실패 (left → failing 순서로 지운다)
+    // failing의 첫 폴더 삭제만 실패 (left → failing 순서로, 한 사람에 폴더 5개)
     vi.mocked(deletePrefixQuietly)
+      .mockResolvedValueOnce(true)
       .mockResolvedValueOnce(true)
       .mockResolvedValueOnce(true)
       .mockResolvedValueOnce(true)
@@ -260,9 +261,10 @@ describe('주기 작업', () => {
       .mockResolvedValueOnce(false);
     expect(await runCleanupJob()).toMatchObject({ withdrawnFileMembers: 2, failed: 1 });
     const id = left.id.toString();
-    expect(vi.mocked(deletePrefixQuietly).mock.calls.slice(0, 4).sort()).toEqual(
+    expect(vi.mocked(deletePrefixQuietly).mock.calls.slice(0, 5).sort()).toEqual(
       [
         [`inquiry/${id}/`, 'private'],
+        [`mapae/${id}/`, 'private'],
         [`profile/${id}/`, 'public'],
         [`receipt/${id}/`, 'private'],
         [`site/${id}/`, 'private'],

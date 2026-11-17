@@ -41,6 +41,8 @@ const inquiry = (patch: Partial<AdminInquiry> = {}): AdminInquiry => ({
   content: '영수증 인증이 안 돼요',
   imageUrl: null,
   refVisitId: 31,
+  mapaeObjection: null,
+  activeMapaeId: null,
   user: { userId: 5, nickname: '동네미식가' },
   status: 'WAITING',
   answer: null,
