@@ -292,3 +292,69 @@
   overflow: hidden;
   clip: rect(0 0 0 0);
 }
+
+/* 마패 문의 내역 (피그마 M6) */
+.mapaeHeadline {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--mk-ink);
+}
+
+.mapaePath {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mk-green);
+}
+
+.mapaeSteps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--mk-white);
+  list-style: none;
+  font-size: 13px;
+  color: var(--mk-subtle);
+}
+
+.mapaeSteps li + li::before {
+  margin-right: 6px;
+  content: '→';
+  color: var(--mk-dot);
+}
+
+.mapaeSteps li[data-state='done'] {
+  color: var(--mk-muted);
+}
+
+.mapaeSteps li[data-state='now'] {
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.mapaeSteps li[data-state='now']::after {
+  margin-left: 4px;
+  content: '●';
+  font-size: 8px;
+  vertical-align: 2px;
+}
+
+.mapaeSent {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.mapaeSent dt {
+  color: var(--mk-muted);
+}
+
+.mapaeSent dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--mk-ink);
+}

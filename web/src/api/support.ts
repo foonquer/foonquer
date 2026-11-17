@@ -1,6 +1,7 @@
 // 공지·FAQ·1:1 문의·약관 API (CS-01~07)
 
 import { api } from '../lib/api';
+import type { ObjectionReason, OwnerRelation } from './mapae';
 import type { Page } from './reviews';
 
 export type NoticeItem = {
@@ -24,17 +25,29 @@ export const getFaqs = () =>
     '/faqs',
   );
 
-export type InquiryCategory = 'VISIT' | 'ACCOUNT' | 'REPORT' | 'ETC';
-export const INQUIRY_CATEGORIES: { value: InquiryCategory; label: string }[] = [
+/** MAPAE(사장님 마패 이의제기)는 고객센터 폼이 아니라 가게 상세의 이의제기로만 보낸다 */
+export type InquiryCategory = 'VISIT' | 'ACCOUNT' | 'REPORT' | 'ETC' | 'MAPAE';
+export const INQUIRY_CATEGORIES: { value: Exclude<InquiryCategory, 'MAPAE'>; label: string }[] = [
   { value: 'VISIT', label: '방문 인증' },
   { value: 'ACCOUNT', label: '계정' },
   { value: 'REPORT', label: '신고' },
   { value: 'ETC', label: '기타' },
 ];
 
+/** 문의 유형 이름 (내 문의 목록·상세) */
+export const inquiryCategoryLabel = (c: InquiryCategory) =>
+  c === 'MAPAE' ? '사장님 이의제기' : (INQUIRY_CATEGORIES.find((i) => i.value === c)?.label ?? c);
+
+/** 사장님 마패 이의제기의 대상 가게·관계·사유 (다른 문의는 null) */
+export type MapaeObjection = {
+  restaurant: { restaurantId: number; name: string } | null;
+  relation: OwnerRelation;
+  reason: ObjectionReason;
+};
+
 /** CS-04 1:1 문의 (사진 1장) */
 export const createInquiry = (body: {
-  category: InquiryCategory;
+  category: Exclude<InquiryCategory, 'MAPAE'>;
   content: string;
   imageKey?: string | null;
 }) => api.post<{ inquiryId: number; status: 'WAITING' }>('/inquiries', body);
@@ -43,6 +56,7 @@ export type InquiryItem = {
   inquiryId: number;
   category: InquiryCategory;
   contentPreview: string;
+  mapaeObjection: MapaeObjection | null;
   status: 'WAITING' | 'ANSWERED';
   regDate: string;
   answeredAt: string | null;
@@ -60,6 +74,7 @@ export const getInquiry = (inquiryId: number) =>
     content: string;
     imageUrl: string | null;
     refVisit: { verificationId: number; restaurantName: string | null; regDate: string } | null;
+    mapaeObjection: MapaeObjection | null;
     status: 'WAITING' | 'ANSWERED';
     answer: string | null;
     answeredAt: string | null;

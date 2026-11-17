@@ -341,7 +341,7 @@ pnpm -C server db:migrate                                       # 적용
 | `FRONTEND_URL` | 웹 주소. 카카오 로그인이 끝나면 `{FRONTEND_URL}/oauth/callback`으로 보낸다 | `http://localhost:5173` |
 | `IMAGE_BASE_URL` | 프로필·리뷰 사진 공개 주소(`https://storage.googleapis.com/<버킷>` 또는 Cloud CDN 도메인). 비우면 사진 URL을 `null`로 준다 | 비워 둔다 |
 | `GCS_BUCKET` | 사진을 두는 Cloud Storage 버킷. 올린 사진 key가 실제로 있는지 확인한다. 비우면 사진 key를 받지 않는다(`PROFILE_IMAGE_NOT_FOUND`) | 비워 둔다 |
-| `GCS_PRIVATE_BUCKET` | 영수증·현장·문의 사진을 두는 비공개 버킷(UPLOAD-01). 조회는 서버가 만든 signed URL로만 한다 | 비워 둔다 |
+| `GCS_PRIVATE_BUCKET` | 영수증·현장·문의·마패 제보 사진을 두는 비공개 버킷(UPLOAD-01). 조회는 서버가 만든 signed URL로만 한다 | 비워 둔다 |
 | `CLOVA_OCR_URL` · `CLOVA_OCR_SECRET` | 네이버 CLOVA OCR 영수증 특화 모델 주소·Secret Key(VISIT-03). 비우면 영수증 인증이 `UNREADABLE`로 실패한다 | 비워 둔다 |
 | `GEMINI_API_KEY` | Gemini API 키 (주기 작업 `review-ai`의 리뷰 글 분석). 비우면 분석하지 않는다 | 비워 둔다 |
 | `GEMINI_MODEL` | 리뷰 분석 모델 | `gemini-3.5-flash-lite` |
@@ -618,7 +618,7 @@ GCP에서 준비할 것:
 | 방화벽 | 80·443은 모두에게, 22는 IAP 대역(`35.235.240.0/20`)에만 |
 | VM 서비스 계정 | `foonquer-vm`. `roles/secretmanager.secretAccessor`, 사진 두 버킷의 `roles/storage.objectAdmin`과 서명 권한 `roles/iam.serviceAccountTokenCreator`(자기 자신에게, 업로드 signed URL), 백업 버킷의 `roles/storage.objectCreator`·`roles/storage.objectViewer`(복구할 때 읽기) |
 | Secret Manager | `foonquer-prod-env` — 운영 `.env` 내용 (아래 표) |
-| Cloud Storage | 공개 사진 버킷(`GCS_BUCKET`, 프로필 `profile/{회원 id}/`·리뷰 사진)은 `allUsers` 읽기 허용, 영수증·현장·문의 사진은 공개하지 않는 별도 버킷에 둔다(`GCS_PRIVATE_BUCKET`, `receipt/`·`site/`·`inquiry/` 폴더). 브라우저에서 signed URL로 바로 올리므로(USER-02, UPLOAD-01) 두 버킷 모두 버킷 CORS에 웹 주소, `PUT`, 요청 헤더 `Content-Type`·`x-goog-content-length-range`·`x-goog-if-generation-match` 허용. DB 백업 버킷은 비공개, 30일 지나면 지우는 수명 주기 |
+| Cloud Storage | 공개 사진 버킷(`GCS_BUCKET`, 프로필 `profile/{회원 id}/`·리뷰 사진)은 `allUsers` 읽기 허용, 영수증·현장·문의·마패 제보 사진은 공개하지 않는 별도 버킷에 둔다(`GCS_PRIVATE_BUCKET`, `receipt/`·`site/`·`inquiry/`·`mapae/` 폴더). 브라우저에서 signed URL로 바로 올리므로(USER-02, UPLOAD-01) 두 버킷 모두 버킷 CORS에 웹 주소, `PUT`, 요청 헤더 `Content-Type`·`x-goog-content-length-range`·`x-goog-if-generation-match` 허용. DB 백업 버킷은 비공개, 30일 지나면 지우는 수명 주기 |
 | 배포용 서비스 계정 | `foonquer-deploy`. GitHub Actions가 VM에 IAP로 SSH할 권한만 준다 (`roles/compute.instanceAdmin.v1`, `roles/iap.tunnelResourceAccessor`, `roles/iam.serviceAccountUser`). 키 파일은 만들지 않고 Workload Identity Federation으로 이 저장소(`foonquer/foonquer`)의 Actions만 이 계정을 쓸 수 있게 한다: 풀 `github`, 공급자 `foonquer`(발급자 `https://token.actions.githubusercontent.com`, 속성 매핑 `google.subject=assertion.sub,attribute.repository=assertion.repository`, 조건 `assertion.repository=='foonquer/foonquer'`), 그리고 `foonquer-deploy`에 연합 주체 `principalSet://iam.googleapis.com/projects/<프로젝트 번호>/locations/global/workloadIdentityPools/github/attribute.repository/foonquer/foonquer`의 `roles/iam.workloadIdentityUser`. VM이 한 대뿐인 프로젝트라 `instanceAdmin.v1`은 프로젝트 단위로 준다(`gcloud compute ssh`가 프로젝트 메타데이터도 읽는다). VM을 늘리면 그 VM으로 좁힌다 |
 
 운영 `.env`(Secret Manager `foonquer-prod-env`)에 넣는 값 — 값은 로컬 `.env`와 같은 뜻이고, 운영에서 다른 것만 적었다:

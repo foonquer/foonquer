@@ -224,9 +224,19 @@ function Detail({
             <span className={styles.mapaeIcon} aria-hidden="true">
               마패
             </span>
-            <div>
+            <div className={styles.mapaeText}>
               <p className={styles.mapaeTitle}>리뷰 이벤트를 하는 가게입니다</p>
-              <p className={styles.mapaeSub}>뒷광고 또는 리뷰 이벤트가 확인된 가게예요</p>
+              <p className={styles.mapaeSub}>
+                {r.mapaeReportCount
+                  ? `리뷰 이벤트 제보가 확인된 가게예요 · 방문자 사진 제보 ${r.mapaeReportCount}건 · 위치 확인 완료`
+                  : '뒷광고 또는 리뷰 이벤트가 확인된 가게예요'}
+              </p>
+              <Link
+                to={`/restaurants/${r.restaurantId}/mapae-objection`}
+                className={styles.mapaeLink}
+              >
+                사장님이신가요? 이의제기 ›
+              </Link>
             </div>
           </section>
         )}
@@ -279,6 +289,13 @@ function Detail({
               ? '방문 인증한 사람들의 리뷰를 전체 보기에서 볼 수 있어요.'
               : '아직 인증 리뷰가 없어요. 방문 인증하고 첫 리뷰를 남겨 보세요.'}
           </p>
+        )}
+
+        {!r.hasMapae && !closed && (
+          <Link to={`/restaurants/${r.restaurantId}/mapae-report`} className={styles.mapaeReport}>
+            <span>이 가게에서 리뷰 이벤트 안내를 봤나요?</span>
+            <strong>제보하기 ›</strong>
+          </Link>
         )}
       </div>
       {situation && (

@@ -136,6 +136,8 @@ export async function withdrawMember(userId: bigint, body: WithdrawalBody, now =
       await tx.visitReceiptItem.deleteMany({ where: { visit: { userId } } });
       // 1:1 문의도 내용·사진째 지운다 (사진 파일은 트랜잭션 뒤 폴더째)
       await tx.inquiry.deleteMany({ where: { userId } });
+      // 아직 마패로 확정되지 않은 제보는 지운다 (확정된 제보는 마패 근거로 남긴다. 사진은 아래에서 함께 지운다)
+      await tx.mapaeReport.deleteMany({ where: { userId, status: 'P' } });
 
       await deletePersonalRows(tx, userId);
 

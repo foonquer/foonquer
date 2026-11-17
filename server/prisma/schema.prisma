@@ -93,6 +93,7 @@ model Member {
   notifications           Notification[]
   inquiries               Inquiry[]
   reports                 Report[]
+  mapaeReports            MapaeReport[]
   blockerMemberBlocks     MemberBlock[]             @relation("member_block_blocker_id")
   blockedMemberBlocks     MemberBlock[]             @relation("member_block_blocked_id")
   trustTempLogs           TrustTempLog[]            @relation("trust_temp_log_user_id")
@@ -342,6 +343,8 @@ model Restaurant {
   reviews          Review[]
   mukkaebis        Mukkaebi[]
   mapaes           RestaurantMapae[]
+  mapaeReports     MapaeReport[]
+  inquiries        Inquiry[]
   aspectStats      RestaurantAspectStat[]
   picks            MemberPick[]
   quests           Quest[]                @relation("quest_restaurant_id")
@@ -360,31 +363,65 @@ model Restaurant {
 /// 음식점 상세·추천맛집용 집계. 비율 대신 개수를 저장해서 리뷰가 추가·삭제될 때 +1/-1로 정확히 갱신한다. review.score_weight가 바뀌면 그 차이만큼 weight_sum·weighted_score_sum을 고친다
 /// 마패 (2026-11-04). 뒷광고 또는 리뷰 이벤트가 확인된 가게에 "리뷰 이벤트를 하는 가게입니다"를 붙인다. 운영자가 확인한 뒤 붙이고, 붙이거나 해제할 때 restaurant.has_mapae를 함께 바꾼다(한 트랜잭션). 해제해도 행은 지우지 않는다(이력)
 model RestaurantMapae {
-  id            BigInt     @id @default(autoincrement())
-  restaurantId  BigInt     @map("restaurant_id")
+  id            BigInt        @id @default(autoincrement())
+  restaurantId  BigInt        @map("restaurant_id")
   /// A 뒷광고(협찬을 숨긴 리뷰) / E 리뷰 이벤트(리뷰를 쓰면 혜택을 주는 이벤트)
-  reason        String     @db.Char(1)
+  reason        String        @db.Char(1)
   /// 운영자가 확인한 근거 — 신고 내용, 리뷰 id, 매장 안내문 사진 등 요약
-  evidence      String?    @db.VarChar(500)
+  evidence      String?       @db.VarChar(500)
   /// 계기가 된 신고 (있을 때)
-  reportId      BigInt?    @map("report_id")
+  reportId      BigInt?       @map("report_id")
   /// 계기가 된 리뷰 — Gemini가 협찬·이벤트 문구를 찾은 리뷰 등 (있을 때)
-  reviewId      BigInt?    @map("review_id")
+  reviewId      BigInt?       @map("review_id")
   /// A 표시 중 / R 해제
-  status        String     @default("A") @db.Char(1)
-  /// 붙인 운영자 (관리자 화면이 없으면 이름이나 메일)
-  grantedBy     String     @map("granted_by") @db.VarChar(50)
-  grantedAt     DateTime   @map("granted_at")
+  status        String        @default("A") @db.Char(1)
+  /// 붙인 운영자 (관리자 화면이 없으면 이름이나 메일). 방문자 제보로 자동으로 붙으면 auto:report
+  grantedBy     String        @map("granted_by") @db.VarChar(50)
+  grantedAt     DateTime      @map("granted_at")
   /// 해제 시각 — 이벤트가 끝났거나 잘못 붙인 경우
-  releasedAt    DateTime?  @map("released_at")
-  releaseReason String?    @map("release_reason") @db.VarChar(255)
-  regDate       DateTime   @default(now()) @map("reg_date")
-  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
-  report        Report?    @relation(fields: [reportId], references: [id])
-  review        Review?    @relation(fields: [reviewId], references: [id])
+  releasedAt    DateTime?     @map("released_at")
+  releaseReason String?       @map("release_reason") @db.VarChar(255)
+  regDate       DateTime      @default(now()) @map("reg_date")
+  restaurant    Restaurant    @relation(fields: [restaurantId], references: [id])
+  report        Report?       @relation(fields: [reportId], references: [id])
+  review        Review?       @relation(fields: [reviewId], references: [id])
+  /// 이 마패를 붙게 한 방문자 사진 제보 (자동으로 붙은 경우)
+  reports       MapaeReport[]
 
   @@index([restaurantId, status], map: "restaurant_mapae_restaurant_idx")
   @@map("restaurant_mapae")
+}
+
+/// 마패 제보 (2026-11-17). 가게에서 앱 카메라로 찍은 리뷰 이벤트 안내 사진 + 그때 내 위치(가게 100m 안).
+/// 30일 안에 서로 다른 방문자 2명이 제보하면 마패를 자동으로 붙이고(restaurant_mapae.granted_by = auto:report) 제보자마다 +50P(MAPAE_REPORT)
+model MapaeReport {
+  id           BigInt           @id @default(autoincrement())
+  restaurantId BigInt           @map("restaurant_id")
+  userId       BigInt           @map("user_id")
+  /// STAR5 별점 5점 조건 / SERVICE 리뷰 쓰면 서비스 / RECEIPT 영수증 리뷰 유도 / ETC 기타
+  eventType    String           @map("event_type") @db.VarChar(10)
+  /// 안내 문구 등 (선택)
+  memo         String?          @db.VarChar(200)
+  /// 안내문 사진 스토리지 key (private, mapae/ 폴더)
+  photoKey     String           @map("photo_key") @db.VarChar(255)
+  lat          Decimal          @db.Decimal(10, 7)
+  lng          Decimal          @db.Decimal(10, 7)
+  /// 제보한 자리와 가게 사이 거리 (m)
+  distanceM    Int              @map("distance_m")
+  /// 제보할 때 이 가게 방문 인증 기록이 있었는지
+  hasVisit     Boolean          @map("has_visit")
+  /// P 대기 / C 확정(마패에 반영) / R 반려
+  status       String           @default("P") @db.Char(1)
+  /// 확정되어 붙은 마패
+  mapaeId      BigInt?          @map("mapae_id")
+  regDate      DateTime         @default(now()) @map("reg_date")
+  restaurant   Restaurant       @relation(fields: [restaurantId], references: [id])
+  user         Member           @relation(fields: [userId], references: [id])
+  mapae        RestaurantMapae? @relation(fields: [mapaeId], references: [id])
+
+  @@index([restaurantId, status, regDate], map: "mapae_report_restaurant_idx")
+  @@index([userId, regDate], map: "mapae_report_user_idx")
+  @@map("mapae_report")
 }
 
 model RestaurantStat {
@@ -1118,22 +1155,29 @@ model PolicyDocument {
 
 /// 고객센터 1:1 문의. 답변이 달리면 앱 알림(notification INQUIRY_ANSWER)으로만 알린다 (이메일은 받지 않는다)
 model Inquiry {
-  id         BigInt    @id @default(autoincrement())
-  userId     BigInt    @map("user_id")
-  /// VISIT 방문 인증 / ACCOUNT 계정 / REPORT 신고 / ETC 기타
-  category   String    @db.VarChar(20)
-  content    String    @db.VarChar(1000)
+  id              BigInt      @id @default(autoincrement())
+  userId          BigInt      @map("user_id")
+  /// VISIT 방문 인증 / ACCOUNT 계정 / REPORT 신고 / ETC 기타 / MAPAE 사장님 마패 이의제기
+  category        String      @db.VarChar(20)
+  content         String      @db.VarChar(1000)
   /// 방문 인증(영수증·현장) 문제일 때 해당 인증
-  refVisitId BigInt?   @map("ref_visit_id")
+  refVisitId      BigInt?     @map("ref_visit_id")
   /// 첨부 사진 스토리지 key (선택)
-  imageKey   String?   @map("image_key") @db.VarChar(255)
+  imageKey        String?     @map("image_key") @db.VarChar(255)
+  /// 마패 이의제기(MAPAE)의 대상 가게
+  refRestaurantId BigInt?     @map("ref_restaurant_id")
+  /// 마패 이의제기: 가게와의 관계 OWNER 대표자 / MANAGER 매장 관리자
+  ownerRelation   String?     @map("owner_relation") @db.VarChar(10)
+  /// 마패 이의제기 사유: ENDED 이벤트 종료 / NEVER 이벤트를 한 적 없음 / ETC 기타
+  objectionReason String?     @map("objection_reason") @db.VarChar(10)
   /// W 대기 / D 답변 완료
-  status     String    @default("W") @db.Char(1)
-  answer     String?   @db.VarChar(1000)
-  answeredAt DateTime? @map("answered_at")
-  regDate    DateTime  @default(now()) @map("reg_date")
-  user       Member    @relation(fields: [userId], references: [id])
-  refVisit   Visit?    @relation(fields: [refVisitId], references: [id])
+  status          String      @default("W") @db.Char(1)
+  answer          String?     @db.VarChar(1000)
+  answeredAt      DateTime?   @map("answered_at")
+  regDate         DateTime    @default(now()) @map("reg_date")
+  user            Member      @relation(fields: [userId], references: [id])
+  refVisit        Visit?      @relation(fields: [refVisitId], references: [id])
+  refRestaurant   Restaurant? @relation(fields: [refRestaurantId], references: [id])
 
   @@index([userId, regDate], map: "inquiry_user_idx")
   @@map("inquiry")

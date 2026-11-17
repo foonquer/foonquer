@@ -56,6 +56,9 @@ import { SearchPage } from './pages/search/SearchPage';
 import { NoticesPage } from './pages/support/NoticesPage';
 import { NotificationsPage } from './pages/support/NotificationsPage';
 import { SupportPage } from './pages/support/SupportPage';
+import { MapaeObjectionPage } from './pages/mapae/MapaeObjectionPage';
+import { MapaeReportPage } from './pages/mapae/MapaeReportPage';
+import { MapaeReportStatusPage } from './pages/mapae/MapaeReportStatusPage';
 import { TermsViewPage } from './pages/support/TermsViewPage';
 import { FollowPage } from './pages/visit/FollowPage';
 import { OnSitePage } from './pages/visit/OnSitePage';
@@ -114,6 +117,9 @@ export const routes: RouteObject[] = [
           },
           { path: '/search', element: <SearchPage /> }, // ?keyword= | ?categoryId=&category=
           { path: '/restaurants/:restaurantId', element: <RestaurantDetailPage /> },
+          { path: '/restaurants/:restaurantId/mapae-report', element: <MapaeReportPage /> },
+          { path: '/restaurants/:restaurantId/mapae-objection', element: <MapaeObjectionPage /> },
+          { path: '/mapae-reports/:reportId', element: <MapaeReportStatusPage /> },
           { path: '/recommendations/list', element: <RecommendationListPage /> }, // ?type=
           { path: '/me/profile', element: <ProfileEditPage /> },
           { path: '/me/settings', element: <SettingsPage /> },

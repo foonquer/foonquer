@@ -36,6 +36,24 @@ export const termsQuery = z.object({ version: z.string().max(20).optional() });
 
 const STATUS_API: Record<string, string> = { W: 'WAITING', D: 'ANSWERED' };
 
+/** 사장님 마패 이의제기(category MAPAE)의 대상 가게·관계·사유. 다른 문의면 null */
+export function mapaeObjectionOf(i: {
+  ownerRelation: string | null;
+  objectionReason: string | null;
+  refRestaurant: { id: bigint; name: string } | null;
+}) {
+  if (!i.ownerRelation || !i.objectionReason) return null;
+  return {
+    restaurant: i.refRestaurant
+      ? { restaurantId: i.refRestaurant.id, name: i.refRestaurant.name }
+      : null,
+    relation: i.ownerRelation,
+    reason: i.objectionReason,
+  };
+}
+
+const refRestaurantSelect = { refRestaurant: { select: { id: true, name: true } } } as const;
+
 /** CS-01 공지사항 목록 (필독 고정 먼저, 최신순) */
 export async function listNotices(query: z.infer<typeof noticeListQuery>) {
   const where = { status: 'A' };
@@ -122,6 +140,7 @@ export async function listMyInquiries(userId: bigint, query: z.infer<typeof inqu
       orderBy: { id: 'desc' },
       skip: (query.page - 1) * query.size,
       take: query.size,
+      include: refRestaurantSelect,
     }),
     prisma.inquiry.count({ where }),
   ]);
@@ -129,6 +148,7 @@ export async function listMyInquiries(userId: bigint, query: z.infer<typeof inqu
     inquiryId: i.id,
     category: i.category,
     contentPreview: i.content.slice(0, 50),
+    mapaeObjection: mapaeObjectionOf(i),
     status: STATUS_API[i.status] ?? i.status,
     regDate: toKstIso(i.regDate),
     answeredAt: toKstIsoOrNull(i.answeredAt),
@@ -144,6 +164,7 @@ export async function getInquiry(userId: bigint, inquiryId: number) {
       refVisit: {
         select: { id: true, status: true, regDate: true, restaurant: { select: { name: true } } },
       },
+      ...refRestaurantSelect,
     },
   });
   if (!i || i.userId !== userId) throw new AppError(SupportError.INQUIRY_NOT_FOUND);
@@ -159,6 +180,7 @@ export async function getInquiry(userId: bigint, inquiryId: number) {
           regDate: toKstIso(i.refVisit.regDate),
         }
       : null,
+    mapaeObjection: mapaeObjectionOf(i),
     status: STATUS_API[i.status] ?? i.status,
     answer: i.answer,
     answeredAt: toKstIsoOrNull(i.answeredAt),

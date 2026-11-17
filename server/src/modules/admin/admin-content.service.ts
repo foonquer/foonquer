@@ -6,6 +6,7 @@ import { prisma } from '../../lib/prisma';
 import { createReadUrl } from '../../lib/storage';
 import { notify } from '../notification/notify';
 import { SupportError } from '../support/support.errors';
+import { mapaeObjectionOf } from '../support/support.service';
 import { AdminError } from './admin.errors';
 import type {
   AdminFaqListQuery,
@@ -38,10 +39,22 @@ export async function listInquiries(query: InquiryListQuery) {
       orderBy: { id: 'asc' },
       skip: (query.page - 1) * query.size,
       take: query.size,
-      include: { user: { select: { id: true, nickname: true } } },
+      include: {
+        user: { select: { id: true, nickname: true } },
+        refRestaurant: { select: { id: true, name: true } },
+      },
     }),
     prisma.inquiry.count({ where }),
   ]);
+  // 사장님 마패 이의제기면 그 가게에 지금 붙어 있는 마패 (관리자가 바로 해제할 수 있게)
+  const objected = rows.flatMap((i) => (i.refRestaurantId ? [i.refRestaurantId] : []));
+  const activeMapaes = objected.length
+    ? await prisma.restaurantMapae.findMany({
+        where: { restaurantId: { in: objected }, status: 'A' },
+        select: { id: true, restaurantId: true },
+      })
+    : [];
+  const activeMapaeOf = new Map(activeMapaes.map((m) => [m.restaurantId.toString(), m.id]));
   const items = await Promise.all(
     rows.map(async (i) => ({
       inquiryId: i.id,
@@ -49,6 +62,11 @@ export async function listInquiries(query: InquiryListQuery) {
       content: i.content,
       imageUrl: await createReadUrl(i.imageKey, 600),
       refVisitId: i.refVisitId,
+      mapaeObjection: mapaeObjectionOf(i),
+      /** 이의제기한 가게에 지금 붙어 있는 마패 (ADMIN-07로 해제) */
+      activeMapaeId: i.refRestaurantId
+        ? (activeMapaeOf.get(i.refRestaurantId.toString()) ?? null)
+        : null,
       user: { userId: i.user.id, nickname: i.user.nickname },
       status: i.status === 'W' ? 'WAITING' : 'ANSWERED',
       answer: i.answer,
