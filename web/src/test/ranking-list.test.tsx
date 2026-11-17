@@ -261,6 +261,11 @@ describe('랭킹/현황', () => {
     expect(outlines).toHaveLength(25);
     expect(board.querySelectorAll('path[data-selected="true"]')).toHaveLength(1);
     expect(outlines[24]).toHaveAttribute('data-selected', 'true');
+    // 지도를 확대하면 지도만 커지고(1.5배), 축소 버튼으로 돌아온다
+    fireEvent.click(screen.getByRole('button', { name: '지도 확대' }));
+    expect(board.firstElementChild).toHaveStyle({ width: '150%' });
+    fireEvent.click(screen.getByRole('button', { name: '지도 원래 크기로' }));
+    expect(board.firstElementChild).toHaveStyle({ width: '100%' });
     fireEvent.click(screen.getByRole('button', { name: '마포구' }));
     expect(screen.getByRole('region', { name: '마포구의 먹짱' })).toHaveTextContent(
       '아직 먹짱이 없어요',

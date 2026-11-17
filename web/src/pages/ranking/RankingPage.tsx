@@ -20,6 +20,7 @@ import { useBoxSize } from '../../lib/useBoxSize';
 import { wearingOf } from '../../lib/wearing';
 import { HAN_RIVER, SEOUL_DISTRICTS, SEOUL_VIEWBOX } from '../../data/seoulDistricts';
 import { placeLabels, textWidth } from './mapLabels';
+import { useZoomPan, ZOOM_MAX, ZOOM_MIN } from './useZoomPan';
 import styles from './Ranking.module.css';
 
 type Tab = 'status' | 'rank';
@@ -252,7 +253,7 @@ function RankTab({
     <div className={styles.content}>
       <div className={styles.toolbar}>
         <SeasonSelect season={data.season} onChange={onSeason} />
-        <span className={styles.hint}>먹깨비를 누르면 그 구의 먹짱을 보여 줘요</span>
+        <span className={styles.hint}>먹깨비를 누르면 먹짱 프로필 · 두 손가락으로 확대</span>
       </div>
       <MukjjangMap
         seasonName={data.season.name}
@@ -284,9 +285,12 @@ function MukjjangMap({
 }) {
   const board = useRef<HTMLDivElement>(null);
   const size = useBoxSize(board, BOARD_FALLBACK);
+  const { view, zoomIn, zoomOut, reset, handlers } = useZoomPan(size);
+  // 확대하면 지도(구 자리)만 커지고 먹깨비·이름표 크기는 그대로라 자리가 넓어진다
+  const content = { width: size.width * view.zoom, height: size.height * view.zoom };
   const at = (g: MukjjangSigungu) => {
     const f = fraction(g);
-    return { x: f.x * size.width, y: f.y * size.height };
+    return { x: f.x * content.width, y: f.y * content.height };
   };
   const nickOf = (g: MukjjangSigungu) => g.mukjjang?.nickname ?? '탐험가';
   // 고른 구 → 나 → 정복을 많이 한 먹짱 순서로 이름표 자리를 준다
@@ -315,7 +319,7 @@ function MukjjangMap({
         const w = textWidth(g.name, 10) + 4;
         return { x: p.x - w / 2, y: p.y - 7, w, h: 14 };
       }),
-    size,
+    content,
     AVATAR,
     selected?.sigunguId ?? null,
   );
@@ -326,73 +330,106 @@ function MukjjangMap({
       className={styles.board}
       role="group"
       aria-label={`${seasonName} 구별 먹짱 지도`}
+      {...handlers}
     >
-      <svg
-        className={styles.seoul}
-        viewBox={`0 0 ${SEOUL_VIEWBOX.width} ${SEOUL_VIEWBOX.height}`}
-        // 이름표(position)와 같은 좌표계: 판의 안쪽 여백만큼 줄인 상자 (svg는 너비를 안 주면 판 전체 너비가 된다)
+      <div
+        className={styles.zoomLayer}
         style={{
-          left: `${INSET}%`,
-          top: `${INSET}%`,
-          width: `${100 - INSET * 2}%`,
-          height: `${100 - INSET * 2}%`,
+          width: `${view.zoom * 100}%`,
+          height: `${view.zoom * 100}%`,
+          transform: `translate(${view.x}px, ${view.y}px)`,
         }}
-        aria-hidden="true"
       >
-        {/* 고른 구는 테두리가 가려지지 않게 맨 위에 그린다 */}
-        {[...SEOUL_DISTRICTS]
-          .sort((a, b) => Number(a.name === selected?.name) - Number(b.name === selected?.name))
-          .map((d) => {
-            const g = items.find((i) => i.name === d.name);
+        <svg
+          className={styles.seoul}
+          viewBox={`0 0 ${SEOUL_VIEWBOX.width} ${SEOUL_VIEWBOX.height}`}
+          // 이름표(position)와 같은 좌표계: 판의 안쪽 여백만큼 줄인 상자 (svg는 너비를 안 주면 판 전체 너비가 된다)
+          style={{
+            left: `${INSET}%`,
+            top: `${INSET}%`,
+            width: `${100 - INSET * 2}%`,
+            height: `${100 - INSET * 2}%`,
+          }}
+          aria-hidden="true"
+        >
+          {/* 고른 구는 테두리가 가려지지 않게 맨 위에 그린다 */}
+          {[...SEOUL_DISTRICTS]
+            .sort((a, b) => Number(a.name === selected?.name) - Number(b.name === selected?.name))
+            .map((d) => {
+              const g = items.find((i) => i.name === d.name);
+              return (
+                <path
+                  key={d.name}
+                  d={d.d}
+                  fill={d.fill}
+                  data-selected={g !== undefined && g.sigunguId === selected?.sigunguId}
+                  onClick={g ? () => onPick(g.sigunguId) : undefined}
+                />
+              );
+            })}
+          <path d={HAN_RIVER} className={styles.han} />
+        </svg>
+        {items.map((g) => {
+          const isSelected = g.sigunguId === selected?.sigunguId;
+          if (!g.mukjjang) {
             return (
-              <path
-                key={d.name}
-                d={d.d}
-                fill={d.fill}
-                data-selected={g !== undefined && g.sigunguId === selected?.sigunguId}
-                onClick={g ? () => onPick(g.sigunguId) : undefined}
-              />
+              <button
+                key={g.sigunguId}
+                type="button"
+                className={`${styles.marker} ${styles.dot}`}
+                style={position(g)}
+                aria-pressed={isSelected}
+                onClick={() => onPick(g.sigunguId)}
+              >
+                {g.name}
+              </button>
             );
-          })}
-        <path d={HAN_RIVER} className={styles.han} />
-      </svg>
-      {items.map((g) => {
-        const isSelected = g.sigunguId === selected?.sigunguId;
-        if (!g.mukjjang) {
+          }
+          const side = sides.get(g.sigunguId) ?? null;
           return (
             <button
               key={g.sigunguId}
               type="button"
-              className={`${styles.marker} ${styles.dot}`}
+              className={styles.marker}
               style={position(g)}
               aria-pressed={isSelected}
+              aria-label={`${g.name}의 먹짱 ${nickOf(g)}`}
               onClick={() => onPick(g.sigunguId)}
             >
-              {g.name}
+              <img src={g.mukjjang.profileImageUrl ?? mukkaebi} alt="" />
+              {side && (
+                <span className={styles.markerLabel} data-side={side}>
+                  <small>{g.name}</small>
+                  {nickOf(g)}
+                </span>
+              )}
             </button>
           );
-        }
-        const side = sides.get(g.sigunguId) ?? null;
-        return (
-          <button
-            key={g.sigunguId}
-            type="button"
-            className={styles.marker}
-            style={position(g)}
-            aria-pressed={isSelected}
-            aria-label={`${g.name}의 먹짱 ${nickOf(g)}`}
-            onClick={() => onPick(g.sigunguId)}
-          >
-            <img src={g.mukjjang.profileImageUrl ?? mukkaebi} alt="" />
-            {side && (
-              <span className={styles.markerLabel} data-side={side}>
-                <small>{g.name}</small>
-                {nickOf(g)}
-              </span>
-            )}
+        })}
+      </div>
+      <div className={styles.zoomButtons}>
+        <button
+          type="button"
+          aria-label="지도 확대"
+          onClick={zoomIn}
+          disabled={view.zoom >= ZOOM_MAX}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          aria-label="지도 축소"
+          onClick={zoomOut}
+          disabled={view.zoom <= ZOOM_MIN}
+        >
+          −
+        </button>
+        {view.zoom > ZOOM_MIN && (
+          <button type="button" aria-label="지도 원래 크기로" onClick={reset} data-wide="true">
+            전체
           </button>
-        );
-      })}
+        )}
+      </div>
     </div>
   );
 }

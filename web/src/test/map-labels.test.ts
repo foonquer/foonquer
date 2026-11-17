@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { avatarBox, labelBox, placeLabels, type MapMarker } from '../pages/ranking/mapLabels';
+import { clampView, zoomAround } from '../pages/ranking/useZoomPan';
 
 const board = { width: 346, height: 284 };
 const marker = (id: number, x: number, y: number, w = 70): MapMarker => ({
@@ -54,5 +55,22 @@ describe('먹짱 지도 이름표 자리 (placeLabels)', () => {
       null,
     );
     expect(sides.get(1)).not.toBe('below');
+  });
+});
+
+describe('먹짱 지도 확대·이동 (zoomAround · clampView)', () => {
+  const size = { width: 300, height: 240 };
+  it('가운데를 기준으로 확대하면 가운데 점이 그 자리에 있다', () => {
+    const v = zoomAround({ zoom: 1, x: 0, y: 0 }, 2, { x: 150, y: 120 }, size);
+    expect(v).toEqual({ zoom: 2, x: -150, y: -120 });
+  });
+  it('1~3배까지만, 지도 밖 빈틈이 보이게 옮기지는 않는다', () => {
+    expect(zoomAround({ zoom: 2, x: 0, y: 0 }, 9, { x: 0, y: 0 }, size).zoom).toBe(3);
+    expect(zoomAround({ zoom: 2, x: 0, y: 0 }, 0.2, { x: 0, y: 0 }, size)).toEqual({
+      zoom: 1,
+      x: 0,
+      y: 0,
+    });
+    expect(clampView({ zoom: 2, x: 50, y: -500 }, size)).toEqual({ zoom: 2, x: 0, y: -240 });
   });
 });
