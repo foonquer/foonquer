@@ -13,7 +13,7 @@ import { EmptyState, Loading } from '../../components/StateViews';
 import { TasteCriteriaSheet } from '../../components/TasteSheets';
 import { useToast } from '../../components/Toast';
 import { ApiError, errorMessage } from '../../lib/api';
-import { formatDistance, formatScore, joinDot, noRatingText } from '../../lib/format';
+import { formatDistance, formatScore, joinDot, MIN_REVIEWS_FOR_RATING } from '../../lib/format';
 import { eunNeun } from '../../lib/korean';
 import { scoreBand, tasteCriterion } from '../../lib/taste';
 import { useAsync } from '../../lib/useAsync';
@@ -179,25 +179,29 @@ function Detail({
           <h2 className={styles.name}>{r.name}</h2>
           <ConquestBadge state={r.my.conquestState} size="md" />
         </div>
-        <div className={styles.ratingRow}>
-          <p className={styles.rating}>
-            {score ? (
-              <>
-                <StarIcon /> {score}
-                <span className={styles.tasteLabel}>맛 별점</span>
-                <span className={styles.gap} />
-                <span className={styles.reviewCount}>인증 평가 {r.rating.reviewCount}</span>
-              </>
-            ) : (
-              noRatingText(r.rating.reviewCount)
-            )}
-          </p>
-          {r.my.conquestState === 'CONQUERED' && myScore && (
-            <p className={styles.myScore}>
-              내 평가 <StarIcon /> {myScore}
+        {score ? (
+          <div className={styles.ratingRow}>
+            {/* 맛 별점을 크게 (피그마 상세 v2: 숫자 9개 → 맛 별점 한 줄) */}
+            <p className={styles.rating}>
+              <span className={styles.bigStar}>
+                <StarIcon />
+              </span>
+              <span className={styles.bigScore}>{score}</span>
+              <span className={styles.tasteLabel}>맛 별점</span>
+              <span className={styles.reviewCount}>인증 평가 {r.rating.reviewCount}</span>
             </p>
-          )}
-        </div>
+            {r.my.conquestState === 'CONQUERED' && myScore && (
+              <p className={styles.myScore}>
+                내 평가 <StarIcon /> {myScore}
+              </p>
+            )}
+          </div>
+        ) : (
+          <CollectingCard
+            reviewCount={r.rating.reviewCount}
+            firstConquest={r.my.conquestState !== 'CONQUERED' && !r.my.conqueredInPastSeason}
+          />
+        )}
         {r.rating.score !== null && (
           <button type="button" className={styles.criteria} onClick={() => setCriteriaOpen(true)}>
             <span className={styles.band}>{scoreBand(r.rating.score)}</span>
@@ -296,5 +300,48 @@ function Detail({
         }
       />
     </Screen>
+  );
+}
+
+/**
+ * 리뷰 5개 전: 별점 숫자는 숨기고 모이는 중인 것을 보여 준다 (피그마 상세 v3 "별점 모이는 중").
+ * 평가가 적을 때는 한두 명의 점수에 크게 흔들려서 숫자를 보여 주지 않는다
+ */
+function CollectingCard({
+  reviewCount,
+  firstConquest,
+}: {
+  reviewCount: number;
+  firstConquest: boolean;
+}) {
+  const count = Math.min(reviewCount, MIN_REVIEWS_FOR_RATING);
+  const left = MIN_REVIEWS_FOR_RATING - count;
+  return (
+    <section className={styles.collecting} aria-label="별점이 모이는 중">
+      <p className={styles.collectingTitle}>
+        <StarIcon /> 별점이 모이는 중이에요
+      </p>
+      <div className={styles.collectingBar}>
+        <span
+          role="progressbar"
+          aria-label="인증 평가"
+          aria-valuemin={0}
+          aria-valuemax={MIN_REVIEWS_FOR_RATING}
+          aria-valuenow={count}
+        >
+          <span style={{ width: `${(count / MIN_REVIEWS_FOR_RATING) * 100}%` }} />
+        </span>
+        <strong>
+          인증 평가 {count} / {MIN_REVIEWS_FOR_RATING}
+        </strong>
+      </div>
+      <p className={styles.collectingText}>
+        {left}명만 더 평가하면 신뢰 별점이 공개돼요. 평가가 적을 때는 한두 명의 점수에 크게 흔들려서
+        아직 숫자를 보여 주지 않아요.
+      </p>
+      {firstConquest && (
+        <p className={styles.collectingReward}>🎁 지금 정복하면 새 가게 첫 정복 보상 +100P</p>
+      )}
+    </section>
   );
 }

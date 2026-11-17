@@ -77,6 +77,38 @@
   display: block;
 }
 
+/* 핀 오른쪽 위에 붙는 별점 칩 (피그마 홈 v2): ★ 4.5 / 리뷰 5개 전에는 평가 3/5 */
+.pinRating {
+  position: absolute;
+  top: 12px;
+  left: calc(100% - 8px);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 7px;
+  border: 1px solid #f1d7a8;
+  border-radius: 10px;
+  background: var(--mk-white);
+  box-shadow: 0 2px 5px rgba(33, 61, 41, 0.12);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 14px;
+  color: #b66a10;
+  white-space: nowrap;
+}
+
+.pinRating svg {
+  width: 12px;
+  height: 12px;
+  fill: #f2a234;
+}
+
+.pinRating[data-collecting='true'] {
+  border-color: var(--mk-line);
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
 /* 가게 이름은 핀 아래에 붙인다 (핀 끝이 가게 좌표에 오도록 이름은 크기 계산에서 뺀다) */
 .pinLabel {
   position: absolute;

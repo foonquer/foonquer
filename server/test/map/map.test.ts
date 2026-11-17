@@ -107,6 +107,20 @@ describe('MAP-01 GET /map/restaurants — 조회·필터', () => {
     });
     expect(byName['저장']).toMatchObject({ conquestState: 'NOT_CONQUERED', isSaved: true });
     expect(byName['남이정복']).toMatchObject({ conquestState: 'NOT_CONQUERED' });
+    // 핀 옆 별점: 리뷰 5개 미만이면 숫자 없이 리뷰 수만
+    expect(byName['저장'].rating).toEqual({ score: null, reviewCount: 0 });
+    await prisma.restaurantStat.create({
+      data: { restaurantId: savedOne.id, reviewCount: 3, displayScore: 4.2 },
+    });
+    await prisma.restaurantStat.create({
+      data: { restaurantId: othersConquest.id, reviewCount: 7, displayScore: 4.4 },
+    });
+    const again = await getMap(me.id);
+    const rating = Object.fromEntries(
+      again.body.data.items.map((i: { name: string; rating: unknown }) => [i.name, i.rating]),
+    );
+    expect(rating['저장']).toEqual({ score: null, reviewCount: 3 });
+    expect(rating['남이정복']).toEqual({ score: 4.4, reviewCount: 7 });
   });
 
   it('conquestState로 정복한 곳 / 아직 정복 안 한 곳(이동 중 포함)만 볼 수 있다', async () => {
