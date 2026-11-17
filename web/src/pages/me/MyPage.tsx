@@ -11,6 +11,7 @@ import { EmptyState } from '../../components/StateViews';
 import { errorMessage } from '../../lib/api';
 import { joinDot } from '../../lib/format';
 import { useAsync } from '../../lib/useAsync';
+import { useMyLook } from '../../lib/myLook';
 import { wearingOf } from '../../lib/wearing';
 import styles from './MyPage.module.css';
 
@@ -19,7 +20,9 @@ export function MyPage() {
   const me = useAsync(getMe, []);
   const summary = useAsync(getMySummary, []).data;
   // 안 읽은 알림 수와 먹깨비 착용 아이템 (홈과 같은 HOME-01) — 못 받아도 화면은 그대로
-  const home = useAsync(getHomeSummary, []).data;
+  const homeSummary = useAsync(getHomeSummary, []);
+  const home = homeSummary.data;
+  const look = useMyLook(home?.mukkaebi);
   const record = summary?.seasonRecord;
   const first = me.data?.localRegions[0];
 
@@ -40,8 +43,9 @@ export function MyPage() {
           <Link to="/me/profile" className={styles.profile} aria-label="프로필 수정">
             <MukkaebiAvatar
               size={64}
-              stage={home?.mukkaebi.stage}
-              wearing={home ? wearingOf(home.mukkaebi) : undefined}
+              stage={look?.stage}
+              wearing={look ? wearingOf(look) : undefined}
+              pending={!look && !homeSummary.error}
             />
             <span className={styles.profileText}>
               <span className={styles.nickname}>{me.data?.nickname ?? ' '}</span>

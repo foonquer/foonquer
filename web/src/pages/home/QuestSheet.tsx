@@ -61,7 +61,7 @@ function CrewQuestTab({ data }: { data: Awaited<ReturnType<typeof getCrewQuests>
       <>
         <p className={quest.empty}>친구·가족·연인과 모임을 만들면 같이 정복하는 퀘스트를 받아요.</p>
         <div className={crew.sheetActions}>
-          <ButtonLink to="/crews/join" variant="white" size="md">
+          <ButtonLink to="/crews/join" variant="outline" size="md">
             초대 코드로 참여
           </ButtonLink>
           <ButtonLink to="/crews/new" size="md">
@@ -102,8 +102,16 @@ function CrewQuestTab({ data }: { data: Awaited<ReturnType<typeof getCrewQuests>
         </div>
       )}
       <div className={crew.sheetActions}>
-        <ButtonLink to={`/crews/${picked.crewId}`} variant="white" size="md">
+        <ButtonLink
+          to={`/crews/${picked.crewId}`}
+          variant="outline"
+          size="md"
+          className={crew.sheetWide}
+        >
           모임 공간 열기
+        </ButtonLink>
+        <ButtonLink to="/crews/join" variant="outline" size="md">
+          초대 코드로 참여
         </ButtonLink>
         <ButtonLink to="/crews/new" size="md">
           새 모임 만들기

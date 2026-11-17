@@ -5,6 +5,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { API_PREFIX } from './config';
+import { forgetMyLook } from './myLook';
 
 /** 로그인 뒤 가야 할 곳 (명세서 nextAction) */
 export type NextAction = 'HOME' | 'TERMS_REQUIRED' | 'PROFILE_REQUIRED';
@@ -67,6 +68,7 @@ export function setNextAction(nextAction: NextAction) {
 export function signOut() {
   generation += 1;
   accessToken = null;
+  forgetMyLook();
   setSession({ status: 'guest' });
 }
 

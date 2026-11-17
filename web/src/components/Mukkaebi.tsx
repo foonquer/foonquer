@@ -11,6 +11,8 @@ type Props = {
   stage?: Stage;
   /** 내 먹깨비가 입은 아이템 */
   wearing?: Wearing;
+  /** 내 먹깨비를 아직 받는 중이면 빈 동그라미 (기본 먹깨비가 잠깐 보였다가 바뀌지 않게) */
+  pending?: boolean;
   className?: string;
 };
 
@@ -18,7 +20,7 @@ type Props = {
  * 크림색 동그라미 안의 기본 먹깨비 (프로필 사진 자리).
  * 꾸미기 아이템(모자 등)은 먹깨비 담당 화면에서 이 위에 겹친다.
  */
-export function MukkaebiAvatar({ size, stage, wearing, className }: Props) {
+export function MukkaebiAvatar({ size, stage, wearing, pending, className }: Props) {
   return (
     <span
       className={`${styles.avatar} ${className ?? ''}`}
@@ -30,7 +32,7 @@ export function MukkaebiAvatar({ size, stage, wearing, className }: Props) {
         <span className={styles.figure}>
           <MukkaebiBody wearing={wearing ?? {}} stage={stage} width={size * 0.953} />
         </span>
-      ) : (
+      ) : pending ? null : (
         <img src={mukkaebi} alt="" className={styles.image} />
       )}
     </span>

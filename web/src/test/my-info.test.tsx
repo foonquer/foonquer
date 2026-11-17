@@ -50,6 +50,54 @@ describe('내 정보 (USER-04)', () => {
   });
 });
 
+describe('내 정보 먹깨비', () => {
+  const summary = {
+    mukkaebi: {
+      level: 7,
+      stage: 'BABY',
+      stageName: '아기',
+      equipped: { hat: { code: 'HAT_STRAWBERRY', name: '딸기 모자', rarity: 'R' } },
+    },
+    title: null,
+    season: null,
+    rank: { conquestCount: 0, main: null },
+    unreadNotificationCount: 0,
+    celebrationCount: 0,
+  };
+  const avatar = () =>
+    screen.getByRole('link', { name: '프로필 수정' }).querySelector('[data-figure]');
+  /** 기본 먹깨비 그림 (내 먹깨비를 모를 때) */
+  const defaultImage = () => avatar()?.querySelector(':scope[data-figure="false"] > img') ?? null;
+  /** 내 먹깨비 (단계·착용 아이템으로 그린 것) */
+  const myFigure = () => (avatar()?.getAttribute('data-figure') === 'true' ? avatar() : null);
+
+  it('받기 전에는 기본 먹깨비 대신 빈 동그라미, 다시 오면 받기 전에도 내 먹깨비', async () => {
+    let answer: (value: unknown) => void = () => {};
+    const handlers = {
+      'GET /users/me': ok(me),
+      'GET /home/summary': () =>
+        new Promise<ReturnType<typeof ok>>((resolve) => {
+          answer = () => resolve(ok(summary));
+        }),
+    };
+    mockApi(handlers);
+    const first = renderRoute('/me');
+    expect(await screen.findByText('아기깨비')).toBeInTheDocument();
+    expect(defaultImage()).toBeNull();
+    expect(myFigure()).toBeNull();
+    answer(null);
+    await waitFor(() => expect(myFigure()).not.toBeNull());
+    first.unmount();
+
+    // 탭을 오가 다시 열면 새로 받는 동안에도 마지막 내 먹깨비를 보여 준다
+    mockApi(handlers);
+    renderRoute('/me');
+    expect(await screen.findByText('아기깨비')).toBeInTheDocument();
+    expect(myFigure()).not.toBeNull();
+    expect(defaultImage()).toBeNull();
+  });
+});
+
 describe('프로필 수정 (USER-05)', () => {
   it('바꾼 값만 보내고, 닉네임은 중복 확인을 통과해야 저장할 수 있다', async () => {
     const server = mockApi({
