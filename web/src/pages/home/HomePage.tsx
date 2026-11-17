@@ -29,6 +29,7 @@ import type { Coords } from '../../lib/geolocation';
 import { SEOUL_CENTER, useViewRegion } from '../../lib/region';
 import { useAsync } from '../../lib/useAsync';
 import { useMyCoords } from '../../lib/useMyCoords';
+import { useMyLook } from '../../lib/myLook';
 import { geolocationGranted, useWatchedCoords } from '../../lib/useWatchedCoords';
 import { wearingOf } from '../../lib/wearing';
 import { NearbySheet } from './NearbySheet';
@@ -235,7 +236,7 @@ export function HomePage() {
     region?.lat && region.lng ? { lat: region.lat, lng: region.lng } : SEOUL_CENTER;
   const focused = focus && focus.regionId === region?.regionId ? focus : null;
   const center = focused?.coords ?? regionCenter;
-  const myMukkaebi = summary.data?.mukkaebi;
+  const myMukkaebi = useMyLook(summary.data?.mukkaebi);
 
   return (
     <div className={styles.page}>
@@ -245,6 +246,7 @@ export function HomePage() {
             size={54}
             stage={myMukkaebi?.stage}
             wearing={myMukkaebi ? wearingOf(myMukkaebi) : undefined}
+            pending={!myMukkaebi && !summary.error}
           />
           <div className={styles.profileText}>
             {summary.data && <span className={styles.level}>LV.{summary.data.mukkaebi.level}</span>}

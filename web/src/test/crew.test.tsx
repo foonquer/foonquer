@@ -208,6 +208,11 @@ describe('퀘스트 시트 모임 퀘스트 탭 (G1)', () => {
       'href',
       '/crews/new',
     );
+    // 모임이 있어도 다른 모임의 초대 코드로 참여할 수 있다
+    expect(within(sheet).getByRole('link', { name: '초대 코드로 참여' })).toHaveAttribute(
+      'href',
+      '/crews/join',
+    );
 
     // 혼자인 모임은 초대부터
     fireEvent.click(within(sheet).getByRole('button', { name: /민지 1/ }));
