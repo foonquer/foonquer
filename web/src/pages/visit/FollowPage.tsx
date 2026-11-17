@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router';
 import { getMyMukkaebi, type MyMukkaebi } from '../../api/mukkaebi';
 import { getVerification, type Verification } from '../../api/visits';
@@ -11,6 +11,7 @@ import { EmptyState, Loading } from '../../components/StateViews';
 import { errorMessage } from '../../lib/api';
 import { formatDate, formatWon } from '../../lib/format';
 import { useAsync } from '../../lib/useAsync';
+import { useBoxSize } from '../../lib/useBoxSize';
 import { wearingOf } from '../../lib/wearing';
 import flow from './Flow.module.css';
 import styles from './Journey.module.css';
@@ -65,30 +66,13 @@ export function FollowPage() {
   return <Journey v={v} mukkaebi={mukkaebi} />;
 }
 
-/** 화면 크기 (바뀌면 길을 다시 그린다). 잴 수 없으면 휴대폰 크기 */
-function useBoxSize(ref: RefObject<HTMLElement | null>) {
-  const [size, setSize] = useState({ width: 390, height: 800 });
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      if (width > 0 && height > 0)
-        setSize({ width: Math.round(width), height: Math.round(height) });
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [ref]);
-  return size;
-}
-
 function Journey({ v, mukkaebi }: { v: Verification; mukkaebi: MyMukkaebi | null }) {
   const navigate = useNavigate();
   const scene = useRef<HTMLDivElement>(null);
   const walker = useRef<HTMLDivElement>(null);
   const facing = useRef<HTMLDivElement>(null);
   const trail = useRef<SVGPathElement>(null);
-  const { width, height } = useBoxSize(scene);
+  const { width, height } = useBoxSize(scene, { width: 390, height: 800 });
   const route = useMemo(() => buildRoute(width, height, TOP_ROOM, BOTTOM_ROOM), [width, height]);
   const routeRef = useRef(route);
   const [arrived, setArrived] = useState(

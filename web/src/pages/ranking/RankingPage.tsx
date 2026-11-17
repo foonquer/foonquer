@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState, type RefObject } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import {
   getMukjjangMap,
@@ -6,15 +6,20 @@ import {
   type MukjjangSigungu,
   type MySigungu,
 } from '../../api/ranking';
+import { getMemberProfile } from '../../api/profile';
 import { getMe } from '../../api/users';
 import mukkaebi from '../../assets/illust/mukkaebi.svg';
+import { MukkaebiBody } from '../../components/MukkaebiFigure';
 import { Screen } from '../../components/Screen';
 import { SeasonSelect } from '../../components/SeasonSelect';
 import { EmptyState, Loading } from '../../components/StateViews';
 import { ApiError, errorMessage } from '../../lib/api';
-import { formatSeasonRange } from '../../lib/format';
+import { formatSeasonRange, joinDot } from '../../lib/format';
 import { useAsync } from '../../lib/useAsync';
+import { useBoxSize } from '../../lib/useBoxSize';
+import { wearingOf } from '../../lib/wearing';
 import { HAN_RIVER, SEOUL_DISTRICTS, SEOUL_VIEWBOX } from '../../data/seoulDistricts';
+import { placeLabels, textWidth } from './mapLabels';
 import styles from './Ranking.module.css';
 
 type Tab = 'status' | 'rank';
@@ -184,9 +189,9 @@ function StatusTab({ seasonId, onSeason }: { seasonId?: number; onSeason: (id: n
 /** 지도 판 안쪽 여백 (%) — 구 이름표가 판 밖으로 잘리지 않게 */
 const INSET = 4;
 const DISTRICT = new Map(SEOUL_DISTRICTS.map((d) => [d.name, d]));
-/** 구 모양 무게중심(피그마 지도 기준)을 판 위 위치(%)로. 모양이 없는 구는 중심 좌표로 */
+/** 구 모양 무게중심(피그마 지도 기준)을 판 위 위치(0~1)로. 모양이 없는 구는 중심 좌표로 */
 const BOX = { minLat: 37.43, maxLat: 37.7, minLng: 126.79, maxLng: 127.18 };
-const position = (g: MukjjangSigungu) => {
+const fraction = (g: MukjjangSigungu) => {
   const d = DISTRICT.get(g.name);
   const [x, y] = d
     ? [d.label[0] / SEOUL_VIEWBOX.width, d.label[1] / SEOUL_VIEWBOX.height]
@@ -194,9 +199,19 @@ const position = (g: MukjjangSigungu) => {
         ((g.centerLng ?? 126.98) - BOX.minLng) / (BOX.maxLng - BOX.minLng),
         (BOX.maxLat - (g.centerLat ?? 37.56)) / (BOX.maxLat - BOX.minLat),
       ];
-  const span = 100 - INSET * 2;
-  return { left: `${INSET + x * span}%`, top: `${INSET + y * span}%` };
+  const span = (100 - INSET * 2) / 100;
+  return { x: INSET / 100 + x * span, y: INSET / 100 + y * span };
 };
+const position = (g: MukjjangSigungu) => {
+  const f = fraction(g);
+  return { left: `${f.x * 100}%`, top: `${f.y * 100}%` };
+};
+/** 지도 위 먹깨비 지름 (px). 가장 가까운 두 구(마포·서대문, 약 29px)도 서로 겹치지 않는 크기 */
+const AVATAR = 26;
+/** 이름표 높이 (구 이름 + 닉네임 두 줄) */
+const LABEL_H = 28;
+/** 판 크기를 잴 수 없을 때 (휴대폰 너비) */
+const BOARD_FALLBACK = { width: 346, height: 284 };
 
 /** 랭킹: 구별 먹짱 지도 (RANK-06) */
 function RankTab({
@@ -212,6 +227,7 @@ function RankTab({
   // 순위가 있는 구가 없으면 내 동네 구부터 보여 준다 — 못 받아도 지도는 그대로
   const me = useAsync(getMe, []).data;
   const [picked, setPicked] = useState<number | null>(initialSigunguId);
+  const card = useRef<HTMLElement>(null);
   if (error) return <Failed error={error} onRetry={reload} />;
   if (!data) return <Loading />;
 
@@ -224,107 +240,250 @@ function RankTab({
     data.items.find((g) => g.mukjjang) ??
     data.items[0];
   const query = seasonId ? `?seasonId=${seasonId}` : '';
+  // 구를 누르면 아래 프로필 카드가 화면에 들어오게
+  const pick = (sigunguId: number) => {
+    setPicked(sigunguId);
+    requestAnimationFrame(() =>
+      card.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' }),
+    );
+  };
 
   return (
     <div className={styles.content}>
       <div className={styles.toolbar}>
         <SeasonSelect season={data.season} onChange={onSeason} />
-        <span className={styles.hint}>구를 누르면 그 구의 먹짱을 보여 줘요</span>
+        <span className={styles.hint}>먹깨비를 누르면 그 구의 먹짱을 보여 줘요</span>
       </div>
-      <div className={styles.board} role="group" aria-label={`${data.season.name} 구별 먹짱 지도`}>
-        <svg
-          className={styles.seoul}
-          viewBox={`0 0 ${SEOUL_VIEWBOX.width} ${SEOUL_VIEWBOX.height}`}
-          // 이름표(position)와 같은 좌표계: 판의 안쪽 여백만큼 줄인 상자 (svg는 너비를 안 주면 판 전체 너비가 된다)
-          style={{
-            left: `${INSET}%`,
-            top: `${INSET}%`,
-            width: `${100 - INSET * 2}%`,
-            height: `${100 - INSET * 2}%`,
-          }}
-          aria-hidden="true"
-        >
-          {/* 고른 구는 테두리가 가려지지 않게 맨 위에 그린다 */}
-          {[...SEOUL_DISTRICTS]
-            .sort((a, b) => Number(a.name === selected?.name) - Number(b.name === selected?.name))
-            .map((d) => {
-              const g = data.items.find((i) => i.name === d.name);
-              return (
-                <path
-                  key={d.name}
-                  d={d.d}
-                  fill={d.fill}
-                  data-selected={g !== undefined && g.sigunguId === selected?.sigunguId}
-                  onClick={g ? () => setPicked(g.sigunguId) : undefined}
-                />
-              );
-            })}
-          <path d={HAN_RIVER} className={styles.han} />
-        </svg>
-        {data.items.map((g) =>
-          g.mukjjang ? (
-            <button
-              key={g.sigunguId}
-              type="button"
-              className={styles.marker}
-              style={position(g)}
-              aria-pressed={g.sigunguId === selected?.sigunguId}
-              onClick={() => setPicked(g.sigunguId)}
-            >
-              <img src={g.mukjjang.profileImageUrl ?? mukkaebi} alt="" />
-              <span className={styles.markerLabel}>
-                <small>{g.name}의 먹짱</small>
-                {g.mukjjang.nickname}
-              </span>
-            </button>
-          ) : (
+      <MukjjangMap
+        seasonName={data.season.name}
+        items={data.items}
+        selected={selected}
+        onPick={pick}
+      />
+      {selected && (
+        <SelectedCard cardRef={card} g={selected} seasonName={data.season.name} query={query} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * 서울 지도 위 구별 먹짱. 먹깨비는 구 자리에 그대로, 이름표는 겹치지 않는 쪽(아래·오른쪽·왼쪽·위)에 달고
+ * 자리가 없으면 숨긴다. 고른 구는 이름표를 늘 보여 주고 맨 앞에 그린다
+ */
+function MukjjangMap({
+  seasonName,
+  items,
+  selected,
+  onPick,
+}: {
+  seasonName: string;
+  items: MukjjangSigungu[];
+  selected: MukjjangSigungu | undefined;
+  onPick: (sigunguId: number) => void;
+}) {
+  const board = useRef<HTMLDivElement>(null);
+  const size = useBoxSize(board, BOARD_FALLBACK);
+  const at = (g: MukjjangSigungu) => {
+    const f = fraction(g);
+    return { x: f.x * size.width, y: f.y * size.height };
+  };
+  const nickOf = (g: MukjjangSigungu) => g.mukjjang?.nickname ?? '탐험가';
+  // 고른 구 → 나 → 정복을 많이 한 먹짱 순서로 이름표 자리를 준다
+  const order = items
+    .filter((g) => g.mukjjang)
+    .sort(
+      (a, b) =>
+        Number(b.sigunguId === selected?.sigunguId) - Number(a.sigunguId === selected?.sigunguId) ||
+        Number(b.mukjjang?.isMe) - Number(a.mukjjang?.isMe) ||
+        (b.mukjjang?.conquestCount ?? 0) - (a.mukjjang?.conquestCount ?? 0),
+    );
+  const sides = placeLabels(
+    order.map((g) => ({
+      id: g.sigunguId,
+      ...at(g),
+      label: {
+        w: Math.ceil(Math.max(textWidth(g.name, 9), textWidth(nickOf(g), 10.5)) + 14),
+        h: LABEL_H,
+      },
+    })),
+    // 먹짱 없는 구 이름은 가리지 않는다
+    items
+      .filter((g) => !g.mukjjang)
+      .map((g) => {
+        const p = at(g);
+        const w = textWidth(g.name, 10) + 4;
+        return { x: p.x - w / 2, y: p.y - 7, w, h: 14 };
+      }),
+    size,
+    AVATAR,
+    selected?.sigunguId ?? null,
+  );
+
+  return (
+    <div
+      ref={board}
+      className={styles.board}
+      role="group"
+      aria-label={`${seasonName} 구별 먹짱 지도`}
+    >
+      <svg
+        className={styles.seoul}
+        viewBox={`0 0 ${SEOUL_VIEWBOX.width} ${SEOUL_VIEWBOX.height}`}
+        // 이름표(position)와 같은 좌표계: 판의 안쪽 여백만큼 줄인 상자 (svg는 너비를 안 주면 판 전체 너비가 된다)
+        style={{
+          left: `${INSET}%`,
+          top: `${INSET}%`,
+          width: `${100 - INSET * 2}%`,
+          height: `${100 - INSET * 2}%`,
+        }}
+        aria-hidden="true"
+      >
+        {/* 고른 구는 테두리가 가려지지 않게 맨 위에 그린다 */}
+        {[...SEOUL_DISTRICTS]
+          .sort((a, b) => Number(a.name === selected?.name) - Number(b.name === selected?.name))
+          .map((d) => {
+            const g = items.find((i) => i.name === d.name);
+            return (
+              <path
+                key={d.name}
+                d={d.d}
+                fill={d.fill}
+                data-selected={g !== undefined && g.sigunguId === selected?.sigunguId}
+                onClick={g ? () => onPick(g.sigunguId) : undefined}
+              />
+            );
+          })}
+        <path d={HAN_RIVER} className={styles.han} />
+      </svg>
+      {items.map((g) => {
+        const isSelected = g.sigunguId === selected?.sigunguId;
+        if (!g.mukjjang) {
+          return (
             <button
               key={g.sigunguId}
               type="button"
               className={`${styles.marker} ${styles.dot}`}
               style={position(g)}
-              aria-pressed={g.sigunguId === selected?.sigunguId}
-              onClick={() => setPicked(g.sigunguId)}
+              aria-pressed={isSelected}
+              onClick={() => onPick(g.sigunguId)}
             >
               {g.name}
             </button>
-          ),
-        )}
-      </div>
-
-      {selected && (
-        <section className={styles.selected} aria-label={`${selected.name}의 먹짱`}>
-          <p className={styles.selectedHead}>
-            {selected.name}의 먹짱 · {data.season.name}
-          </p>
-          <p className={styles.selectedRow}>
-            <span className={styles.selectedName}>
-              {selected.mukjjang ? (
-                <Link to={`/users/${selected.mukjjang.userId}`} className={styles.profileLink}>
-                  {selected.mukjjang.nickname}
-                </Link>
-              ) : (
-                '아직 먹짱이 없어요'
-              )}
-            </span>
-            {selected.mukjjang && (
-              <span className={styles.selectedCount}>{selected.mukjjang.conquestCount}곳 정복</span>
+          );
+        }
+        const side = sides.get(g.sigunguId) ?? null;
+        return (
+          <button
+            key={g.sigunguId}
+            type="button"
+            className={styles.marker}
+            style={position(g)}
+            aria-pressed={isSelected}
+            aria-label={`${g.name}의 먹짱 ${nickOf(g)}`}
+            onClick={() => onPick(g.sigunguId)}
+          >
+            <img src={g.mukjjang.profileImageUrl ?? mukkaebi} alt="" />
+            {side && (
+              <span className={styles.markerLabel} data-side={side}>
+                <small>{g.name}</small>
+                {nickOf(g)}
+              </span>
             )}
-          </p>
-          <p className={styles.selectedFoot}>
-            <span>
-              {selected.myRank !== null
-                ? selected.mukjjang?.isMe
-                  ? '내가 이 구의 먹짱이에요!'
-                  : `내 순위 ${selected.myRank}위 · 먹짱까지 ${selected.mukjjangGap}곳`
-                : '첫 정복으로 순위에 올라 보세요'}
-            </span>
-            <Link to={`/ranking/sigungus/${selected.sigunguId}${query}`}>
-              {selected.name} TOP 50 보기 ›
-            </Link>
-          </p>
-        </section>
-      )}
+          </button>
+        );
+      })}
     </div>
+  );
+}
+
+/** 고른 구의 먹짱 카드: 먹깨비·닉네임·칭호·레벨·신뢰 온도·소개, 내 순위와 TOP 50 */
+function SelectedCard({
+  cardRef,
+  g,
+  seasonName,
+  query,
+}: {
+  cardRef: RefObject<HTMLElement | null>;
+  g: MukjjangSigungu;
+  seasonName: string;
+  query: string;
+}) {
+  const userId = g.mukjjang?.userId;
+  // 먹짱 프로필 (PROFILE-01). 못 받아도 지도에서 받은 이름·정복 수는 그대로 보여 준다
+  const profile = useAsync(
+    () => (userId ? getMemberProfile(userId) : Promise.resolve(null)),
+    [userId],
+  ).data;
+  const m = g.mukjjang;
+  const p = profile && profile.userId === userId ? profile : null;
+  return (
+    <section ref={cardRef} className={styles.selected} aria-label={`${g.name}의 먹짱`}>
+      <p className={styles.selectedHead}>
+        {g.name}의 먹짱 · {seasonName}
+      </p>
+      {m ? (
+        <div className={styles.profileRow}>
+          <Link
+            to={`/users/${m.userId}`}
+            className={styles.profileFigure}
+            aria-hidden="true"
+            tabIndex={-1}
+          >
+            {p ? (
+              <MukkaebiBody wearing={wearingOf(p.mukkaebi)} stage={p.mukkaebi.stage} width={52} />
+            ) : (
+              <img src={m.profileImageUrl ?? mukkaebi} alt="" />
+            )}
+          </Link>
+          <div className={styles.profileText}>
+            <p className={styles.selectedRow}>
+              <Link
+                to={`/users/${m.userId}`}
+                className={`${styles.selectedName} ${styles.profileLink}`}
+              >
+                {m.nickname ?? '탐험가'}
+              </Link>
+              <span className={styles.selectedCount}>{m.conquestCount}곳 정복</span>
+            </p>
+            <p className={styles.profileMeta}>
+              {joinDot([
+                p?.title,
+                `LV.${p?.mukkaebi.level ?? m.level}`,
+                p && `신뢰 온도 ${p.trustTemp.toFixed(1)}°`,
+                p?.homeRegion,
+              ])}
+            </p>
+            {p?.bio && <p className={styles.profileBio}>{p.bio}</p>}
+            {p && (
+              <p className={styles.profileStats}>
+                {joinDot([
+                  `누적 정복 ${p.totalConquestCount}곳`,
+                  `받은 도움돼요 ${p.helpfulReceived.toLocaleString('ko-KR')}`,
+                  p.counts.picks > 0 && `PICK ${p.counts.picks}곳`,
+                ])}
+              </p>
+            )}
+            <Link to={`/users/${m.userId}`} className={styles.profileMore}>
+              프로필 보기 ›
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <p className={styles.selectedRow}>
+          <span className={styles.selectedName}>아직 먹짱이 없어요</span>
+        </p>
+      )}
+      <p className={styles.selectedFoot}>
+        <span>
+          {g.myRank !== null
+            ? m?.isMe
+              ? '내가 이 구의 먹짱이에요!'
+              : `내 순위 ${g.myRank}위 · 먹짱까지 ${g.mukjjangGap}곳`
+            : '첫 정복으로 순위에 올라 보세요'}
+        </span>
+        <Link to={`/ranking/sigungus/${g.sigunguId}${query}`}>{g.name} TOP 50 보기 ›</Link>
+      </p>
+    </section>
   );
 }
