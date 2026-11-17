@@ -176,6 +176,23 @@ describe('랭킹/현황', () => {
           },
         ],
       }),
+      'GET /users/:id/profile': ok({
+        userId: 9,
+        nickname: '동네미식가',
+        profileImageUrl: null,
+        bio: '칼국수 맛집만 찾아다녀요',
+        trustTemp: 62.3,
+        title: '강서구 미식가',
+        homeRegion: '강서구 가양동',
+        mukkaebi: {
+          level: 7,
+          stage: 'BABY',
+          equipped: { hat: null, face: null, prop: null, skin: null, club: null },
+        },
+        totalConquestCount: 40,
+        helpfulReceived: 12,
+        counts: { visitedRestaurants: 40, reviews: 20, picks: 3 },
+      }),
       'GET /rankings/mukjjang-map': ok({
         season,
         level: 'SIGUNGU',
@@ -223,12 +240,32 @@ describe('랭킹/현황', () => {
     const card = await screen.findByRole('region', { name: '강서구의 먹짱' });
     expect(card).toHaveTextContent('동네미식가');
     expect(card).toHaveTextContent('내 순위 8위 · 먹짱까지 11곳');
+    // 먹짱 프로필: 칭호·레벨·신뢰 온도·사는 동네·소개·누적 기록
+    await waitFor(() =>
+      expect(card).toHaveTextContent('강서구 미식가 · LV.7 · 신뢰 온도 62.3° · 강서구 가양동'),
+    );
+    expect(card).toHaveTextContent('칼국수 맛집만 찾아다녀요');
+    expect(card).toHaveTextContent('누적 정복 40곳 · 받은 도움돼요 12 · PICK 3곳');
+    expect(within(card).getByRole('link', { name: '프로필 보기 ›' })).toHaveAttribute(
+      'href',
+      '/users/9',
+    );
+    // 지도 위 먹깨비는 이름표가 숨어도 누구인지 읽힌다
+    expect(screen.getByRole('button', { name: '강서구의 먹짱 동네미식가' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     // 서울 25개 구 경계를 그리고, 고른 구는 맨 위에 테두리를 굵게
     const board = screen.getByRole('group', { name: /구별 먹짱 지도/ });
     const outlines = board.querySelectorAll('path[data-selected]');
     expect(outlines).toHaveLength(25);
     expect(board.querySelectorAll('path[data-selected="true"]')).toHaveLength(1);
     expect(outlines[24]).toHaveAttribute('data-selected', 'true');
+    // 지도를 확대하면 지도만 커지고(1.5배), 축소 버튼으로 돌아온다
+    fireEvent.click(screen.getByRole('button', { name: '지도 확대' }));
+    expect(board.firstElementChild).toHaveStyle({ width: '150%' });
+    fireEvent.click(screen.getByRole('button', { name: '지도 원래 크기로' }));
+    expect(board.firstElementChild).toHaveStyle({ width: '100%' });
     fireEvent.click(screen.getByRole('button', { name: '마포구' }));
     expect(screen.getByRole('region', { name: '마포구의 먹짱' })).toHaveTextContent(
       '아직 먹짱이 없어요',

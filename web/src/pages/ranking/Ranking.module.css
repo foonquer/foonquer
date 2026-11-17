@@ -249,6 +249,47 @@
   border-radius: 22px;
   background: #e8efe3;
   overflow: hidden;
+  /* 지도 위에서는 손가락으로 끌고 벌려 지도를 옮기고 확대한다 (useZoomPan) */
+  touch-action: none;
+  user-select: none;
+}
+
+/* 확대하면 이 층만 커지고 옮겨진다. 먹깨비·이름표는 % 자리라 따라오고 크기는 그대로 */
+.zoomLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+.zoomButtons {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.zoomButtons button {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--mk-white);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--mk-forest);
+  box-shadow: 0 1px 4px rgba(36, 40, 36, 0.16);
+}
+
+.zoomButtons button:disabled {
+  color: var(--mk-check-off);
+}
+
+.zoomButtons button[data-wide='true'] {
+  font-size: 11px;
 }
 
 .seoul {
@@ -259,6 +300,7 @@
 .seoul path {
   stroke: var(--mk-white);
   stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
   stroke-linejoin: round;
   cursor: pointer;
 }
@@ -281,23 +323,37 @@
 
 .marker {
   position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  z-index: 2;
+  display: block;
+  width: 26px;
+  height: 26px;
   padding: 0;
   transform: translate(-50%, -50%);
 }
 
+/* 고른 구는 먹깨비와 이름표를 맨 앞에 */
+.marker[aria-pressed='true'] {
+  z-index: 4;
+}
+
 .marker img {
-  width: 34px;
-  height: 34px;
+  display: block;
+  width: 26px;
+  height: 26px;
   border: 2px solid var(--mk-white);
   border-radius: 50%;
   background: var(--mk-cream);
+  box-shadow: 0 1px 3px rgba(36, 40, 36, 0.18);
 }
 
+.marker[aria-pressed='true'] img {
+  border-color: var(--mk-forest);
+  transform: scale(1.18);
+}
+
+/* 이름표는 겹치지 않는 쪽(아래·오른쪽·왼쪽·위)에 단다 (mapLabels.ts) */
 .markerLabel {
+  position: absolute;
   padding: 2px 6px;
   border-radius: 8px;
   background: var(--mk-white);
@@ -308,6 +364,50 @@
   color: var(--mk-ink);
   white-space: nowrap;
   box-shadow: 0 1px 3px rgba(36, 40, 36, 0.12);
+}
+
+.markerLabel[data-side='below'] {
+  top: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.markerLabel[data-side='above'] {
+  bottom: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.markerLabel[data-side='right'] {
+  top: 50%;
+  left: calc(100% + 3px);
+  transform: translateY(-50%);
+}
+
+.markerLabel[data-side='left'] {
+  top: 50%;
+  right: calc(100% + 3px);
+  transform: translateY(-50%);
+}
+
+.markerLabel[data-side='belowRight'] {
+  top: calc(100% - 2px);
+  left: calc(100% - 4px);
+}
+
+.markerLabel[data-side='belowLeft'] {
+  top: calc(100% - 2px);
+  right: calc(100% - 4px);
+}
+
+.markerLabel[data-side='aboveRight'] {
+  bottom: calc(100% - 2px);
+  left: calc(100% - 4px);
+}
+
+.markerLabel[data-side='aboveLeft'] {
+  bottom: calc(100% - 2px);
+  right: calc(100% - 4px);
 }
 
 .markerLabel small {
@@ -326,12 +426,18 @@
   color: var(--mk-gold-light);
 }
 
+/* 먹짱이 없는 구: 이름만 */
 .dot {
+  z-index: 1;
+  width: auto;
+  height: auto;
   font-size: 10px;
   color: var(--mk-muted);
+  white-space: nowrap;
 }
 
 .dot[aria-pressed='true'] {
+  z-index: 4;
   font-weight: 700;
   color: var(--mk-forest);
 }
@@ -381,6 +487,68 @@
 }
 
 .selectedFoot a {
+  font-weight: 700;
+  color: var(--mk-green);
+}
+
+/* 고른 구 먹짱 프로필: 꾸민 먹깨비 · 닉네임 · 칭호·레벨·신뢰 온도 · 소개 */
+.profileRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.profileFigure {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-end;
+  justify-content: center;
+  width: 60px;
+  height: 64px;
+  padding-bottom: 4px;
+  border-radius: 18px;
+  background: var(--mk-green-50);
+  overflow: hidden;
+}
+
+.profileFigure > img {
+  width: 46px;
+  height: 46px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profileText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.profileMeta {
+  font-size: 12px;
+  color: var(--mk-muted);
+  word-break: keep-all;
+}
+
+.profileBio {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mk-ink);
+}
+
+.profileStats {
+  font-size: 11px;
+  color: var(--mk-subtle);
+}
+
+.profileMore {
+  align-self: flex-start;
+  margin-top: 2px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--mk-green);
 }
