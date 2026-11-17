@@ -338,7 +338,7 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
     expect(ok.body.data.rewards.point).toBe(30);
   });
 
-  it('음식점 리뷰 목록: 차단한 사람 제외, 작성자 신뢰 온도·칭호·로컬 표시, 별로예요 수는 없다', async () => {
+  it('음식점 리뷰 목록: 차단한 사람 제외, 작성자 칭호·로컬 표시(남의 신뢰 온도는 안 줌), 별로예요 수는 없다', async () => {
     const season = await createActiveSeason(3);
     const viewer = await createMember();
     const writer = await createMember({ nickname: '동네미식가' });
@@ -356,7 +356,8 @@ describe('REVIEW-02·03·04·06·07 세부평가와 리뷰 목록', () => {
     const [card] = res.body.data.items;
     expect(card.author).toMatchObject({
       nickname: '동네미식가',
-      trustTemp: 50.6,
+      trustTemp: null,
+      trustLevel: null,
       title: '강서구의 먹짱',
       isLocal: false,
     });

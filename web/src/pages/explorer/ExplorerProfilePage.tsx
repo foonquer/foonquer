@@ -17,6 +17,7 @@ import { MukkaebiFigure } from '../../components/MukkaebiFigure';
 import { ReviewCard } from '../../components/ReviewCard';
 import { Screen } from '../../components/Screen';
 import { EmptyState, Loading } from '../../components/StateViews';
+import { TrustBadge } from '../../components/TrustBadge';
 import { useToast } from '../../components/Toast';
 import { ApiError, errorMessage } from '../../lib/api';
 import { formatKoreanDate, formatMonthDay, formatScore, joinDot } from '../../lib/format';
@@ -143,11 +144,11 @@ function Profile({ p, onBlocked }: { p: MemberProfile; onBlocked: (blocked: bool
             {(best?.tierTitle ?? p.title) && (
               <span className={styles.titleChip}>{best?.tierTitle ?? p.title}</span>
             )}
+            <TrustBadge level={p.trustLevel} temp={p.trustTemp} />
           </div>
           <p className={styles.meta}>
             {joinDot([
               p.homeRegion,
-              `신뢰 온도 ${p.trustTemp.toFixed(1)}°`,
               best?.rank && p.currentSeason
                 ? `시즌 ${p.currentSeason.seasonNo} ${best.sigunguName} ${best.rank}위`
                 : null,

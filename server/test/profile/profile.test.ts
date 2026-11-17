@@ -59,7 +59,9 @@ describe('PROFILE·PICK·REPORT·BLOCK', () => {
     expect(res.body.data).toMatchObject({
       nickname: '동네미식가',
       bio: '강서구 토박이 10년차',
-      trustTemp: 50,
+      // 다른 사람의 신뢰 온도는 숫자를 주지 않고, 잎새(60°) 미만이면 단계도 주지 않는다
+      trustTemp: null,
+      trustLevel: null,
       title: '강서구의 먹짱',
       currentSeason: { seasonNo: 3, conquestCount: 2, best: { rank: 1, tier: 'MUKJJANG' } },
       totalConquestCount: 2,
@@ -72,6 +74,28 @@ describe('PROFILE·PICK·REPORT·BLOCK', () => {
       .get(`/api/v1/users/${explorer.id}/visited-restaurants`)
       .set('Authorization', bearer(viewer.id));
     expect(visited.body.data.totalCount).toBe(2);
+  });
+
+  it('신뢰 온도: 본인은 숫자와 단계, 다른 사람은 잎새(60°) 이상일 때 단계만', async () => {
+    await createActiveSeason(3);
+    const viewer = await createMember();
+    const leaf = await createMember({ trustTemp: 63.4 });
+    const profileOf = async (userId: bigint, by: bigint) =>
+      (await request(app).get(`/api/v1/users/${userId}/profile`).set('Authorization', bearer(by)))
+        .body.data;
+
+    expect(await profileOf(leaf.id, leaf.id)).toMatchObject({
+      trustTemp: 63.4,
+      trustLevel: 'LEAF',
+    });
+    expect(await profileOf(leaf.id, viewer.id)).toMatchObject({
+      trustTemp: null,
+      trustLevel: 'LEAF',
+    });
+    expect(await profileOf(viewer.id, viewer.id)).toMatchObject({
+      trustTemp: 50,
+      trustLevel: 'SPROUT',
+    });
   });
 
   it('다녀온 가게: 그 시즌에 정복한 구 목록(많은 순)과 구로 거르기', async () => {

@@ -12,6 +12,7 @@ import mukkaebi from '../../assets/illust/mukkaebi.svg';
 import { MukkaebiBody } from '../../components/MukkaebiFigure';
 import { Screen } from '../../components/Screen';
 import { SeasonSelect } from '../../components/SeasonSelect';
+import { TrustBadge } from '../../components/TrustBadge';
 import { EmptyState, Loading } from '../../components/StateViews';
 import { ApiError, errorMessage } from '../../lib/api';
 import { formatSeasonRange, joinDot } from '../../lib/format';
@@ -434,7 +435,7 @@ function MukjjangMap({
   );
 }
 
-/** 고른 구의 먹짱 카드: 먹깨비·닉네임·칭호·레벨·신뢰 온도·소개, 내 순위와 TOP 50 */
+/** 고른 구의 먹짱 카드: 먹깨비·닉네임·칭호·레벨·리뷰어 단계·소개, 내 순위와 TOP 50 */
 function SelectedCard({
   cardRef,
   g,
@@ -484,12 +485,8 @@ function SelectedCard({
               <span className={styles.selectedCount}>{m.conquestCount}곳 정복</span>
             </p>
             <p className={styles.profileMeta}>
-              {joinDot([
-                p?.title,
-                `LV.${p?.mukkaebi.level ?? m.level}`,
-                p && `신뢰 온도 ${p.trustTemp.toFixed(1)}°`,
-                p?.homeRegion,
-              ])}
+              {joinDot([p?.title, `LV.${p?.mukkaebi.level ?? m.level}`, p?.homeRegion])}
+              {p && <TrustBadge level={p.trustLevel} temp={p.trustTemp} />}
             </p>
             {p?.bio && <p className={styles.profileBio}>{p.bio}</p>}
             {p && (

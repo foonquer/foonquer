@@ -4,6 +4,7 @@ import type { Prisma } from '../../generated/prisma/client';
 import { publicImageUrl } from '../../lib/image-url';
 import { prisma } from '../../lib/prisma';
 import { loadTitles, titleOf } from '../ranking/title';
+import { trustViewOf } from './trust-level';
 
 /** 리뷰 카드에 필요한 관계 (REVIEW-03·04·05·10 공통) */
 export const reviewCardInclude = {
@@ -34,7 +35,7 @@ const REACTION_API: Record<string, 'HELPFUL' | 'UNHELPFUL'> = { H: 'HELPFUL', U:
 
 /**
  * 리뷰 카드 목록. 별로예요 수(unhelpful_count)는 비공개라 내려주지 않는다.
- * 작성자: 닉네임·사진·신뢰 온도·대표 칭호, 그 가게 기준 로컬 여부(visit.is_local), 인증 방식
+ * 작성자: 닉네임·사진·신뢰 온도(본인만)·리뷰어 단계·대표 칭호, 그 가게 기준 로컬 여부(visit.is_local), 인증 방식
  */
 export async function toReviewCards(rows: ReviewCardRow[], viewerId: bigint) {
   if (rows.length === 0) return [];
@@ -68,7 +69,10 @@ export async function toReviewCards(rows: ReviewCardRow[], viewerId: bigint) {
         userId: withdrawn ? null : r.user.id,
         nickname: withdrawn ? WITHDRAWN_NAME : r.user.nickname,
         profileImageUrl: withdrawn ? null : publicImageUrl(r.user.profileImageKey),
-        trustTemp: withdrawn ? null : r.user.trustTemp.toNumber(),
+        // 신뢰 온도는 본인 리뷰에만, 다른 사람은 잎새 이상일 때 리뷰어 단계만
+        ...(withdrawn
+          ? { trustTemp: null, trustLevel: null }
+          : trustViewOf(r.user.trustTemp.toNumber(), r.userId === viewerId)),
         title: withdrawn ? null : titleOf(titles, r.user.id),
         isLocal: r.visit.isLocal,
       },

@@ -1,6 +1,7 @@
 // 탐방러 프로필·내 PICK·신고·차단 API (PROFILE-01·02, PICK-01·02, REPORT-01, BLOCK-01·02)
 
 import { api } from '../lib/api';
+import type { TrustLevel } from '../lib/trustLevel';
 import type { MyMukkaebi } from './mukkaebi';
 import type { Tier } from './ranking';
 import type { Page } from './reviews';
@@ -70,7 +71,10 @@ export type MemberProfile = {
   nickname: string | null;
   profileImageUrl: string | null;
   bio: string | null;
-  trustTemp: number;
+  /** 신뢰 온도 — 내 프로필일 때만 (다른 사람은 null) */
+  trustTemp: number | null;
+  /** 리뷰어 단계 — 다른 사람은 잎새 이상일 때만 */
+  trustLevel: TrustLevel | null;
   /** 대표 칭호 */
   title: string | null;
   /** "강서구 가양동" */

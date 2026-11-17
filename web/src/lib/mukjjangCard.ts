@@ -3,6 +3,8 @@
 
 import qrcode from 'qrcode-generator';
 import mukkaebi from '../assets/illust/mukkaebi.svg?raw';
+import { joinDot } from './format';
+import { TRUST_LEVEL_NAME, type TrustLevel } from './trustLevel';
 
 export type CardTheme = 'NAVY' | 'CREAM' | 'GREEN';
 
@@ -40,7 +42,8 @@ export type CardData = {
   sigunguName: string;
   nickname: string;
   conquestCount: number;
-  trustTemp: number;
+  /** 리뷰어 단계 (공유 카드는 다른 사람이 보므로 온도 숫자 대신 단계) */
+  trustLevel: TrustLevel | null;
   /** PICK 위에서 3곳 */
   picks: { name: string; categoryName: string | null }[];
   /** QR로 여는 주소 (내 PICK) */
@@ -150,7 +153,11 @@ export function cardSvg(d: CardData, theme: CardTheme) {
     text(
       W / 2,
       752,
-      `정복 ${d.conquestCount}곳 · ${d.sigunguName} 1위 · 신뢰 온도 ${d.trustTemp.toFixed(1)}°`,
+      joinDot([
+        `정복 ${d.conquestCount}곳`,
+        `${d.sigunguName} 1위`,
+        d.trustLevel && `리뷰어 ${TRUST_LEVEL_NAME[d.trustLevel]}`,
+      ]),
       { size: 26, fill: t.sub, anchor: 'middle' },
     ),
     `<rect x="80" y="800" width="${W - 160}" height="2" fill="${t.soft}"/>`,

@@ -49,7 +49,7 @@ async function loadCard(): Promise<{ card: CardData; userId: number } | null> {
     card: {
       ...season,
       nickname: profile.nickname ?? me.nickname ?? '탐험가',
-      trustTemp: profile.trustTemp,
+      trustLevel: profile.trustLevel,
       picks: profile.picks.slice(0, 3),
       url: `${window.location.origin}/users/${me.id}?tab=pick`,
     },

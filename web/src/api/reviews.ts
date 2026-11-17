@@ -1,6 +1,7 @@
 // 별점·리뷰 API (REVIEW-01~10)
 
 import { api, type Query } from '../lib/api';
+import type { TrustLevel } from '../lib/trustLevel';
 import type { CrewTogether } from './crews';
 import type { QuestAdvance } from './quests';
 
@@ -42,7 +43,10 @@ export type Review = {
     userId: number | null;
     nickname: string | null;
     profileImageUrl: string | null;
+    /** 신뢰 온도 — 내 리뷰일 때만 (다른 사람은 null) */
     trustTemp: number | null;
+    /** 리뷰어 단계 — 다른 사람은 잎새 이상일 때만 */
+    trustLevel: TrustLevel | null;
     title: string | null;
     isLocal: boolean;
   };

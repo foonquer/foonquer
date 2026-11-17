@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { cancelReaction, reactReview, type Review } from '../api/reviews';
 import { errorMessage } from '../lib/api';
-import { formatMonthDay, formatScore, joinDot } from '../lib/format';
+import { formatMonthDay, formatScore } from '../lib/format';
 import { MukkaebiAvatar } from './Mukkaebi';
 import { useToast } from './Toast';
 import styles from './ReviewCard.module.css';
 import { StarIcon } from './StarRating';
+import { TrustBadge } from './TrustBadge';
 
 const DETAIL_LABELS = [
   ['cleanliness', '청결'],
@@ -75,10 +76,8 @@ export function ReviewCard({ review: r, showRestaurant, onChange }: Props) {
               <p className={styles.nickname}>{r.author.nickname ?? '탐방러'}</p>
             )}
             <p className={styles.authorMeta}>
-              {joinDot([
-                r.author.title,
-                r.author.trustTemp !== null ? `신뢰 온도 ${r.author.trustTemp.toFixed(1)}°` : null,
-              ])}
+              {r.author.title}
+              <TrustBadge level={r.author.trustLevel} temp={r.author.trustTemp} />
             </p>
           </div>
           <span className={styles.date}>{formatMonthDay(r.visitedAt ?? r.regDate)} 방문</span>
