@@ -254,3 +254,26 @@ describe('MapView 지도 누르기 (홈)', () => {
     expect(onMapClick).not.toHaveBeenCalled();
   });
 });
+
+describe('MapView 핀 옆 별점', () => {
+  it('리뷰 5개부터 ★ 별점, 그 전에는 평가 n/5, 리뷰가 없으면 달지 않는다', async () => {
+    fakeKakao();
+    render(
+      <MapView
+        fit
+        selectedId={null}
+        onPinClick={() => {}}
+        pins={[
+          { ...pins[0], rating: { score: 4.2, reviewCount: 12 } },
+          { ...pins[1], rating: { score: null, reviewCount: 3 } },
+          { ...pins[0], restaurantId: 3, name: '빈집', rating: { score: null, reviewCount: 0 } },
+        ]}
+      />,
+    );
+    const rated = await screen.findByRole('button', { name: '새맛집 (미정복 · 맛 4.2)' });
+    expect(rated).toHaveTextContent('4.2');
+    const collecting = screen.getByRole('button', { name: '대전식탁 (정복 완료 · 평가 3/5)' });
+    expect(collecting).toHaveTextContent('평가 3/5');
+    expect(screen.getByRole('button', { name: '빈집 (미정복)' })).not.toHaveTextContent('평가');
+  });
+});

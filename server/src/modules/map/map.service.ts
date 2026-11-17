@@ -6,6 +6,7 @@ import { type BBox, SEOUL } from '../region/seoul-regions';
 import { requireCategory } from '../restaurant/category';
 import { saveKakaoPlaceId } from '../restaurant/kakao-link';
 import { loadMyStates, myStateOf } from '../restaurant/my-state';
+import { ratingOf } from '../restaurant/restaurant-stats';
 import { normalizeStoreName, storeNameMatches } from '../visit/visit.service';
 import type { MapRestaurantsQuery, NearbyPlacesQuery } from './map.schema';
 
@@ -76,6 +77,7 @@ export async function getMapRestaurants(userId: bigint, q: MapRestaurantsQuery) 
         category: { select: { name: true } },
         lat: true,
         lng: true,
+        restaurantStat: true,
       },
     }),
     loadMyStates(userId, ids, season),
@@ -96,6 +98,8 @@ export async function getMapRestaurants(userId: bigint, q: MapRestaurantsQuery) 
       conquestState: state.conquestState,
       conqueredInPastSeason: state.conqueredInPastSeason,
       isSaved: state.isSaved,
+      // 핀 옆 별점 (리뷰 5개 미만이면 score null, reviewCount로 "평가 3/5")
+      rating: ratingOf(r.restaurantStat),
     };
   });
   return { items, totalCount: items.length, truncated };

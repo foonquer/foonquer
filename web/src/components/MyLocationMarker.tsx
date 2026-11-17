@@ -11,7 +11,7 @@ export function MyLocationMarker({ wearing, stage }: { wearing: Wearing; stage?:
   return (
     <span className={styles.marker} role="img" aria-label="내 위치 (내 먹깨비)">
       <span className={styles.figure}>
-        <MukkaebiBody wearing={wearing} stage={stage} width={64} />
+        <MukkaebiBody wearing={wearing} stage={stage} width={44} />
       </span>
       <span className={styles.shadow} />
       <span className={styles.label}>내 먹깨비</span>
@@ -20,7 +20,7 @@ export function MyLocationMarker({ wearing, stage }: { wearing: Wearing; stage?:
 }
 
 /**
- * 좌표가 가리키는 곳 = 발밑 그림자 가운데. 몸 68.6px(64 × 150/140) + 그림자 12px(위로 10px 겹침)
- * + 이름표 22px 중 그림자 가운데(64.6px)의 비율
+ * 좌표가 가리키는 곳 = 발밑 그림자 가운데. 몸 47.1px(44 × 150/140) + 그림자 9px(위로 7px 겹침, 가운데 44.6px)
+ * + 이름표 19px(위 여백 2px 포함) → 전체 68.1px 중 그림자 가운데의 비율
  */
-export const MY_LOCATION_Y_ANCHOR = 0.7;
+export const MY_LOCATION_Y_ANCHOR = 0.655;

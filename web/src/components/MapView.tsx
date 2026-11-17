@@ -10,6 +10,7 @@ import type { Bounds, MapRestaurant } from '../api/restaurants';
 import pinConquered from '../assets/illust/pin-conquered.svg';
 import pinUnconquered from '../assets/illust/pin-unconquered.svg';
 import { KAKAO_MAP_KEY } from '../lib/config';
+import { MIN_REVIEWS_FOR_RATING } from '../lib/format';
 import { metersBetween } from '../lib/geo';
 import {
   loadKakaoMaps,
@@ -19,12 +20,18 @@ import {
   type KakaoOverlay,
 } from '../lib/kakaoMaps';
 import { MY_LOCATION_Y_ANCHOR } from './MyLocationMarker';
+import { STAR_PATH } from './StarRating';
 import styles from './MapView.module.css';
 
 type LatLng = { lat: number; lng: number };
 
 /** 지도에 꽂는 핀 (가게 이름 + 정복했는지) */
-export type MapPin = Pick<MapRestaurant, 'restaurantId' | 'name' | 'lat' | 'lng' | 'conquestState'>;
+export type MapPin = Pick<
+  MapRestaurant,
+  'restaurantId' | 'name' | 'lat' | 'lng' | 'conquestState'
+> &
+  /** 있으면 핀 옆에 별점(★ 4.5) 또는 모이는 중(평가 3/5) */
+  Partial<Pick<MapRestaurant, 'rating'>>;
 
 type Props = {
   pins: MapPin[];
@@ -115,15 +122,44 @@ function setWalking(el: HTMLElement, walking: boolean) {
   el.dataset.walking = String(walking);
 }
 
-/** 핀 하나 (그림 + 가게 이름). 카카오 지도 오버레이와 간단한 지도가 같이 쓴다 */
+/**
+ * 핀 옆 별점 칩: 리뷰 5개부터 "★ 4.5", 그 전에는 "평가 3/5"(모이는 중). 리뷰가 없으면 달지 않는다
+ */
+function ratingChip(rating: MapPin['rating']) {
+  if (!rating || (rating.score === null && rating.reviewCount === 0)) return null;
+  const chip = document.createElement('span');
+  chip.className = styles.pinRating;
+  if (rating.score === null) {
+    chip.dataset.collecting = 'true';
+    chip.textContent = `평가 ${Math.min(rating.reviewCount, MIN_REVIEWS_FOR_RATING)}/${MIN_REVIEWS_FOR_RATING}`;
+    return chip;
+  }
+  const star = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  star.setAttribute('viewBox', '0 0 24 24');
+  star.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', STAR_PATH);
+  star.append(path);
+  chip.append(star, ` ${rating.score.toFixed(1)}`);
+  return chip;
+}
+
+/** 핀 하나 (그림 + 가게 이름 + 별점). 카카오 지도 오버레이와 간단한 지도가 같이 쓴다 */
 function pinElement(pin: MapPin, selected: boolean, onClick: () => void) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = styles.pin;
   button.dataset.selected = String(selected);
+  const rating = pin.rating;
+  const ratingText =
+    rating?.score != null
+      ? ` · 맛 ${rating.score.toFixed(1)}`
+      : rating?.reviewCount
+        ? ` · 평가 ${Math.min(rating.reviewCount, MIN_REVIEWS_FOR_RATING)}/${MIN_REVIEWS_FOR_RATING}`
+        : '';
   button.setAttribute(
     'aria-label',
-    `${pin.name} (${pin.conquestState === 'CONQUERED' ? '정복 완료' : '미정복'})`,
+    `${pin.name} (${pin.conquestState === 'CONQUERED' ? '정복 완료' : '미정복'}${ratingText})`,
   );
   const img = document.createElement('img');
   img.src = pin.conquestState === 'CONQUERED' ? pinConquered : pinUnconquered;
@@ -133,6 +169,8 @@ function pinElement(pin: MapPin, selected: boolean, onClick: () => void) {
   label.className = styles.pinLabel;
   label.textContent = pin.name;
   button.append(img, label);
+  const chip = ratingChip(pin.rating);
+  if (chip) button.append(chip);
   button.addEventListener('click', (event) => {
     // 핀을 누른 것은 지도를 누른 것으로 치지 않는다 (간단한 지도)
     event.stopPropagation();

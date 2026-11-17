@@ -37,6 +37,8 @@ export type MapRestaurant = {
   conquestState: ConquestState;
   conqueredInPastSeason: boolean;
   isSaved: boolean;
+  /** 신뢰 별점. 리뷰 5개 미만이면 score null (핀 옆 "평가 3/5") */
+  rating: { score: number | null; reviewCount: number };
 };
 
 /** mineOnly: 내가 찜한 곳·정복한 곳만 */

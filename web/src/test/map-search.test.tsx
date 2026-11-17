@@ -653,6 +653,73 @@ describe('음식점 상세 (REST-01)', () => {
     expect(router.state.location.pathname).toBe('/reviews/9');
   });
 
+  it('리뷰 5개 전에는 별점 숫자 대신 모이는 중(3/5)과 남은 평가 수, 첫 정복 보상을 보여 준다', async () => {
+    mockApi({
+      'GET /restaurants/:id': ok({
+        restaurantId: 4,
+        kakaoPlaceId: '1',
+        name: '이가네떡볶이',
+        status: 'A',
+        categoryId: 5,
+        categoryName: '분식',
+        categoryDetail: '김밥/만두/분식',
+        phone: '02-123-4567',
+        roadAddress: '서울 강서구 가양로 12',
+        jibunAddress: null,
+        sigunguName: '강서구',
+        dongName: '가양동',
+        lat: 37.56,
+        lng: 126.85,
+        distanceM: null,
+        kakaoPlaceUrl: 'https://place.map.kakao.com/1',
+        businessHours: null,
+        businessStatus: null,
+        rating: { score: null, reviewCount: 3 },
+        myOverall: {
+          score: 4.3,
+          items: [
+            { key: 'taste', average: 4.2, weightPercent: 30 },
+            { key: 'cleanliness', average: 4.3, weightPercent: 30 },
+            { key: 'portion', average: null, weightPercent: null },
+            { key: 'service', average: 4.5, weightPercent: 20 },
+            { key: 'price', average: 4.2, weightPercent: 20 },
+          ],
+        },
+        hasMapae: true,
+        stats: {
+          cleanliness: 4.3,
+          portion: null,
+          service: 4.5,
+          price: 4.2,
+          revisitIntentRate: 81,
+          localVisitRate: 72,
+          revisitRate: 38,
+          textReviewCount: 40,
+          photoReviewCount: 20,
+          visitCount: 128,
+          currentSeasonConquerorCount: 12,
+        },
+        my: {
+          conquestState: 'NOT_CONQUERED',
+          conqueredInPastSeason: false,
+          conqueredAt: '2026-09-14T12:00:00+09:00',
+          myScore: null,
+          myReviewId: null,
+          movingVisitId: null,
+          isSaved: false,
+        },
+      }),
+    });
+    renderRoute('/restaurants/4');
+
+    const card = await screen.findByRole('region', { name: '별점이 모이는 중' });
+    expect(card).toHaveTextContent('인증 평가 3 / 5');
+    expect(card).toHaveTextContent('2명만 더 평가하면 신뢰 별점이 공개돼요');
+    expect(card).toHaveTextContent('지금 정복하면 새 가게 첫 정복 보상 +100P');
+    expect(within(card).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '3');
+    expect(screen.queryByText('맛 별점')).not.toBeInTheDocument();
+  });
+
   it('없는 가게면 안내한다', async () => {
     mockApi({
       'GET /restaurants/:id': fail(404, 'RESTAURANT_NOT_FOUND', '가게를 찾을 수 없어요.'),

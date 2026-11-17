@@ -31,28 +31,96 @@
 
 .ratingRow {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  margin-top: 4px;
+  gap: 8px;
+  margin-top: 6px;
 }
 
+/* 맛 별점 크게: ★ 4.4 맛 별점 · 인증 평가 128 */
 .rating {
-  font-size: 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   font-weight: 700;
-  line-height: 1.5;
   color: var(--mk-forest);
 }
 
-.gap {
-  display: inline-block;
-  width: 12px;
+.bigStar {
+  align-self: center;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.bigScore {
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: -0.5px;
 }
 
 /* "인증 평가 128" */
 .reviewCount {
-  font-size: 11px;
+  margin-left: 4px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--mk-subtle);
+}
+
+/* 리뷰 5개 전: 별점이 모이는 중 */
+.collecting {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--mk-green-50);
+}
+
+.collectingTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mk-forest);
+}
+
+.collectingBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--mk-forest);
+}
+
+.collectingBar > span {
+  flex: 1;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--mk-white);
+}
+
+.collectingBar > span > span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--mk-green);
+}
+
+.collectingText {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--mk-ink);
+  word-break: keep-all;
+}
+
+.collectingReward {
+  align-self: flex-start;
+  padding: 5px 10px;
+  border-radius: 10px;
+  background: var(--mk-cream);
+  font-size: 12px;
+  font-weight: 700;
+  color: #b66a10;
 }
 
 /* Figma "음식점 상세 · 마패": 가게 분류 아래 배너 346×58, 둥글기 14 */
@@ -283,8 +351,7 @@
 }
 
 .tasteLabel {
-  margin-left: 6px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--mk-forest);
 }

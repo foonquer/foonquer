@@ -2,7 +2,7 @@ import { useId, useState, type CSSProperties } from 'react';
 import styles from './StarRating.module.css';
 
 /** 꼭짓점이 둥글고 통통한 별 (24×24) */
-const STAR =
+export const STAR_PATH =
   'M11.09 3.49Q12.00 1.60 12.91 3.49L14.61 7.06Q15.17 8.23 16.46 8.40L20.38 8.92Q22.46 9.20 20.94 10.65L18.08 13.37Q17.14 14.27 17.37 15.55L18.09 19.43Q18.47 21.50 16.62 20.50L13.14 18.62Q12.00 18.00 10.86 18.62L7.38 20.50Q5.53 21.50 5.91 19.43L6.63 15.55Q6.86 14.27 5.92 13.37L3.06 10.65Q1.54 9.20 3.62 8.92L7.54 8.40Q8.83 8.23 9.39 7.06Z';
 
 /** 채운 별의 금빛 (위가 밝다) */
@@ -23,7 +23,7 @@ export function StarIcon() {
       <defs>
         <GoldGradient id={`${id}-g`} />
       </defs>
-      <path d={STAR} fill={`url(#${id}-g)`} className={styles.full} />
+      <path d={STAR_PATH} fill={`url(#${id}-g)`} className={styles.full} />
     </svg>
   );
 }
@@ -54,7 +54,7 @@ function Star({
       data-pop={pop}
       style={{ '--delay': `${delay}ms` } as CSSProperties}
     >
-      <path d={STAR} className={styles.empty} />
+      <path d={STAR_PATH} className={styles.empty} />
       {fill > 0 && (
         <>
           <defs>
@@ -64,7 +64,7 @@ function Star({
             </clipPath>
           </defs>
           <g clipPath={`url(#${id}-c)`}>
-            <path d={STAR} fill={`url(#${id}-g)`} className={styles.full} />
+            <path d={STAR_PATH} fill={`url(#${id}-g)`} className={styles.full} />
             <ellipse
               cx="8.4"
               cy="9.9"
